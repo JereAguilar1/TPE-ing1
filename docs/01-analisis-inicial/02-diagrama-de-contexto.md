@@ -43,9 +43,9 @@ flowchart TB
 
     T <-->|"autorización delegada, suscripción a cambios,<br/>lectura de mensajes de viaje"| PC
     T <-->|"detalles, actualizaciones y cancelaciones<br/>de reservas vía APIs estándar"| AE
-    T <-->|" "| HO
-    T <-->|" "| RE
-    T <-->|" "| GDS
+    T <--> HO
+    T <--> RE
+    T <--> GDS
     T <-.->|"punto de extensión previsto"| TB
     T -->|"derivación de casos de soporte"| AG
     T -->|"publicación voluntaria de un resumen<br/>de itinerario"| RS

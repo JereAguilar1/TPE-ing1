@@ -30,12 +30,12 @@ erDiagram
         date inicio
         date fin
         string destino_principal
-        string estado "planificado|en_curso|completado|archivado"
+        string estado "planificado, en curso, completado, archivado"
     }
     RESERVA {
         id identificador
         string codigo_confirmacion
-        string estado "confirmada|modificada|cancelada"
+        string estado "confirmada, modificada, cancelada"
         timestamp obtenida_en
         string confianza_extraccion
     }
@@ -47,7 +47,7 @@ erDiagram
         string destino
     }
     TIPO_SEGMENTO {
-        string nombre "vuelo|hotel|auto|tren|autobus"
+        string nombre "vuelo, hotel, auto, tren, autobus"
     }
 ```
 
