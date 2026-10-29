@@ -28,5 +28,5 @@ Punto de entrada: **[docs/Home.md](docs/Home.md)**.
 
 | Entrega | Alcance | Estado |
 |---|---|---|
-| 1ra entrega | Análisis inicial + 4 iteraciones de ADD documentadas | Iteración 1 completa; 2–4 planificadas |
+| 1ra entrega | Análisis inicial + 4 iteraciones de ADD documentadas | Iteraciones 1, 2 y 3 completas; 4 planificada |
 | 2da entrega | Módulo avanzado (Opción A o B) + prototipo trazable | Pendiente |

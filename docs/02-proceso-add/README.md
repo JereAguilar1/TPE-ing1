@@ -32,24 +32,23 @@ se anuncia la elegida), y el paso 7 es donde se verifica honestamente qué qued�
 | Iteración | Objetivo | Estado |
 |---|---|---|
 | [**Iteración 1**](iteracion-1/README.md) | Establecer la estructura general del sistema | ✅ Completa |
-| [**Iteración 2**](iteracion-2-plan.md) | Identificar las estructuras que soportan la funcionalidad primaria | 📋 Planificada |
-| [**Iteración 3**](iteracion-3-plan.md) | Refinar para rendimiento, disponibilidad y escalabilidad | 📋 Planificada |
+| [**Iteración 2**](iteracion-2/README.md) | Identificar las estructuras que soportan la funcionalidad primaria | ✅ Completa |
+| [**Iteración 3**](iteracion-3/README.md) | Refinar para rendimiento, disponibilidad y escalabilidad | ✅ Completa |
 | [**Iteración 4**](iteracion-4-plan.md) | Refinar para interoperabilidad, seguridad y evolucionabilidad | 📋 Planificada |
 
 El fundamento de este orden está en el [plan de iteraciones](../00-gestion/plan-de-iteraciones.md#por-qué-este-orden-y-no-otro).
 
 ## Estado global de los drivers
 
-Resumen del [kanban de drivers](iteracion-1/paso-7-analisis.md#kanban-de-drivers) al cierre de la
-iteración 1. En ADD, el avance se mide por cuántos drivers quedaron tratados, no por cuántos
+Resumen del [kanban de drivers](iteracion-3/paso-7-analisis.md#kanban-de-drivers) al cierre de la
+iteración 3. En ADD, el avance se mide por cuántos drivers quedaron tratados, no por cuántos
 diagramas se dibujaron.
 
 | Estado | Cantidad | Qué significa |
 |---|---|---|
-| ⬜ No tratado | 15 | Ninguna decisión tomada todavía lo aborda |
-| 🟨 Parcialmente tratado | 27 | Hay una decisión estructural que lo habilita, pero falta refinamiento |
-| 🟩 Completamente tratado | 11 | Las decisiones tomadas lo satisfacen y se puede verificar |
-| **Total** | **53** | 15 RF + 18 QA + 10 CON + 10 CRN |
+| ⬜ No tratado | 6 | 5 drivers reservados para la iteración 4 (`QA-14`, `QA-17`, `QA-18`, `CON-10`, `CRN-10`) + `CON-05` (2da entrega) |
+| 🟨 Parcialmente tratado | 14 | Hay decisiones que lo sostienen; resta cierre en la iteración 4 o calibración empírica en el prototipo |
+| 🟩 Completamente tratado | 36 | Las decisiones tomadas lo satisfacen y tienen criterio verificable |
+| **Total** | **56** | 15 RF + 18 QA + 10 CON + 13 CRN (`CRN-01`…`CRN-13`) |
 
-Que al cierre de la primera iteración **ningún requisito funcional** esté completamente tratado es
-lo esperado: esta iteración decidió la forma del sistema, no el comportamiento de sus partes.
+Evolución por iteración: **Iteración 1** (`15 ⬜ · 27 🟨 · 11 🟩 = 53`) → **Iteración 2** (`8 ⬜ · 28 🟨 · 19 🟩 = 55`) → **Iteración 3** (`6 ⬜ · 14 🟨 · 36 🟩 = 56`).

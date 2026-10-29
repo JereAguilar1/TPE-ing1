@@ -43,8 +43,8 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 |---|---|
 | [Resumen del proceso](02-proceso-add/README.md) | — |
 | [Iteración 1 — Estructura general del sistema](02-proceso-add/iteracion-1/README.md) | ✅ Completa |
-| [Iteración 2 — Estructuras para la funcionalidad primaria](02-proceso-add/iteracion-2-plan.md) | 📋 Planificada |
-| [Iteración 3 — Refinamiento para rendimiento, disponibilidad y escalabilidad](02-proceso-add/iteracion-3-plan.md) | 📋 Planificada |
+| [Iteración 2 — Estructuras para la funcionalidad primaria](02-proceso-add/iteracion-2/README.md) | ✅ Completa |
+| [Iteración 3 — Refinamiento para rendimiento, disponibilidad y escalabilidad](02-proceso-add/iteracion-3/README.md) | ✅ Completa |
 | [Iteración 4 — Refinamiento para interoperabilidad, seguridad y evolucionabilidad](02-proceso-add/iteracion-4-plan.md) | 📋 Planificada |
 
 ## 3. Decisiones arquitectónicas (ADR)
@@ -62,6 +62,16 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 | [ADR-0007](03-adr/ADR-0007-identidad-y-comparticion.md) | OIDC para identidad, delegación OAuth y compartición por designados | 1 |
 | [ADR-0008](03-adr/ADR-0008-alcance-disponibilidad.md) | Alcance y forma de medición del objetivo de disponibilidad | 1 |
 | [ADR-0009](03-adr/ADR-0009-contratos-spec-driven.md) | Contratos (OpenAPI/AsyncAPI) como artefactos de primera clase | 1 |
+| `ADR-0010`…`ADR-0017` | Decisiones `D10`–`D17` de funcionalidad primaria ([ver Iteración 2](02-proceso-add/iteracion-2/paso-4-alternativas.md)) | 2 |
+| [ADR-0018](03-adr/ADR-0018-consistencia-datos-multirregion.md) | Consistencia multirregión con región primaria por usuario y testigo transregional | 3 |
+| [ADR-0019](03-adr/ADR-0019-cache-camino-lectura-arranque-movil.md) | Caché multinivel del camino de lectura y arranque móvil | 3 |
+| [ADR-0020](03-adr/ADR-0020-contrapresion-y-sobrecarga.md) | Contrapresión, colas con prioridad y modos automáticos de degradación | 3 |
+| [ADR-0021](03-adr/ADR-0021-estrategia-autoescalado.md) | Autoescalado híbrido y separación operativa de `itinerary` | 3 |
+| [ADR-0022](03-adr/ADR-0022-despliegue-progresivo-y-reversion.md) | Entrega progresiva canaria por región, reversión automática y *expand/contract* | 3 |
+| [ADR-0023](03-adr/ADR-0023-particionamiento-y-crecimiento.md) | Particionamiento por *hash* consistente (`64` *buckets*) y archivo frío | 3 |
+| [ADR-0024](03-adr/ADR-0024-cortacircuitos-reintentos-y-cuotas.md) | Mamparos, cortacircuitos, cola persistente y gobierno de cuotas de terceros | 3 |
+| [ADR-0025](03-adr/ADR-0025-observabilidad-sli-slo-presupuesto-error.md) | Observabilidad con OpenTelemetry y gobierno por presupuesto de error | 3 |
+| [ADR-0026](03-adr/ADR-0026-modelo-costo-y-camino-escalonado.md) | Modelo de costo mensual y camino escalonado en tres etapas | 3 |
 
 ## 4. Vistas arquitectónicas
 
@@ -71,6 +81,7 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 | [Módulos — nivel 1](04-vistas/vista-modulos-nivel-1.md) | Descomposición en subsistemas y sus dependencias |
 | [Componentes y conectores — nivel 1](04-vistas/vista-cyc-nivel-1.md) | Elementos en ejecución y cómo se comunican |
 | [Despliegue — nivel 1](04-vistas/vista-despliegue-nivel-1.md) | Asignación a infraestructura multirregión |
+| [Despliegue — nivel 2](04-vistas/vista-despliegue-nivel-2.md) | Interior regional en 3 AZs, topología de datos sin `R-1`/`R-4`, dimensionamiento y autoescalado |
 
 ## 5. Trazabilidad
 
