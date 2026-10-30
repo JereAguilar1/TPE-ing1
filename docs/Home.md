@@ -41,11 +41,11 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 
 | Página | Estado |
 |---|---|
-| [Resumen del proceso](02-proceso-add/README.md) | — |
+| [Resumen del proceso](02-proceso-add/README.md) | ✅ 1ra entrega cerrada (58/58 drivers atendidos) |
 | [Iteración 1 — Estructura general del sistema](02-proceso-add/iteracion-1/README.md) | ✅ Completa |
 | [Iteración 2 — Estructuras para la funcionalidad primaria](02-proceso-add/iteracion-2/README.md) | ✅ Completa |
 | [Iteración 3 — Refinamiento para rendimiento, disponibilidad y escalabilidad](02-proceso-add/iteracion-3/README.md) | ✅ Completa |
-| [Iteración 4 — Refinamiento para interoperabilidad, seguridad y evolucionabilidad](02-proceso-add/iteracion-4-plan.md) | 📋 Planificada |
+| [Iteración 4 — Refinamiento para interoperabilidad, seguridad, evolucionabilidad y uso internacional](02-proceso-add/iteracion-4/README.md) | ✅ Completa |
 
 ## 3. Decisiones arquitectónicas (ADR)
 
@@ -72,6 +72,15 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 | [ADR-0024](03-adr/ADR-0024-cortacircuitos-reintentos-y-cuotas.md) | Mamparos, cortacircuitos, cola persistente y gobierno de cuotas de terceros | 3 |
 | [ADR-0025](03-adr/ADR-0025-observabilidad-sli-slo-presupuesto-error.md) | Observabilidad con OpenTelemetry y gobierno por presupuesto de error | 3 |
 | [ADR-0026](03-adr/ADR-0026-modelo-costo-y-camino-escalonado.md) | Modelo de costo mensual y camino escalonado en tres etapas | 3 |
+| [ADR-0027](03-adr/ADR-0027-versionado-y-evolucion-de-contratos.md) | Evolución compatible de contratos por omisión, negociación de versión mayor y `SemVer` en complementos | 4 |
+| [ADR-0028](03-adr/ADR-0028-autorizacion-comparticion-y-publicacion.md) | Autorización declarativa ABAC con vales firmados, OTP para designados sin cuenta y publicación por lista blanca | 4 |
+| [ADR-0029](03-adr/ADR-0029-cifrado-custodia-y-rotacion-de-claves.md) | Cifrado por sobres (`KEK_region` / `DEK_u`), custodia mTLS exclusiva, detección `≤ 5 min` y revocación `≤ 15 min` | 4 |
+| [ADR-0030](03-adr/ADR-0030-auditoria-y-supresion-datos-personales.md) | Bitácora de auditoría inmutable y supresión verificable en dos fases sobre ambos planos (`≤ 30 días`) | 4 |
+| [ADR-0031](03-adr/ADR-0031-residencia-de-datos-por-region.md) | Residencia de datos en tres clases y testigo transregional cifrado jurisdiccional (`R-6` cerrado) | 4 |
+| [ADR-0032](03-adr/ADR-0032-internacionalizacion-y-localizacion.md) | Dominio neutral al idioma, catálogos ICU en CDN y formateo CLDR con instantes `UTC + IANA TZ` | 4 |
+| [ADR-0033](03-adr/ADR-0033-capacidades-nativas-gps-y-degradacion.md) | Evaluación espacial en el dispositivo móvil con geocodificación previa y degradación sin GPS | 4 |
+| [ADR-0034](03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) | Punto de extensión del módulo avanzado nº 14 (Opción A y B) y recorte del prototipo por ASRs | 4 |
+| [ADR-0035](03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) | Ingesta sin OAuth mediante reenvío verificado / credenciales delegadas y flujo asistido ante formato desconocido | 4 |
 
 ## 4. Vistas arquitectónicas
 
@@ -79,10 +88,12 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 |---|---|
 | [Contexto](04-vistas/vista-contexto.md) | El sistema como caja negra frente a su entorno |
 | [Módulos — nivel 1](04-vistas/vista-modulos-nivel-1.md) | Descomposición en subsistemas y sus dependencias |
+| [Módulos — nivel 2 (adaptadores, identidad y extensión)](04-vistas/vista-modulos-adaptadores.md) | Subsistema de complementos versionados, interior de `identity-access` y `sharing`, `locales-icu` y elemento nº 14 |
 | [Componentes y conectores — nivel 1](04-vistas/vista-cyc-nivel-1.md) | Elementos en ejecución y cómo se comunican |
 | [Despliegue — nivel 1](04-vistas/vista-despliegue-nivel-1.md) | Asignación a infraestructura multirregión |
 | [Despliegue — nivel 2](04-vistas/vista-despliegue-nivel-2.md) | Interior regional en 3 AZs, topología de datos sin `R-1`/`R-4`, dimensionamiento y autoescalado |
+| [Seguridad, privacidad y residencia de datos](04-vistas/vista-seguridad-y-datos.md) | Fronteras de confianza, cifrado por sobres, cierre gráfico de `R-6`, catálogo de PII y supresión en ambos planos |
 
 ## 5. Trazabilidad
 
-[Matriz driver → decisión → vista → ADR](05-trazabilidad/matriz-drivers-decisiones.md)
+[Matriz driver → decisión → vista → ADR (58/58 drivers · 100 %)](05-trazabilidad/matriz-drivers-decisiones.md)

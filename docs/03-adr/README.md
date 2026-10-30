@@ -65,10 +65,19 @@ contrato), documentadas con sus alternativas en
 | [ADR-0025](ADR-0025-observabilidad-sli-slo-presupuesto-error.md) | Observabilidad con OpenTelemetry, correlación extremo a extremo y gobierno por presupuesto de error | `aceptado` | CRN-03, QA-05, QA-07, CON-09 |
 | [ADR-0026](ADR-0026-modelo-costo-y-camino-escalonado.md) | Modelo de costo mensual y camino escalonado en tres etapas sin rediseño estructural | `aceptado` | CRN-08, QA-05, QA-08, QA-09 |
 
-### Iteración 4 — Interoperabilidad, seguridad y evolucionabilidad
+### Iteración 4 — Interoperabilidad, seguridad, evolucionabilidad y uso internacional
 
-Pendiente (`ADR-0027` a `ADR-0035`). Los temas previstos están en el plan de la
-[iteración 4](../02-proceso-add/iteracion-4-plan.md#adrs-previstos).
+| ADR | Decisión | Estado | Drivers principales |
+|---|---|---|---|
+| [ADR-0027](ADR-0027-versionado-y-evolucion-de-contratos.md) | Evolución compatible de contratos por omisión, negociación de versión mayor y `SemVer` en complementos | `aceptado` | CRN-14, QA-10, QA-15, QA-07, CON-04 |
+| [ADR-0028](ADR-0028-autorizacion-comparticion-y-publicacion.md) | Autorización declarativa ABAC con vales firmados, OTP para designados sin cuenta y publicación por lista blanca | `aceptado` | QA-12, QA-14, RF-11, RF-13, AMB-10 |
+| [ADR-0029](ADR-0029-cifrado-custodia-y-rotacion-de-claves.md) | Cifrado por sobres (`KEK_region` / `DEK_u`), custodia mTLS exclusiva, detección `≤ 5 min` y revocación regional `≤ 15 min` | `aceptado` | QA-13, CRN-05, CON-08, RF-01 |
+| [ADR-0030](ADR-0030-auditoria-y-supresion-datos-personales.md) | Bitácora de auditoría inmutable y supresión verificable en dos fases sobre ambos planos (`≤ 30 días`) | `aceptado` | QA-14, CON-10, QA-09, CRN-08 |
+| [ADR-0031](ADR-0031-residencia-de-datos-por-region.md) | Residencia de datos en tres clases y testigo transregional cifrado bajo custodia jurisdiccional (`R-6` cerrado) | `aceptado` | CRN-15, CON-10, QA-18, QA-05 |
+| [ADR-0032](ADR-0032-internacionalizacion-y-localizacion.md) | Dominio neutral al idioma, catálogos ICU externalizados en CDN y formateo local CLDR con `UTC + IANA TZ` | `aceptado` | QA-18, CRN-10, RF-15, QA-03 |
+| [ADR-0033](ADR-0033-capacidades-nativas-gps-y-degradacion.md) | Evaluación espacial en el dispositivo móvil con geocodificación previa y degradación automática sin GPS | `aceptado` | QA-17, QA-03, CON-10, RF-09 |
+| [ADR-0034](ADR-0034-punto-de-extension-modulo-avanzado.md) | Integración del módulo avanzado de la 2da entrega como elemento autónomo nº 14 y recorte del prototipo por ASRs | `aceptado` | CON-06, CON-05, CON-A4, QA-04 |
+| [ADR-0035](ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) | Ingesta sin OAuth mediante reenvío verificado / credenciales delegadas y flujo asistido ante formato desconocido | `aceptado` | CON-08, QA-11, QA-13, RF-01, RF-03 |
 
 ## Plantilla
 

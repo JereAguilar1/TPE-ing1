@@ -23,7 +23,7 @@
 - [Iteración 1 ✅](02-proceso-add/iteracion-1/README.md)
 - [Iteración 2 ✅](02-proceso-add/iteracion-2/README.md)
 - [Iteración 3 ✅](02-proceso-add/iteracion-3/README.md)
-- [Iteración 4 📋](02-proceso-add/iteracion-4-plan.md)
+- [Iteración 4 ✅](02-proceso-add/iteracion-4/README.md)
 
 **ADRs**
 - [Índice](03-adr/README.md)
@@ -31,9 +31,11 @@
 **Vistas**
 - [Contexto](04-vistas/vista-contexto.md)
 - [Módulos N1](04-vistas/vista-modulos-nivel-1.md)
+- [Módulos Adaptadores N2](04-vistas/vista-modulos-adaptadores.md)
 - [C&C N1](04-vistas/vista-cyc-nivel-1.md)
 - [Despliegue N1](04-vistas/vista-despliegue-nivel-1.md)
 - [Despliegue N2](04-vistas/vista-despliegue-nivel-2.md)
+- [Seguridad y Datos](04-vistas/vista-seguridad-y-datos.md)
 
 **Trazabilidad**
 - [Matriz de drivers](05-trazabilidad/matriz-drivers-decisiones.md)

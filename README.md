@@ -19,14 +19,14 @@ Punto de entrada: **[docs/Home.md](docs/Home.md)**.
 |---|---|
 | [Gestión](docs/00-gestion/) | Equipo, bitácora de evolución, plan de iteraciones |
 | [Análisis inicial](docs/01-analisis-inicial/) | Alcance, contexto, requisitos, escenarios de calidad, árbol de utilidad |
-| [Proceso ADD](docs/02-proceso-add/) | Las iteraciones de diseño, paso por paso |
-| [ADRs](docs/03-adr/) | Decisiones arquitectónicas en formato MADR |
-| [Vistas](docs/04-vistas/) | Vistas de contexto, módulos, C&C y despliegue |
-| [Trazabilidad](docs/05-trazabilidad/) | Matriz driver → decisión → vista → ADR |
+| [Proceso ADD](docs/02-proceso-add/) | Las 4 iteraciones de diseño completas, paso por paso |
+| [ADRs](docs/03-adr/) | Decisiones arquitectónicas en formato MADR (`ADR-0001` a `ADR-0035`) |
+| [Vistas](docs/04-vistas/) | Vistas de contexto, módulos (N1/N2), C&C, despliegue (N1/N2) y seguridad/datos |
+| [Trazabilidad](docs/05-trazabilidad/) | Matriz completa (100 %) driver → decisión → vista → ADR |
 
 ## Estado
 
 | Entrega | Alcance | Estado |
 |---|---|---|
-| 1ra entrega | Análisis inicial + 4 iteraciones de ADD documentadas | Iteraciones 1, 2 y 3 completas; 4 planificada |
-| 2da entrega | Módulo avanzado (Opción A o B) + prototipo trazable | Pendiente |
+| 1ra entrega | Análisis inicial + 4 iteraciones de ADD documentadas | ✅ Completa (iteraciones 1, 2, 3 y 4 cerradas; 58/58 drivers trazados) |
+| 2da entrega | Módulo avanzado (Opción A o B) + prototipo trazable | Pendiente *(punto de extensión verificado en `ADR-0034`)* |
