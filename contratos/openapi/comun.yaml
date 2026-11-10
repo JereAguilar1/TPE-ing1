@@ -1,0 +1,451 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — componentes comunes
+  version: 1.0.0
+  description: |
+    Esquemas, parámetros, respuestas y esquemas de seguridad compartidos por todos los contratos
+    OpenAPI y por el contrato AsyncAPI de eventos de dominio. No expone rutas.
+
+    Trazabilidad:
+    - Modelo canónico `Reserva` / `Segmento` / `Viaje`: ADR-0010, ADR-0011 (iteración 2, §5.2).
+    - `precision` en inicio y fin de segmento: hallazgo de la validación contra «tren» (iteración 2, paso 7).
+    - Instantes en UTC con zona horaria IANA aparte: ADR-0032.
+    - Cabecera `X-Min-Version` (lectura causal): ADR-0018.
+    - `Idempotency-Key`: ADR-0014.
+    - `429` con `Retry-After`, `X-Deadline-Ms`: ADR-0020.
+    - `traceparent`: ADR-0025.
+    - Versionado por tipo de medio `application/vnd.trotamundos.v{N}+json`: ADR-0027.
+paths: {}
+components:
+  securitySchemes:
+    oidc:
+      type: openIdConnect
+      openIdConnectUrl: https://id.trotamundos.app/.well-known/openid-configuration
+      description: Sesión OIDC del viajero (ADR-0007). El token transporta `region_primaria` (ADR-0018).
+    valeInterno:
+      type: apiKey
+      in: header
+      name: X-Vale-Autorizacion
+      description: |
+        Vale JWS de corta vida (TTL 60 s) emitido por `motor-autorizacion-abac` de `identity-access`
+        y ligado a un recurso concreto (ADR-0028). Lo usan las llamadas internas entre servicios,
+        además de mTLS.
+    firmaWebhook:
+      type: apiKey
+      in: header
+      name: X-Firma
+      description: Firma HMAC o JWS del emisor externo, verificada por el receptor antes de encolar (ADR-0020).
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Clave enviada por el cliente. Dos comandos con la misma clave producen un solo efecto y la misma respuesta (ADR-0014).
+      schema: { type: string, format: uuid }
+    MinVersion:
+      name: X-Min-Version
+      in: header
+      required: false
+      description: Último `versionUsuario` que el cliente vio en una mutación. Si la réplica local está atrasada, el BFF garantiza *read-your-writes* (ADR-0018).
+      schema: { type: integer, format: int64, minimum: 0 }
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      required: false
+      description: Solo se usa si el usuario no fijó un idioma en sus preferencias (ADR-0032).
+      schema: { type: string, example: es-AR }
+    Traceparent:
+      name: traceparent
+      in: header
+      required: false
+      description: Contexto de traza W3C, propagado de punta a punta (ADR-0025).
+      schema: { type: string }
+    DeadlineMs:
+      name: X-Deadline-Ms
+      in: header
+      required: false
+      description: Plazo restante en milisegundos, fijado por `api-gateway` y descontado por cada servicio (ADR-0020). Solo en llamadas internas.
+      schema: { type: integer, minimum: 0 }
+    UsuarioId:
+      name: X-Usuario-Id
+      in: header
+      required: true
+      description: Usuario sobre el que se opera, propagado por el BFF y ligado al vale interno. Es la clave de partición (ADR-0012).
+      schema: { $ref: '#/components/schemas/Id' }
+    ViajeId:
+      name: id
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Id' }
+    ReservaId:
+      name: id
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Id' }
+
+  headers:
+    VersionUsuario:
+      description: Contador monótono de versión del usuario tras la mutación; el cliente lo reenvía en `X-Min-Version` (ADR-0018).
+      schema: { type: integer, format: int64 }
+    RetryAfter:
+      description: Segundos a esperar antes de reintentar (2 a 8 s, aleatorio) (ADR-0020).
+      schema: { type: integer, minimum: 1 }
+    ETag:
+      description: Validador para respuestas condicionales `304 Not Modified` (ADR-0019).
+      schema: { type: string }
+    Deprecation:
+      description: Presente cuando la versión de representación solicitada está en retiro (ADR-0027).
+      schema: { type: string }
+    Sunset:
+      description: Fecha de retiro de la versión de representación solicitada, al menos 90 días después del anuncio (ADR-0027).
+      schema: { type: string }
+
+  responses:
+    SolicitudInvalida:
+      description: La petición no cumple el contrato o la validación del descriptor de tipo.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NoAutenticado:
+      description: Falta o es inválida la sesión OIDC.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NoEncontrado:
+      description: |
+        El recurso no existe **o** el solicitante no tiene acceso. Ambos casos responden igual, para
+        no revelar existencia (ADR-0028).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    Conflicto:
+      description: Conflicto de versión o de estado.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    DemasiadasPeticiones:
+      description: Se superó la cubeta de fichas por usuario (60 req/min, ráfaga 20) (ADR-0020).
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NoDisponible:
+      description: Función apagada por un modo de degradación (`Pico elevado` o `Disrupción masiva`) o plazo agotado (ADR-0020).
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+
+  schemas:
+    Id:
+      type: string
+      format: uuid
+
+    Problema:
+      type: object
+      description: Error con formato RFC 9457 (*problem details*).
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        correlationId: { type: string }
+        errores:
+          type: array
+          items:
+            type: object
+            required: [campo, mensaje]
+            properties:
+              campo: { type: string }
+              mensaje: { type: string }
+
+    Fuente:
+      type: string
+      enum: [correo, proveedor, manual]
+      description: Origen de una observación. Determina la precedencia al fusionar (ADR-0013).
+
+    Lugar:
+      type: object
+      required: [nombre, pais, zonaHoraria]
+      properties:
+        nombre: { type: string }
+        codigo:
+          type: string
+          description: Opcional; las estaciones de tren y autobús no tienen un código universal (iteración 2, paso 7).
+        esquemaDeCodigo:
+          type: string
+          examples: [IATA, UIC, interno]
+        pais: { type: string, pattern: '^[A-Z]{2}$', description: ISO 3166-1 alfa-2 }
+        coordenadas:
+          type: object
+          required: [lat, lon]
+          properties:
+            lat: { type: number, minimum: -90, maximum: 90 }
+            lon: { type: number, minimum: -180, maximum: 180 }
+        zonaHoraria: { type: string, description: Zona IANA, examples: [America/Argentina/Buenos_Aires] }
+
+    Extremo:
+      type: object
+      description: Inicio o fin de un segmento.
+      required: [instante, precision, zonaHoraria, lugar]
+      properties:
+        instante: { type: string, format: date-time, description: Instante en UTC (ADR-0032) }
+        precision:
+          type: string
+          enum: [instante, dia]
+          description: '`dia` para boletos abiertos de tren o autobús que valen «ese día», sin hora.'
+        zonaHoraria: { type: string }
+        lugar: { $ref: '#/components/schemas/Lugar' }
+
+    Identificador:
+      type: object
+      required: [emisor, codigo]
+      description: Par que identifica una reserva ante un emisor. Una reserva tiene un conjunto (ADR-0013).
+      properties:
+        emisor: { type: string, examples: [aerolinea:AR, agencia:despegar] }
+        codigo: { type: string }
+
+    Segmento:
+      type: object
+      required: [id, tipo, versionTipo, orden, inicio, fin, operador, estado, detalle]
+      properties:
+        id: { $ref: '#/components/schemas/Id' }
+        tipo:
+          type: string
+          description: Clave del registro de tipos (ADR-0011). No es un enum cerrado, para que un tipo nuevo no rompa el contrato.
+          examples: [vuelo, hotel, auto, tren, autobus]
+        versionTipo: { type: integer, minimum: 1, description: Versión del descriptor contra la que se validó el detalle (ADR-0027) }
+        orden: { type: integer, minimum: 0 }
+        inicio: { $ref: '#/components/schemas/Extremo' }
+        fin: { $ref: '#/components/schemas/Extremo' }
+        operador: { type: string }
+        referencia: { type: [string, 'null'], description: 'Número de vuelo, de tren, línea, habitación…' }
+        estado: { type: string, enum: [confirmado, cancelado] }
+        detalle:
+          type: object
+          description: Validado contra `esquemaDeDetalle` del descriptor `(tipo, versionTipo)`.
+          additionalProperties: true
+        fijados:
+          type: array
+          description: Campos fijados por una edición manual del usuario (ADR-0013).
+          items: { type: string }
+
+    EstadoReserva:
+      type: string
+      enum: [PorConfirmar, Confirmada, Cancelada, Finalizada, Descartada]
+
+    ValorEnDisputa:
+      type: object
+      required: [fuente, valor]
+      properties:
+        fuente: { $ref: '#/components/schemas/Fuente' }
+        valor: {}
+        observadoEn: { type: string, format: date-time }
+
+    ConflictoDeFuentes:
+      type: object
+      required: [id, campo, valores, estado]
+      properties:
+        id: { $ref: '#/components/schemas/Id' }
+        campo: { type: string, examples: ['segmentos[0].inicio.instante'] }
+        valores:
+          type: array
+          minItems: 2
+          items: { $ref: '#/components/schemas/ValorEnDisputa' }
+        estado: { type: string, enum: [Abierto, Resuelto] }
+
+    Reserva:
+      type: object
+      required: [id, estado, version, identificadores, segmentos, fuentes]
+      properties:
+        id: { $ref: '#/components/schemas/Id' }
+        estado: { $ref: '#/components/schemas/EstadoReserva' }
+        version: { type: integer, format: int64 }
+        identificadores:
+          type: array
+          items: { $ref: '#/components/schemas/Identificador' }
+        segmentos:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/Segmento' }
+        fuentes:
+          type: array
+          items: { $ref: '#/components/schemas/Fuente' }
+        banda:
+          type: string
+          enum: [alta, media]
+          description: Solo para reservas originadas en correo (ADR-0015).
+        conflictosAbiertos:
+          type: array
+          items: { $ref: '#/components/schemas/ConflictoDeFuentes' }
+        viajeId: { oneOf: [{ $ref: '#/components/schemas/Id' }, { type: 'null' }] }
+
+    EstadoViaje:
+      type: string
+      enum: [Planificado, EnCurso, Completado, Archivado, Eliminado, Cancelado]
+
+    Viaje:
+      type: object
+      required: [id, titulo, estado, desde, hasta, version, reservas]
+      properties:
+        id: { $ref: '#/components/schemas/Id' }
+        titulo: { type: string }
+        estado: { $ref: '#/components/schemas/EstadoViaje' }
+        desde: { type: string, format: date-time }
+        hasta: { type: string, format: date-time }
+        destinoPrincipal: { $ref: '#/components/schemas/Lugar' }
+        version: { type: integer, format: int64 }
+        reservas:
+          type: array
+          items: { $ref: '#/components/schemas/Reserva' }
+
+    ViajeResumen:
+      type: object
+      required: [id, titulo, estado, desde, hasta, cantidadReservas]
+      properties:
+        id: { $ref: '#/components/schemas/Id' }
+        titulo: { type: string }
+        estado: { $ref: '#/components/schemas/EstadoViaje' }
+        desde: { type: string, format: date-time }
+        hasta: { type: string, format: date-time }
+        destinoPrincipal: { type: string }
+        cantidadReservas: { type: integer, minimum: 0 }
+        proximoSegmento: { $ref: '#/components/schemas/Segmento' }
+
+    Panel:
+      type: object
+      description: |
+        Respuesta compuesta del panel en una sola ida y vuelta (UC-3). No incluye viajes
+        `Completado`, `Archivado` ni `Eliminado` (RF-08).
+      required: [viajesActivos, porConfirmar, conflictosAbiertos, versionUsuario]
+      properties:
+        viajesActivos:
+          type: array
+          items: { $ref: '#/components/schemas/Viaje' }
+        porConfirmar:
+          type: array
+          description: Reservas en banda media, fuera del itinerario confirmado (ADR-0015).
+          items: { $ref: '#/components/schemas/Reserva' }
+        conflictosAbiertos:
+          type: array
+          items:
+            type: object
+            required: [reservaId, conflicto]
+            properties:
+              reservaId: { $ref: '#/components/schemas/Id' }
+              conflicto: { $ref: '#/components/schemas/ConflictoDeFuentes' }
+        versionUsuario: { type: integer, format: int64 }
+
+    PanelResumen:
+      type: object
+      description: Variante compacta para el arranque móvil; el cuerpo serializado debe pesar 15 KB o menos (ADR-0019, QA-03).
+      required: [viajesActivos, cantidadPorConfirmar, cantidadConflictos, versionUsuario]
+      properties:
+        viajesActivos:
+          type: array
+          items: { $ref: '#/components/schemas/ViajeResumen' }
+        cantidadPorConfirmar: { type: integer, minimum: 0 }
+        cantidadConflictos: { type: integer, minimum: 0 }
+        versionUsuario: { type: integer, format: int64 }
+
+    SegmentoNuevo:
+      type: object
+      required: [tipo, inicio, fin, operador, detalle]
+      properties:
+        tipo: { type: string }
+        inicio: { $ref: '#/components/schemas/Extremo' }
+        fin: { $ref: '#/components/schemas/Extremo' }
+        operador: { type: string }
+        referencia: { type: string }
+        detalle: { type: object, additionalProperties: true }
+
+    ReservaNueva:
+      type: object
+      required: [segmentos]
+      properties:
+        identificadores:
+          type: array
+          description: Opcional; las cargas manuales suelen no tener código (ADR-0013).
+          items: { $ref: '#/components/schemas/Identificador' }
+        segmentos:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/SegmentoNuevo' }
+        viajeId:
+          $ref: '#/components/schemas/Id'
+          description: Si se indica, la asignación queda fijada.
+
+    EdicionReserva:
+      type: object
+      description: Edición manual. Cada campo tocado queda fijado (ADR-0013).
+      required: [version]
+      properties:
+        version: { type: integer, format: int64, description: Control de concurrencia optimista }
+        identificadores:
+          type: array
+          items: { $ref: '#/components/schemas/Identificador' }
+        segmentos:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/SegmentoNuevo'
+              - type: object
+                properties:
+                  id: { $ref: '#/components/schemas/Id' }
+
+    ResultadoComandoReserva:
+      type: object
+      required: [reserva, versionUsuario]
+      properties:
+        reserva: { $ref: '#/components/schemas/Reserva' }
+        viajeId: { $ref: '#/components/schemas/Id' }
+        versionUsuario: { type: integer, format: int64 }
+        posiblesDuplicados:
+          type: array
+          description: Candidatas por coincidencia difusa. Son solo sugerencias; el sistema nunca fusiona por parecido (ADR-0013).
+          items:
+            type: object
+            required: [reservaId]
+            properties:
+              reservaId: { $ref: '#/components/schemas/Id' }
+              motivo: { type: string }
+
+    SegmentoObservado:
+      type: object
+      required: [tipo, versionTipo, inicio, fin, operador, detalle]
+      properties:
+        tipo: { type: string }
+        versionTipo: { type: integer, minimum: 1 }
+        inicio: { $ref: '#/components/schemas/Extremo' }
+        fin: { $ref: '#/components/schemas/Extremo' }
+        operador: { type: string }
+        referencia: { type: string }
+        estado: { type: string, enum: [confirmado, cancelado] }
+        detalle: { type: object, additionalProperties: true }
+
+    ObservacionCanonica:
+      type: object
+      description: |
+        Lo que una fuente afirma sobre una reserva en un momento (ADR-0010). Es la salida común de
+        adaptadores y extractores. Se identifica por `(fuente, idDeFuente)` y se ordena por
+        `versionDeFuente` (ADR-0014).
+      required: [fuente, idDeFuente, versionDeFuente, identificadores, segmentos]
+      properties:
+        fuente: { $ref: '#/components/schemas/Fuente' }
+        idDeFuente: { type: string }
+        versionDeFuente: { type: string, format: date-time, description: 'Fecha de emisión en la fuente, no de llegada' }
+        identificadores:
+          type: array
+          items: { $ref: '#/components/schemas/Identificador' }
+        segmentos:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/SegmentoObservado' }
+        cancelada: { type: boolean, default: false }
+
+    DescriptorTipoDeSegmento:
+      $ref: '../tipos-de-segmento/descriptor.schema.yaml'

@@ -55,7 +55,30 @@ flowchart TB
 
     style T fill:#2d6a4f,color:#fff,stroke:#1b4332,stroke-width:3px
     style TB stroke-dasharray: 5 5
+
+    subgraph LEYENDA["Leyenda — tipos de elemento"]
+        direction LR
+        LEY_SIS(["sistema bajo diseño"])
+        LEY_EXT["actor humano o sistema externo"]
+        LEY_FUT["sistema externo previsto (futuro)"]
+        LEY_SIS ~~~ LEY_EXT ~~~ LEY_FUT
+    end
+    style LEY_SIS fill:#2d6a4f,color:#fff,stroke:#1b4332,stroke-width:3px
+    style LEY_FUT stroke-dasharray: 5 5
+    style LEYENDA fill:#ffffff,stroke:#888,stroke-dasharray: 3 3
 ```
+
+**Leyenda**
+
+| Notación | Significado en esta vista |
+|---|---|
+| Óvalo verde con borde grueso | **El sistema Trotamundos como caja negra.** No se muestra su interior |
+| Rectángulo | Actor humano o sistema externo (fuera del límite del sistema) |
+| Rectángulo con borde punteado | Sistema externo previsto pero todavía no integrado (punto de extensión) |
+| Recuadro con título | Agrupación por tipo de entidad externa; no es un elemento |
+| `-->` flecha simple | Flujo de información en un solo sentido, rotulado con lo que se intercambia |
+| `<-->` flecha doble | Intercambio en ambos sentidos |
+| `<-.->` flecha punteada | Interfaz prevista, no implementada |
 
 ## Tabla de interfaces externas
 

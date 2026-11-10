@@ -83,7 +83,31 @@ flowchart TB
     style ITIN fill:#2d6a4f,color:#fff
     style CANON fill:#1d3557,color:#fff
     style IDA fill:#6a040f,color:#fff
+
+    subgraph LEYENDA["Leyenda — tipos de elemento"]
+        direction LR
+        LEY_MOD["módulo"]
+        LEY_NUC["módulo núcleo del dominio"]
+        LEY_COM["módulo transversal de tipos y contratos"]
+        LEY_SEG["módulo frontera de seguridad"]
+        LEY_MOD ~~~ LEY_NUC ~~~ LEY_COM ~~~ LEY_SEG
+    end
+    style LEY_NUC fill:#2d6a4f,color:#fff
+    style LEY_COM fill:#1d3557,color:#fff
+    style LEY_SEG fill:#6a040f,color:#fff
+    style LEYENDA fill:#ffffff,stroke:#888,stroke-dasharray: 3 3
 ```
+
+**Leyenda**
+
+| Notación | Significado en esta vista |
+|---|---|
+| Rectángulo | **Módulo**: unidad de implementación (código), no una instancia en ejecución |
+| Verde | `itinerary`, el módulo núcleo del dominio y dueño del modelo canónico |
+| Azul | `modelo-canonico`: tipos compartidos sin dependencias (regla R7) |
+| Rojo | `identity-access`: único módulo con acceso a la bóveda de secretos (regla R5) |
+| Recuadro con título | Capa o agrupación lógica de módulos; no es un elemento |
+| `-->` flecha | Dependencia «usa a» en código: el origen importa o invoca al destino |
 
 Las dependencias hacia `contratos` se omiten del diagrama por legibilidad: **todos** los módulos
 dependen de él.

@@ -1,0 +1,47 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — provider-sync (webhooks entrantes)
+  version: 1.0.0
+  description: |
+    Notificaciones de cambios y cancelaciones que envían los proveedores de viaje (E-01…E-04).
+
+    Trazabilidad:
+    - El módulo `receptor-de-notificaciones` valida la firma, encola en 15 ms o menos y responde
+      `202` (ADR-0020). La traducción la hace el complemento del proveedor con
+      `traducirNotificacion` (`contratos/plugins/adaptador.yaml`, ADR-0006).
+    - La carga es la propia de cada proveedor: el modelo externo no cruza la capa de
+      anticorrupción (regla R3).
+    - Carril de prioridad `P1` para viajes `EnCurso` o que empiezan en menos de 48 h (ADR-0020).
+servers:
+  - url: https://ingesta.trotamundos.app
+paths:
+  /webhooks/proveedor:
+    parameters:
+      - name: X-Proveedor-Id
+        in: header
+        required: true
+        description: Identificador del complemento adaptador registrado que traducirá la carga.
+        schema: { type: string, examples: [aerolinea-ar-ndc, hotelera-htng-demo] }
+    post:
+      operationId: recibirNotificacionDeProveedor
+      security:
+        - firmaWebhook: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Carga nativa del proveedor (NDC, OTA/HTNG, etc.).
+              additionalProperties: true
+          application/xml:
+            schema: { type: string }
+      responses:
+        '202': { description: Encolado para traducción. }
+        '401': { description: Firma inválida. }
+        '404': { description: No hay adaptador registrado con ese identificador. }
+        '429': { $ref: 'comun.yaml#/components/responses/DemasiadasPeticiones' }
+components:
+  securitySchemes:
+    firmaWebhook:
+      $ref: 'comun.yaml#/components/securitySchemes/firmaWebhook'

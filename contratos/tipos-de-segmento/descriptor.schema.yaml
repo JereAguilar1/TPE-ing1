@@ -1,0 +1,68 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://contratos.trotamundos.app/tipos-de-segmento/descriptor.schema.yaml
+title: DescriptorTipoDeSegmento
+description: |
+  Metaesquema de los descriptores de tipo de segmento (ADR-0011). Todo archivo `<tipo>.v<N>.yaml`
+  de esta carpeta debe validar contra él.
+
+  Evolución (ADR-0027): `version` es un entero. Agregar campos opcionales a `esquemaDeDetalle` es
+  compatible; cualquier otro cambio crea una versión nueva que coexiste con la anterior, y los
+  segmentos históricos se validan contra la versión con que se crearon.
+type: object
+required: [tipo, version, rolEnViaje, esquemaDeDetalle, camposRelevantes, presentacion, dimension]
+additionalProperties: false
+properties:
+  tipo:
+    type: string
+    pattern: '^[a-z][a-z0-9]*$'
+  version:
+    type: integer
+    minimum: 1
+  rolEnViaje:
+    type: string
+    enum: [traslado, alojamiento, movilidadLocal]
+    description: La agrupación de reservas en viajes razona por rol y lugar, nunca por tipo (RF-07).
+  esquemaDeDetalle:
+    description: JSON Schema del bloque `detalle` del segmento. El detalle no se indexa (regla del núcleo).
+    $ref: https://json-schema.org/draft/2020-12/schema
+  camposRelevantes:
+    type: array
+    description: Qué cambios generan aviso y con qué severidad (consumido por `notification`).
+    items:
+      type: object
+      required: [campo, severidad]
+      additionalProperties: false
+      properties:
+        campo:
+          type: string
+          description: Ruta del campo, del núcleo (`inicio.instante`) o del detalle (`detalle.puerta`).
+        severidad:
+          type: string
+          enum: [critica, informativa]
+        umbralMinutos:
+          type: integer
+          minimum: 1
+          description: Para campos de tiempo, variación mínima que dispara el aviso.
+  presentacion:
+    type: object
+    description: Cómo se muestra el segmento (consumido por los BFF y los clientes).
+    required: [icono, titulo, filas]
+    additionalProperties: false
+    properties:
+      icono: { type: string }
+      titulo:
+        type: string
+        description: Plantilla con campos del núcleo entre llaves.
+      filas:
+        type: array
+        description: Campos del detalle que se muestran; sus etiquetas salen de los catálogos `locales` (ADR-0032).
+        items: { type: string }
+  dimension:
+    type: object
+    description: Atributos que pasan a `dim_tipo_segmento` en el plano analítico (ADR-0016).
+    required: [atributos]
+    additionalProperties: false
+    properties:
+      atributos:
+        type: array
+        items: { type: string }

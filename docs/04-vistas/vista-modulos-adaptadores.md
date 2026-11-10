@@ -96,7 +96,34 @@ flowchart TB
     style DESC fill:#2d6a4f,color:#fff
     style PL_TREN stroke-dasharray: 5 5
     style EX_TRN stroke-dasharray: 5 5
+
+    subgraph LEYENDA["Leyenda — tipos de elemento"]
+        direction LR
+        LEY_MOD["módulo"]
+        LEY_INT[["«interfaz» de complemento"]]
+        LEY_FUT["complemento previsto (no implementado)"]
+        LEY_COM["artefacto común (tipos)"]
+        LEY_DES["registro declarativo"]
+        LEY_MOD ~~~ LEY_INT ~~~ LEY_FUT ~~~ LEY_COM ~~~ LEY_DES
+    end
+    style LEY_FUT stroke-dasharray: 5 5
+    style LEY_COM fill:#1d3557,color:#fff
+    style LEY_DES fill:#2d6a4f,color:#fff
+    style LEYENDA fill:#ffffff,stroke:#888,stroke-dasharray: 3 3
 ```
+
+**Leyenda**
+
+| Notación | Significado en esta vista |
+|---|---|
+| Rectángulo | **Módulo** o **complemento** (unidad de implementación) |
+| Rectángulo con doble borde | **Interfaz** de complemento que el anfitrión expone |
+| Borde punteado | Complemento previsto para el caso de QA-15 (tren), todavía no implementado |
+| Azul | `modelo-canonico`: tipos compartidos |
+| Verde | Descriptores declarativos de tipo de segmento (configuración, no código) |
+| Recuadro con título | Módulo anfitrión o grupo de complementos |
+| `-->` flecha | Dependencia «usa a» en código |
+| `-.->` rotulada «implementa» | Realización: el complemento implementa la interfaz |
 
 ### Invariantes estáticas verificadas sobre el subsistema de adaptadores
 
@@ -191,7 +218,32 @@ flowchart TB
     style LOC fill:#1d3557,color:#fff
     style MOD_A fill:#2d6a4f,color:#fff,stroke-dasharray: 5 5
     style MOD_B fill:#2d6a4f,color:#fff,stroke-dasharray: 5 5
+
+    subgraph LEYENDA["Leyenda — tipos de elemento"]
+        direction LR
+        LEY_MOD["módulo"]
+        LEY_SEG["módulo único cliente de la bóveda"]
+        LEY_REC["recursos externalizados (no código)"]
+        LEY_OPC["módulo opcional de la 2da entrega"]
+        LEY_MOD ~~~ LEY_SEG ~~~ LEY_REC ~~~ LEY_OPC
+    end
+    style LEY_SEG fill:#6a040f,color:#fff
+    style LEY_REC fill:#1d3557,color:#fff
+    style LEY_OPC fill:#2d6a4f,color:#fff,stroke-dasharray: 5 5
+    style LEYENDA fill:#ffffff,stroke:#888,stroke-dasharray: 3 3
 ```
+
+**Leyenda**
+
+| Notación | Significado en esta vista |
+|---|---|
+| Rectángulo | **Módulo** (unidad de implementación) |
+| Rojo | `custodia-boveda`: único módulo autorizado a usar la bóveda (regla R5) |
+| Azul | Recursos de localización externalizados (catálogos ICU) |
+| Verde con borde punteado | Módulo opcional del punto de extensión; solo se activa la opción elegida |
+| Recuadro con título | Módulo descompuesto o capa; no es un elemento |
+| `-->` flecha | Dependencia «usa a» en código |
+| `-.->` flecha punteada | Dependencia condicional: existe solo si se elige esa opción |
 
 ---
 

@@ -1,0 +1,25 @@
+# Descriptor del tipo «hotel» (implementado). Validación del modelo: iteración 2, paso 7.
+# Un segmento; inicio = ingreso, fin = salida, en el mismo lugar.
+tipo: hotel
+version: 1
+rolEnViaje: alojamiento
+esquemaDeDetalle:
+  type: object
+  required: [habitaciones, huespedes]
+  additionalProperties: false
+  properties:
+    habitaciones: { type: integer, minimum: 1 }
+    tipoDeHabitacion: { type: string }
+    huespedes: { type: integer, minimum: 1 }
+    regimen: { type: string, enum: [soloAlojamiento, desayuno, mediaPension, pensionCompleta, todoIncluido] }
+    politicaDeCancelacion: { type: string }
+camposRelevantes:
+  - { campo: inicio.instante, severidad: critica, umbralMinutos: 60 }
+  - { campo: fin.instante, severidad: informativa, umbralMinutos: 60 }
+  - { campo: detalle.politicaDeCancelacion, severidad: informativa }
+presentacion:
+  icono: hotel
+  titulo: "{operador}"
+  filas: [tipoDeHabitacion, huespedes, regimen]
+dimension:
+  atributos: [operador, regimen]

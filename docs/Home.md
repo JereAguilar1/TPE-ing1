@@ -62,7 +62,14 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 | [ADR-0007](03-adr/ADR-0007-identidad-y-comparticion.md) | OIDC para identidad, delegación OAuth y compartición por designados | 1 |
 | [ADR-0008](03-adr/ADR-0008-alcance-disponibilidad.md) | Alcance y forma de medición del objetivo de disponibilidad | 1 |
 | [ADR-0009](03-adr/ADR-0009-contratos-spec-driven.md) | Contratos (OpenAPI/AsyncAPI) como artefactos de primera clase | 1 |
-| `ADR-0010`…`ADR-0017` | Decisiones `D10`–`D17` de funcionalidad primaria ([ver Iteración 2](02-proceso-add/iteracion-2/paso-4-alternativas.md)) | 2 |
+| [ADR-0010](03-adr/ADR-0010-modelo-canonico-reserva-segmento-viaje.md) | Modelo canónico con dos agregados, `Reserva` y `Viaje` | 2 |
+| [ADR-0011](03-adr/ADR-0011-extensibilidad-del-tipo-de-segmento.md) | Registro de tipos de segmento con esquema declarado | 2 |
+| [ADR-0012](03-adr/ADR-0012-persistencia-del-plano-operacional.md) | Persistencia relacional con detalle semiestructurado y partición por usuario | 2 |
+| [ADR-0013](03-adr/ADR-0013-deduplicacion-y-conflictos.md) | Identificadores múltiples, precedencia por fuente y coincidencia difusa solo como sugerencia | 2 |
+| [ADR-0014](03-adr/ADR-0014-idempotencia-de-la-ingesta.md) | Idempotencia por bandeja de entrada y fusión determinista | 2 |
+| [ADR-0015](03-adr/ADR-0015-politica-de-confianza-de-extraccion.md) | Umbrales de confianza por extractor con tres bandas | 2 |
+| [ADR-0016](03-adr/ADR-0016-modelo-dimensional-analitico.md) | Esquema en estrella alimentado desde eventos crudos | 2 |
+| [ADR-0017](03-adr/ADR-0017-estrategia-de-pruebas-y-contratos.md) | Pruebas derivadas de la especificación con suite de conformidad de complementos | 2 |
 | [ADR-0018](03-adr/ADR-0018-consistencia-datos-multirregion.md) | Consistencia multirregión con región primaria por usuario y testigo transregional | 3 |
 | [ADR-0019](03-adr/ADR-0019-cache-camino-lectura-arranque-movil.md) | Caché multinivel del camino de lectura y arranque móvil | 3 |
 | [ADR-0020](03-adr/ADR-0020-contrapresion-y-sobrecarga.md) | Contrapresión, colas con prioridad y modos automáticos de degradación | 3 |
@@ -88,12 +95,21 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 |---|---|
 | [Contexto](04-vistas/vista-contexto.md) | El sistema como caja negra frente a su entorno |
 | [Módulos — nivel 1](04-vistas/vista-modulos-nivel-1.md) | Descomposición en subsistemas y sus dependencias |
+| [Módulos — nivel 2 (funcionalidad primaria)](04-vistas/vista-modulos-nivel-2.md) | Interior de `itinerary`, `booking-extraction` y `mail-ingest`, con sus reglas de dependencia |
 | [Módulos — nivel 2 (adaptadores, identidad y extensión)](04-vistas/vista-modulos-adaptadores.md) | Subsistema de complementos versionados, interior de `identity-access` y `sharing`, `locales-icu` y elemento nº 14 |
 | [Componentes y conectores — nivel 1](04-vistas/vista-cyc-nivel-1.md) | Elementos en ejecución y cómo se comunican |
+| [Secuencias de los casos primarios](04-vistas/secuencias-casos-primarios.md) | Diagramas de secuencia de UC-1 a UC-7 |
 | [Despliegue — nivel 1](04-vistas/vista-despliegue-nivel-1.md) | Asignación a infraestructura multirregión |
 | [Despliegue — nivel 2](04-vistas/vista-despliegue-nivel-2.md) | Interior regional en 3 AZs, topología de datos sin `R-1`/`R-4`, dimensionamiento y autoescalado |
 | [Seguridad, privacidad y residencia de datos](04-vistas/vista-seguridad-y-datos.md) | Fronteras de confianza, cifrado por sobres, cierre gráfico de `R-6`, catálogo de PII y supresión en ambos planos |
 
-## 5. Trazabilidad
+## 5. Contratos (Spec-driven)
+
+[Contratos de interfaz](../contratos/README.md): OpenAPI de cada servicio y de la API pública,
+AsyncAPI de los 16 eventos de dominio, contratos de complementos, descriptores de los cinco tipos
+de segmento y modelo dimensional analítico ([ADR-0009](03-adr/ADR-0009-contratos-spec-driven.md),
+[ADR-0027](03-adr/ADR-0027-versionado-y-evolucion-de-contratos.md)).
+
+## 6. Trazabilidad
 
 [Matriz driver → decisión → vista → ADR (58/58 drivers · 100 %)](05-trazabilidad/matriz-drivers-decisiones.md)

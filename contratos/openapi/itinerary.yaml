@@ -1,0 +1,259 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — itinerary (API interna)
+  version: 1.0.0
+  description: |
+    API REST interna del núcleo del dominio, servida por el módulo `api` de `itinerary`
+    (vista de módulos N2). La consumen los BFF y `support-liaison`; no se expone en `api-gateway`.
+
+    Dos modos de despliegue desde el mismo código (ADR-0021):
+    - `itinerary-lectura` atiende las operaciones etiquetadas `lectura`.
+    - `itinerary-escritura` atiende las etiquetadas `comando`, escribe el cambio y el evento en la
+      *outbox* en la misma transacción (ADR-0012) y responde con el estado resultante (ADR-0010).
+
+    Toda llamada lleva `X-Usuario-Id` (clave de partición, ADR-0012), un vale interno firmado
+    (ADR-0028), mTLS y `X-Deadline-Ms` (ADR-0020).
+servers:
+  - url: https://itinerary.interno
+security:
+  - valeInterno: []
+tags:
+  - name: lectura
+  - name: comando
+paths:
+  /panel:
+    get:
+      tags: [lectura]
+      operationId: leerPanel
+      summary: Lee la proyección `panel_usuario` (UC-3)
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/UsuarioId'
+        - $ref: 'comun.yaml#/components/parameters/MinVersion'
+        - $ref: 'comun.yaml#/components/parameters/DeadlineMs'
+      responses:
+        '200':
+          description: Proyección del panel.
+          content:
+            application/json:
+              schema: { $ref: 'comun.yaml#/components/schemas/Panel' }
+
+  /viajes:
+    get:
+      tags: [lectura]
+      operationId: leerViajes
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/UsuarioId'
+        - name: estado
+          in: query
+          schema: { $ref: 'comun.yaml#/components/schemas/EstadoViaje' }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limite
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Página de viajes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [viajes]
+                properties:
+                  viajes:
+                    type: array
+                    items: { $ref: 'comun.yaml#/components/schemas/ViajeResumen' }
+                  siguienteCursor: { type: [string, 'null'] }
+
+  /viajes/{id}:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ViajeId'
+      - $ref: 'comun.yaml#/components/parameters/UsuarioId'
+    get:
+      tags: [lectura]
+      operationId: leerViaje
+      responses:
+        '200':
+          description: Viaje completo.
+          content:
+            application/json:
+              schema: { $ref: 'comun.yaml#/components/schemas/Viaje' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+    delete:
+      tags: [comando]
+      operationId: eliminarViaje
+      responses:
+        '204': { description: Eliminado. }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /viajes/{id}/instantanea:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ViajeId'
+      - $ref: 'comun.yaml#/components/parameters/UsuarioId'
+    get:
+      tags: [lectura]
+      operationId: leerInstantaneaDeViaje
+      summary: Instantánea inmutable del viaje para abrir un caso de soporte (UC-7)
+      responses:
+        '200':
+          description: Viaje en el momento de la consulta, con su versión.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [viaje, tomadaEn]
+                properties:
+                  viaje: { $ref: 'comun.yaml#/components/schemas/Viaje' }
+                  tomadaEn: { type: string, format: date-time }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /viajes/{id}/archivo:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ViajeId'
+      - $ref: 'comun.yaml#/components/parameters/UsuarioId'
+    post:
+      tags: [comando]
+      operationId: archivarViaje
+      responses:
+        '204': { description: Archivado; se publica `ViajeArchivado`. }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
+
+  /viajes/{vid}/reservas/{rid}:
+    parameters:
+      - { name: vid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+      - { name: rid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+      - $ref: 'comun.yaml#/components/parameters/UsuarioId'
+    put:
+      tags: [comando]
+      operationId: moverReserva
+      responses:
+        '204': { description: Movida y fijada. }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /reservas:
+    post:
+      tags: [comando]
+      operationId: crearReserva
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/UsuarioId'
+        - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: 'comun.yaml#/components/schemas/ReservaNueva' }
+      responses:
+        '201':
+          description: Estado resultante (UC-4).
+          content:
+            application/json:
+              schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+
+  /reservas/{id}:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ReservaId'
+      - $ref: 'comun.yaml#/components/parameters/UsuarioId'
+    get:
+      tags: [lectura]
+      operationId: leerReserva
+      responses:
+        '200':
+          description: Vista consolidada de la reserva.
+          content:
+            application/json:
+              schema: { $ref: 'comun.yaml#/components/schemas/Reserva' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+    put:
+      tags: [comando]
+      operationId: editarReserva
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: 'comun.yaml#/components/schemas/EdicionReserva' }
+      responses:
+        '200':
+          description: Estado resultante.
+          content:
+            application/json:
+              schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
+    delete:
+      tags: [comando]
+      operationId: eliminarReserva
+      responses:
+        '204': { description: Eliminada. }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /reservas/{id}/confirmacion:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ReservaId'
+      - $ref: 'comun.yaml#/components/parameters/UsuarioId'
+    post:
+      tags: [comando]
+      operationId: confirmarReserva
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [confirmar, descartar] }
+                correccion: { $ref: 'comun.yaml#/components/schemas/EdicionReserva' }
+      responses:
+        '200':
+          description: Estado resultante.
+          content:
+            application/json:
+              schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+        '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
+
+  /reservas/{id}/conflictos/{cid}/resolucion:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ReservaId'
+      - { name: cid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+      - $ref: 'comun.yaml#/components/parameters/UsuarioId'
+    post:
+      tags: [comando]
+      operationId: resolverConflicto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [eleccion]
+              properties:
+                eleccion: { type: string, enum: [mantenerFijado, aceptarFuente] }
+                fuente: { $ref: 'comun.yaml#/components/schemas/Fuente' }
+      responses:
+        '200':
+          description: Estado resultante.
+          content:
+            application/json:
+              schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+
+  /tipos-de-segmento:
+    get:
+      tags: [lectura]
+      operationId: leerTiposDeSegmento
+      summary: Descriptores registrados en el módulo `tipos-de-segmento` (ADR-0011)
+      security: []
+      responses:
+        '200':
+          description: Descriptores vigentes, incluidas las versiones anteriores todavía referenciadas por segmentos históricos (ADR-0027).
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: 'comun.yaml#/components/schemas/DescriptorTipoDeSegmento' }
+components:
+  securitySchemes:
+    valeInterno:
+      $ref: 'comun.yaml#/components/securitySchemes/valeInterno'

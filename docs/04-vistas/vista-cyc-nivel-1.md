@@ -85,7 +85,37 @@ flowchart LR
     style ITIN fill:#2d6a4f,color:#fff
     style IDA fill:#6a040f,color:#fff
     style VAULT fill:#6a040f,color:#fff
+
+    subgraph LEYENDA["Leyenda — tipos de elemento"]
+        direction LR
+        LEY_CMP["componente (instancias en ejecución)"]
+        LEY_DB[("instancia de base de datos / almacén")]
+        LEY_BRK{{"conector: broker de eventos"}}
+        LEY_EXT(["actor o sistema externo"])
+        LEY_NUC["componente núcleo del dominio"]
+        LEY_SEG["frontera de seguridad"]
+        LEY_CMP ~~~ LEY_DB ~~~ LEY_BRK ~~~ LEY_EXT ~~~ LEY_NUC ~~~ LEY_SEG
+    end
+    style LEY_BRK fill:#1d3557,color:#fff
+    style LEY_NUC fill:#2d6a4f,color:#fff
+    style LEY_SEG fill:#6a040f,color:#fff
+    style LEYENDA fill:#ffffff,stroke:#888,stroke-dasharray: 3 3
 ```
+
+**Leyenda**
+
+| Notación | Significado en esta vista |
+|---|---|
+| Rectángulo | **Componente**: proceso en ejecución, replicado en varias instancias |
+| Cilindro | **Instancia de base de datos o almacén** (operacional, proyección, bóveda, columnar) |
+| Hexágono azul | **Conector** *broker* de eventos, particionado por usuario |
+| Óvalo | Actor o sistema externo |
+| Verde | `itinerary`, componente núcleo del dominio |
+| Rojo | Componentes y almacén de la frontera de seguridad (`identity-access` y la bóveda) |
+| Recuadro con título | Plano (operacional, ingesta, analítico); no es un elemento |
+| `-->` flecha rotulada | Llamada **sincrónica**; el rótulo indica el protocolo |
+| `==>` flecha gruesa | Comunicación **asíncrona** por eventos: «publica» o «consume» |
+| `---` línea sin punta | Acceso del componente a su almacén propio |
 
 Flechas: `──→` conector sincrónico (HTTP/JSON) · `══▶` conector asíncrono (publicación-suscripción)
 · `───` acceso a repositorio de datos.
@@ -171,7 +201,7 @@ es señal de que está bien trazada.
 
 | Qué falta | Iteración |
 |---|---|
-| Diagramas de secuencia de UC-1 a UC-7 | 2 |
+| Diagramas de secuencia de UC-1 a UC-7 | 2 — ✅ [resuelto](secuencias-casos-primarios.md) |
 | Umbrales de los cortacircuitos, políticas de reintento y contrapresión | 3 |
 | Políticas de autoescalado, incluido el escalado predictivo por el calendario de picos conocidos | 3 |
 | Topología del plano de datos entre regiones (resolución de **R-1**) | 3 |

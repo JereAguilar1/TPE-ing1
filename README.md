@@ -22,6 +22,7 @@ Punto de entrada: **[docs/Home.md](docs/Home.md)**.
 | [Proceso ADD](docs/02-proceso-add/) | Las 4 iteraciones de diseño completas, paso por paso |
 | [ADRs](docs/03-adr/) | Decisiones arquitectónicas en formato MADR (`ADR-0001` a `ADR-0035`) |
 | [Vistas](docs/04-vistas/) | Vistas de contexto, módulos (N1/N2), C&C, despliegue (N1/N2) y seguridad/datos |
+| [Contratos](contratos/README.md) | OpenAPI, AsyncAPI, contratos de complementos, descriptores de tipo de segmento y modelo dimensional (Spec-driven) |
 | [Trazabilidad](docs/05-trazabilidad/) | Matriz completa (100 %) driver → decisión → vista → ADR |
 
 ## Estado

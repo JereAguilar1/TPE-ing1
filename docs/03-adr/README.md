@@ -45,11 +45,19 @@ contradigan, manda el ADR.
 
 ### Iteración 2 — Estructuras para la funcionalidad primaria
 
-Decisiones `D10` a `D17` (`ADR-0010` a `ADR-0017`: modelo canónico `Reserva`/`Viaje`, extensibilidad de
-segmentos, persistencia híbrida relacional, deduplicación y conflictos, idempotencia de ingesta,
-bandas de confianza de extracción, modelo dimensional analítico y estrategia de pruebas por
-contrato), documentadas con sus alternativas en
-[Iteración 2 — Paso 4](../02-proceso-add/iteracion-2/paso-4-alternativas.md) *(archivos MADR individuales en consolidación de equipo)*.
+| ADR | Decisión | Estado | Drivers principales |
+|---|---|---|---|
+| [ADR-0010](ADR-0010-modelo-canonico-reserva-segmento-viaje.md) | Modelo canónico con dos agregados de límites explícitos, `Reserva` y `Viaje` | `aceptado` | RF-03, RF-07, CRN-11, CRN-12, QA-04, QA-15 |
+| [ADR-0011](ADR-0011-extensibilidad-del-tipo-de-segmento.md) | Registro de tipos de segmento con esquema declarado y núcleo común | `aceptado` | QA-15, QA-02, QA-11, RF-14 |
+| [ADR-0012](ADR-0012-persistencia-del-plano-operacional.md) | Persistencia relacional con detalle semiestructurado y partición por `usuario_id` | `aceptado` | QA-15, QA-02, QA-08, CRN-11, CRN-12 |
+| [ADR-0013](ADR-0013-deduplicacion-y-conflictos.md) | Identidad por identificadores múltiples, precedencia por fuente y coincidencia difusa solo como sugerencia | `aceptado` | CRN-11, RF-06, QA-11 |
+| [ADR-0014](ADR-0014-idempotencia-de-la-ingesta.md) | Idempotencia por bandeja de entrada por mensaje y fusión determinista | `aceptado` | CRN-12, RF-02, RF-05, QA-11 |
+| [ADR-0015](ADR-0015-politica-de-confianza-de-extraccion.md) | Umbrales de confianza por extractor con tres bandas y confirmación del usuario en la banda media | `aceptado` | QA-11, RF-03, RF-04 |
+| [ADR-0016](ADR-0016-modelo-dimensional-analitico.md) | Esquema en estrella alimentado desde eventos de dominio retenidos crudos | `aceptado` | RF-14, QA-09, QA-15, CON-10 |
+| [ADR-0017](ADR-0017-estrategia-de-pruebas-y-contratos.md) | Pruebas derivadas de la especificación con suite de conformidad de complementos | `aceptado` | CRN-06, CON-04, QA-10, QA-11, QA-16 |
+
+El análisis comparativo de estas decisiones está en
+[Iteración 2 — Paso 4](../02-proceso-add/iteracion-2/paso-4-alternativas.md).
 
 ### Iteración 3 — Refinamiento para rendimiento, disponibilidad y escalabilidad
 

@@ -1,0 +1,27 @@
+# Descriptor del tipo «vuelo» (implementado). Validación del modelo: iteración 2, paso 7.
+# Un segmento por tramo; identificadores: localizador de la aerolínea y número de orden de la agencia.
+tipo: vuelo
+version: 1
+rolEnViaje: traslado
+esquemaDeDetalle:
+  type: object
+  required: [aerolinea, numeroDeVuelo]
+  additionalProperties: false
+  properties:
+    aerolinea: { type: string, description: Código IATA de la aerolínea }
+    numeroDeVuelo: { type: string }
+    terminal: { type: string }
+    puerta: { type: string }
+    asiento: { type: string }
+    clase: { type: string, enum: [economica, premium, ejecutiva, primera] }
+camposRelevantes:
+  - { campo: inicio.instante, severidad: critica, umbralMinutos: 15 }
+  - { campo: detalle.puerta, severidad: critica }
+  - { campo: detalle.terminal, severidad: critica }
+  - { campo: detalle.asiento, severidad: informativa }
+presentacion:
+  icono: vuelo
+  titulo: "{operador} {referencia}"
+  filas: [terminal, puerta, asiento, clase]
+dimension:
+  atributos: [operador, clase]

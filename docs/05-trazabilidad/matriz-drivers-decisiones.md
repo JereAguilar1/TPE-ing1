@@ -15,7 +15,15 @@ La sección de [huecos de trazabilidad](#huecos-de-trazabilidad) queda **vacía*
 
 ## Driver → decisión
 
-*(Nota: `D10`–`D17` refieren a las decisiones `ADR-0010`–`ADR-0017` documentadas en
+*(Nota: `D10`–`D17` refieren a las decisiones
+[ADR-0010](../03-adr/ADR-0010-modelo-canonico-reserva-segmento-viaje.md) ·
+[0011](../03-adr/ADR-0011-extensibilidad-del-tipo-de-segmento.md) ·
+[0012](../03-adr/ADR-0012-persistencia-del-plano-operacional.md) ·
+[0013](../03-adr/ADR-0013-deduplicacion-y-conflictos.md) ·
+[0014](../03-adr/ADR-0014-idempotencia-de-la-ingesta.md) ·
+[0015](../03-adr/ADR-0015-politica-de-confianza-de-extraccion.md) ·
+[0016](../03-adr/ADR-0016-modelo-dimensional-analitico.md) ·
+[0017](../03-adr/ADR-0017-estrategia-de-pruebas-y-contratos.md), con su análisis comparativo en
 [Iteración 2 — Paso 4](../02-proceso-add/iteracion-2/paso-4-alternativas.md)).*
 
 ### Requisitos funcionales

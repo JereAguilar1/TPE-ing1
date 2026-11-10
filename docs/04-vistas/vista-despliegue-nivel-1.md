@@ -84,7 +84,35 @@ flowchart TB
     style AM_V fill:#6a040f,color:#fff
     style EU_V fill:#6a040f,color:#fff
     style AP_V fill:#6a040f,color:#fff
+
+    subgraph LEYENDA["Leyenda — tipos de elemento"]
+        direction LR
+        LEY_INS["instancias de servicios"]
+        LEY_DB[("instancia de base de datos")]
+        LEY_SEC[("bóveda de secretos")]
+        LEY_INF{{"infraestructura (DNS, broker)"}}
+        LEY_EXT(["usuarios o actores externos"])
+        LEY_INS ~~~ LEY_DB ~~~ LEY_SEC ~~~ LEY_INF ~~~ LEY_EXT
+    end
+    style LEY_SEC fill:#6a040f,color:#fff
+    style LEYENDA fill:#ffffff,stroke:#888,stroke-dasharray: 3 3
 ```
+
+**Leyenda**
+
+| Notación | Significado en esta vista |
+|---|---|
+| Recuadro «REGIÓN» | **Nodo de despliegue**: una región de la nube, activa |
+| Recuadro de fondo claro | Plano global compartido por las tres regiones |
+| Rectángulo | **Instancias** de uno o más servicios desplegados en la región |
+| Cilindro | **Instancia de base de datos** o almacén de la región |
+| Cilindro rojo | Instancia de la bóveda de secretos |
+| Hexágono | Infraestructura de red o mensajería (DNS geográfico en azul, *broker* regional) |
+| Rectángulo sin región | Servicio global de borde (CDN) |
+| Óvalo | Usuarios o actores externos |
+| `-->` flecha | Tráfico de peticiones |
+| `---` línea sin punta | Acceso a un almacén |
+| `-.->` / `<-.->` punteada | Flujo asíncrono entre nodos: replicación entre regiones o flujo de eventos |
 
 ## Decisiones de asignación
 

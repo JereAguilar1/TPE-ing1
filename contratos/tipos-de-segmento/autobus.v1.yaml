@@ -1,0 +1,24 @@
+# Descriptor del tipo «autobús». Declarado, sin adaptadores ni extractores implementados (CON-A3).
+# Un segmento por tramo; identificador: código del boleto. Validación del modelo: iteración 2, paso 7.
+# Los boletos abiertos usan `precision: dia` en inicio y fin.
+tipo: autobus
+version: 1
+rolEnViaje: traslado
+esquemaDeDetalle:
+  type: object
+  required: [linea]
+  additionalProperties: false
+  properties:
+    linea: { type: string }
+    anden: { type: string }
+    asiento: { type: string }
+    servicio: { type: string, examples: [semicama, cama, ejecutivo] }
+camposRelevantes:
+  - { campo: inicio.instante, severidad: critica, umbralMinutos: 15 }
+  - { campo: detalle.anden, severidad: critica }
+presentacion:
+  icono: autobus
+  titulo: "{operador} {referencia}"
+  filas: [linea, anden, asiento]
+dimension:
+  atributos: [operador, servicio]

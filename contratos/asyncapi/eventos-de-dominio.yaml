@@ -1,0 +1,495 @@
+asyncapi: 3.0.0
+info:
+  title: Trotamundos — eventos de dominio
+  version: 1.1.0
+  description: |
+    Catálogo de eventos publicados en el *broker* (ADR-0001, ADR-0009).
+
+    - `1.0.0`: los 15 eventos de la iteración 2 (§5.10 del README de la iteración 2).
+    - `1.1.0`: se agrega `CuentaSuprimida` (iteración 4, ADR-0030). Agregar un tipo de evento es un
+      cambio compatible (ADR-0027).
+
+    Reglas comunes:
+    - **Entrega al menos una vez.** Todo consumidor aplica una bandeja de entrada por
+      `(consumidor, idDeEvento)` (ADR-0014).
+    - **Publicación transaccional.** Todo productor escribe el evento en su *outbox* en la misma
+      transacción que el cambio (ADR-0012).
+    - **Clave de partición `usuarioId`**: los eventos de un usuario se procesan en orden y en su
+      región primaria (ADR-0018).
+    - **Carriles de prioridad** `P1` crítico, `P2` estándar, `P3` diferible (ADR-0020).
+    - **Evolución**: `versionEsquema` (`MAJOR.MINOR`) es obligatorio en el sobre; un cambio mayor
+      exige doble emisión o *upcaster* durante 14 días o más (ADR-0027).
+    - **Contenido**: `ReservaActualizada` y `ReservaCancelada` las publica **solo** `itinerary`, ya
+      fusionadas (ajuste 1 de la iteración 2).
+defaultContentType: application/json
+
+servers:
+  broker-regional:
+    host: broker.{region}.interno
+    protocol: kafka
+    description: Un clúster por región (ADR-0002). El producto concreto no forma parte del contrato.
+    variables:
+      region:
+        enum: [am, eu, ap]
+
+channels:
+  mensajeDeViajeRecibido:
+    address: dominio.mensaje-de-viaje-recibido
+    messages:
+      MensajeDeViajeRecibido: { $ref: '#/components/messages/MensajeDeViajeRecibido' }
+  reservaExtraida:
+    address: dominio.reserva-extraida
+    messages:
+      ReservaExtraida: { $ref: '#/components/messages/ReservaExtraida' }
+  reservaObservada:
+    address: dominio.reserva-observada
+    messages:
+      ReservaObservada: { $ref: '#/components/messages/ReservaObservada' }
+  extraccionNoReconocida:
+    address: dominio.extraccion-no-reconocida
+    messages:
+      ExtraccionNoReconocida: { $ref: '#/components/messages/ExtraccionNoReconocida' }
+  reservaActualizada:
+    address: dominio.reserva-actualizada
+    messages:
+      ReservaActualizada: { $ref: '#/components/messages/ReservaActualizada' }
+  reservaCancelada:
+    address: dominio.reserva-cancelada
+    messages:
+      ReservaCancelada: { $ref: '#/components/messages/ReservaCancelada' }
+  conflictoDeFuentesDetectado:
+    address: dominio.conflicto-de-fuentes-detectado
+    messages:
+      ConflictoDeFuentesDetectado: { $ref: '#/components/messages/ConflictoDeFuentesDetectado' }
+  viajeArmado:
+    address: dominio.viaje-armado
+    messages:
+      ViajeArmado: { $ref: '#/components/messages/ViajeArmado' }
+  viajeCompletado:
+    address: dominio.viaje-completado
+    messages:
+      ViajeCompletado: { $ref: '#/components/messages/ViajeCompletado' }
+  viajeArchivado:
+    address: dominio.viaje-archivado
+    messages:
+      ViajeArchivado: { $ref: '#/components/messages/ViajeArchivado' }
+  disrupcionDetectada:
+    address: dominio.disrupcion-detectada
+    messages:
+      DisrupcionDetectada: { $ref: '#/components/messages/DisrupcionDetectada' }
+  estadoDeBuzonCambiado:
+    address: dominio.estado-de-buzon-cambiado
+    messages:
+      EstadoDeBuzonCambiado: { $ref: '#/components/messages/EstadoDeBuzonCambiado' }
+  preferenciasActualizadas:
+    address: dominio.preferencias-actualizadas
+    messages:
+      PreferenciasActualizadas: { $ref: '#/components/messages/PreferenciasActualizadas' }
+  casoDerivado:
+    address: dominio.caso-derivado
+    messages:
+      CasoDerivado: { $ref: '#/components/messages/CasoDerivado' }
+  notificacionEmitida:
+    address: dominio.notificacion-emitida
+    messages:
+      NotificacionEmitida: { $ref: '#/components/messages/NotificacionEmitida' }
+  cuentaSuprimida:
+    address: dominio.cuenta-suprimida
+    messages:
+      CuentaSuprimida: { $ref: '#/components/messages/CuentaSuprimida' }
+
+# Cada operación declara el productor (`action: send`) y, en `x-consumidores`, quiénes la consumen.
+operations:
+  publicarMensajeDeViajeRecibido:
+    action: send
+    channel: { $ref: '#/channels/mensajeDeViajeRecibido' }
+    x-productor: mail-ingest
+    x-consumidores: [booking-extraction]
+  publicarReservaExtraida:
+    action: send
+    channel: { $ref: '#/channels/reservaExtraida' }
+    x-productor: booking-extraction
+    x-consumidores: [itinerary]
+  publicarReservaObservada:
+    action: send
+    channel: { $ref: '#/channels/reservaObservada' }
+    x-productor: provider-sync
+    x-consumidores: [itinerary]
+  publicarExtraccionNoReconocida:
+    action: send
+    channel: { $ref: '#/channels/extraccionNoReconocida' }
+    x-productor: booking-extraction
+    x-consumidores: [notification]
+  publicarReservaActualizada:
+    action: send
+    channel: { $ref: '#/channels/reservaActualizada' }
+    x-productor: itinerary
+    x-consumidores: [notification, event-pipeline]
+  publicarReservaCancelada:
+    action: send
+    channel: { $ref: '#/channels/reservaCancelada' }
+    x-productor: itinerary
+    x-consumidores: [notification, event-pipeline, support-liaison]
+  publicarConflictoDeFuentesDetectado:
+    action: send
+    channel: { $ref: '#/channels/conflictoDeFuentesDetectado' }
+    x-productor: itinerary
+    x-consumidores: [notification, event-pipeline]
+  publicarViajeArmado:
+    action: send
+    channel: { $ref: '#/channels/viajeArmado' }
+    x-productor: itinerary
+    x-consumidores: [event-pipeline, elemento-14]  # punto de extensión de la 2da entrega (ADR-0034)
+  publicarViajeCompletado:
+    action: send
+    channel: { $ref: '#/channels/viajeCompletado' }
+    x-productor: itinerary
+    x-consumidores: [event-pipeline, notification]
+  publicarViajeArchivado:
+    action: send
+    channel: { $ref: '#/channels/viajeArchivado' }
+    x-productor: itinerary
+    x-consumidores: [event-pipeline]
+  publicarDisrupcionDetectada:
+    action: send
+    channel: { $ref: '#/channels/disrupcionDetectada' }
+    x-productor: provider-sync
+    x-consumidores: [notification, support-liaison]
+  publicarEstadoDeBuzonCambiado:
+    action: send
+    channel: { $ref: '#/channels/estadoDeBuzonCambiado' }
+    x-productor: identity-access
+    x-consumidores: [mail-ingest, notification]
+  publicarPreferenciasActualizadas:
+    action: send
+    channel: { $ref: '#/channels/preferenciasActualizadas' }
+    x-productor: preferences
+    x-consumidores: [notification, itinerary, support-liaison]
+  publicarCasoDerivado:
+    action: send
+    channel: { $ref: '#/channels/casoDerivado' }
+    x-productor: support-liaison
+    x-consumidores: [notification, event-pipeline]
+  publicarNotificacionEmitida:
+    action: send
+    channel: { $ref: '#/channels/notificacionEmitida' }
+    x-productor: notification
+    x-consumidores: [event-pipeline]
+  publicarCuentaSuprimida:
+    action: send
+    channel: { $ref: '#/channels/cuentaSuprimida' }
+    x-productor: identity-access
+    x-consumidores: [event-pipeline, elemento-14]  # punto de extensión de la 2da entrega (ADR-0034)
+
+components:
+  messages:
+    MensajeDeViajeRecibido:
+      name: MensajeDeViajeRecibido
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P2 (P1 si el remitente corresponde a un viaje EnCurso)
+      payload:
+        type: object
+        required: [buzonId, idDeMensaje, mensaje]
+        properties:
+          buzonId: { $ref: '#/components/schemas/Id' }
+          idDeMensaje: { type: string, description: Clave de la bandeja de entrada de mail-ingest junto con buzonId }
+          via: { type: string, enum: [oauth, reenvio, imapDelegado] }
+          mensaje: { $ref: '#/components/schemas/MensajeNormalizado' }
+    ReservaExtraida:
+      name: ReservaExtraida
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P2
+      payload:
+        type: object
+        required: [buzonId, idDeMensaje, extractor, banda, confianza, observacion]
+        properties:
+          buzonId: { $ref: '#/components/schemas/Id' }
+          idDeMensaje: { type: string }
+          extractor:
+            type: object
+            required: [id, version]
+            properties:
+              id: { type: string }
+              version: { type: string }
+          banda:
+            type: string
+            enum: [alta, media]
+            description: La banda baja no se publica como ReservaExtraida (ADR-0015).
+          confianza: { $ref: '#/components/schemas/Confianza' }
+          observacion: { $ref: '../openapi/comun.yaml#/components/schemas/ObservacionCanonica' }
+    ReservaObservada:
+      name: ReservaObservada
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P1 si el viaje está EnCurso o empieza en menos de 48 h, P2 en otro caso
+      payload:
+        type: object
+        required: [adaptador, observacion]
+        properties:
+          adaptador:
+            type: object
+            required: [id, version]
+            properties:
+              id: { type: string }
+              version: { type: string }
+          observacion: { $ref: '../openapi/comun.yaml#/components/schemas/ObservacionCanonica' }
+    ExtraccionNoReconocida:
+      name: ExtraccionNoReconocida
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P2
+      description: Ningún dato dudoso llega a `itinerary`; se ofrece la carga manual (ADR-0015, ADR-0035).
+      payload:
+        type: object
+        required: [buzonId, idDeMensaje, motivo, remitente, fechaCorreo, huellaDeFormato]
+        properties:
+          buzonId: { $ref: '#/components/schemas/Id' }
+          idDeMensaje: { type: string }
+          motivo: { type: string, enum: [formatoDesconocido, bandaBaja, validacionFallida, disyuntorDeCalidad] }
+          remitente: { type: string, format: email }
+          fechaCorreo: { type: string, format: date-time }
+          asuntoTruncado: { type: string, maxLength: 80 }
+          huellaDeFormato:
+            type: string
+            description: Hash del esqueleto estructural del mensaje, sin textos ni códigos (ADR-0035).
+          borradorSugerido:
+            type: object
+            description: Campos candidatos no validados, para prellenar el alta manual.
+            additionalProperties: true
+    ReservaActualizada:
+      name: ReservaActualizada
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: según la reserva
+      payload:
+        type: object
+        required: [reserva, cambios]
+        properties:
+          reserva: { $ref: '../openapi/comun.yaml#/components/schemas/Reserva' }
+          creada: { type: boolean, description: true si la reserva es nueva }
+          unificadaCon:
+            type: array
+            description: Reservas absorbidas por una unificación de identificadores (ADR-0013).
+            items: { $ref: '#/components/schemas/Id' }
+          cambios:
+            type: array
+            items:
+              type: object
+              required: [campo, fuente]
+              properties:
+                campo: { type: string }
+                anterior: {}
+                nuevo: {}
+                fuente: { $ref: '../openapi/comun.yaml#/components/schemas/Fuente' }
+    ReservaCancelada:
+      name: ReservaCancelada
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P1
+      payload:
+        type: object
+        required: [reservaId, version, fuente, canceladaEn]
+        properties:
+          reservaId: { $ref: '#/components/schemas/Id' }
+          viajeId: { $ref: '#/components/schemas/Id' }
+          version: { type: integer, format: int64 }
+          fuente: { $ref: '../openapi/comun.yaml#/components/schemas/Fuente' }
+          canceladaEn: { type: string, format: date-time }
+    ConflictoDeFuentesDetectado:
+      name: ConflictoDeFuentesDetectado
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P2
+      payload:
+        type: object
+        required: [reservaId, conflicto]
+        properties:
+          reservaId: { $ref: '#/components/schemas/Id' }
+          conflicto: { $ref: '../openapi/comun.yaml#/components/schemas/ConflictoDeFuentes' }
+    ViajeArmado:
+      name: ViajeArmado
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P2
+      payload:
+        type: object
+        required: [viajeId, titulo, estado, desde, hasta, reservaIds]
+        properties:
+          viajeId: { $ref: '#/components/schemas/Id' }
+          titulo: { type: string }
+          estado: { $ref: '../openapi/comun.yaml#/components/schemas/EstadoViaje' }
+          desde: { type: string, format: date-time }
+          hasta: { type: string, format: date-time }
+          destinoPrincipal: { $ref: '../openapi/comun.yaml#/components/schemas/Lugar' }
+          reservaIds:
+            type: array
+            items: { $ref: '#/components/schemas/Id' }
+    ViajeCompletado:
+      name: ViajeCompletado
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P3
+      payload:
+        type: object
+        required: [viajeId, completadoEn]
+        properties:
+          viajeId: { $ref: '#/components/schemas/Id' }
+          completadoEn: { type: string, format: date-time }
+    ViajeArchivado:
+      name: ViajeArchivado
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P3
+      payload:
+        type: object
+        required: [viajeId, archivadoEn, motivo]
+        properties:
+          viajeId: { $ref: '#/components/schemas/Id' }
+          archivadoEn: { type: string, format: date-time }
+          motivo: { type: string, enum: [automatico, manual] }
+    DisrupcionDetectada:
+      name: DisrupcionDetectada
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P1
+      description: Lleva los usuarios afectados, resueltos por el módulo `seguimiento` (ajuste 4 de la iteración 2).
+      payload:
+        type: object
+        required: [disrupcionId, proveedor, severidad, descripcion, afectados]
+        properties:
+          disrupcionId: { type: string, description: Se usa como idDeCausa para correlacionar avisos }
+          proveedor: { type: string }
+          severidad: { type: string, enum: [alta, media, baja] }
+          descripcion: { type: string }
+          afectados:
+            type: array
+            items:
+              type: object
+              required: [usuarioId, reservaIds]
+              properties:
+                usuarioId: { $ref: '#/components/schemas/Id' }
+                reservaIds:
+                  type: array
+                  items: { $ref: '#/components/schemas/Id' }
+    EstadoDeBuzonCambiado:
+      name: EstadoDeBuzonCambiado
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P2
+      payload:
+        type: object
+        required: [buzonId, estadoAnterior, estadoNuevo]
+        properties:
+          buzonId: { $ref: '#/components/schemas/Id' }
+          estadoAnterior: { $ref: '#/components/schemas/EstadoBuzon' }
+          estadoNuevo: { $ref: '#/components/schemas/EstadoBuzon' }
+          motivo: { type: string, enum: [otorgado, renovacionFallida, revocadoPorProveedor, alcanceReducido, desconectadoPorUsuario] }
+    PreferenciasActualizadas:
+      name: PreferenciasActualizadas
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P2
+      payload:
+        type: object
+        required: [preferencias]
+        properties:
+          preferencias: { $ref: '../openapi/preferences.yaml#/components/schemas/Preferencias' }
+    CasoDerivado:
+      name: CasoDerivado
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P1
+      payload:
+        type: object
+        required: [casoId, viajeId, agencia, motivo]
+        properties:
+          casoId: { $ref: '#/components/schemas/Id' }
+          viajeId: { $ref: '#/components/schemas/Id' }
+          agencia: { type: string }
+          motivo: { type: string }
+    NotificacionEmitida:
+      name: NotificacionEmitida
+      headers: { $ref: '#/components/schemas/Sobre' }
+      x-carril: P3
+      payload:
+        type: object
+        required: [notificacionId, severidad, canales]
+        properties:
+          notificacionId: { $ref: '#/components/schemas/Id' }
+          severidad: { type: string, enum: [critica, informativa, administrativa] }
+          canales:
+            type: array
+            items: { type: string, enum: [push, interno, correo] }
+          viajeId: { $ref: '#/components/schemas/Id' }
+          eventosAgrupados: { type: integer, minimum: 1, description: Cantidad de cambios coalescidos en este aviso }
+    CuentaSuprimida:
+      name: CuentaSuprimida
+      headers: { $ref: '#/components/schemas/SobreSinUsuario' }
+      x-carril: P3
+      description: |
+        Cierre de la fase 1 de la supresión (ADR-0030). **No** contiene datos personales ni
+        `usuarioId`: solo el seudónimo analítico, que ya quedó huérfano de identidad.
+      payload:
+        type: object
+        required: [seudonimoAnalitico, suprimidaEn]
+        properties:
+          seudonimoAnalitico: { type: string }
+          suprimidaEn: { type: string, format: date-time }
+
+  schemas:
+    Id:
+      type: string
+      format: uuid
+    Sobre:
+      type: object
+      required: [idDeEvento, tipo, versionEsquema, usuarioId, ocurridoEn, productor]
+      properties:
+        idDeEvento: { $ref: '#/components/schemas/Id' }
+        tipo: { type: string }
+        versionEsquema: { type: string, pattern: '^[0-9]+\.[0-9]+$', examples: ['1.0'] }
+        usuarioId:
+          $ref: '#/components/schemas/Id'
+          description: Clave de partición. En `DisrupcionDetectada` es el primer usuario afectado y la lista completa va en la carga.
+        ocurridoEn: { type: string, format: date-time }
+        productor: { type: string }
+        regionOrigen: { type: string, enum: [AM, EU, AP] }
+        idDeCausa: { type: string, description: 'Correlaciona una disrupción con los cambios que provoca (iteración 2, §5.7)' }
+        traceparent: { type: string }
+    SobreSinUsuario:
+      type: object
+      required: [idDeEvento, tipo, versionEsquema, ocurridoEn, productor]
+      properties:
+        idDeEvento: { $ref: '#/components/schemas/Id' }
+        tipo: { type: string }
+        versionEsquema: { type: string, pattern: '^[0-9]+\.[0-9]+$' }
+        ocurridoEn: { type: string, format: date-time }
+        productor: { type: string }
+        traceparent: { type: string }
+    EstadoBuzon:
+      type: string
+      enum: [Solicitado, Activo, RequiereReautorizacion, Revocado]
+    Confianza:
+      type: object
+      required: [global, porCampo]
+      properties:
+        global:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Mínimo de la confianza de los campos obligatorios, no el promedio (ADR-0015).
+        porCampo:
+          type: object
+          additionalProperties: { type: number, minimum: 0, maximum: 1 }
+    MensajeNormalizado:
+      type: object
+      description: Formato común producido por el módulo `normalizador` de `mail-ingest`.
+      required: [remitente, recibidoEn, asunto]
+      properties:
+        remitente: { type: string, format: email }
+        destinatarios:
+          type: array
+          items: { type: string, format: email }
+        recibidoEn: { type: string, format: date-time }
+        asunto: { type: string }
+        cuerpoTexto: { type: string }
+        cuerpoHtml: { type: string }
+        cabeceras:
+          type: object
+          additionalProperties: { type: string }
+        adjuntos:
+          type: array
+          items:
+            type: object
+            required: [nombre, tipoMedio, referencia]
+            properties:
+              nombre: { type: string }
+              tipoMedio: { type: string }
+              referencia: { type: string, description: Ubicación cifrada del adjunto; el contenido no viaja por el broker }

@@ -1,0 +1,133 @@
+# Contrato de complemento: AdaptadorDeProveedor
+#
+# Lo implementa cada complemento `adaptador-<proveedor>` cargado por `registro-de-adaptadores` en
+# `provider-sync` (vista de módulos N2 de adaptadores). El mismo patrón se usa para los
+# adaptadores de agencia de `support-liaison` (iteración 2, §5.7).
+#
+# Trazabilidad:
+#   - Capa de anticorrupción con adaptadores como complementos: ADR-0006.
+#   - Contrato concreto: iteración 2, §5.5.
+#   - Cortacircuitos, mamparo y cuota por adaptador: ADR-0024.
+#   - Suite de conformidad: ADR-0017. SemVer del contrato y puente de versión mayor: ADR-0027.
+#   - Guía para agregar un proveedor (QA-10) o el tren (QA-15): iteración 4, guías de extensión.
+
+contrato: AdaptadorDeProveedor
+apiContrato: "1.0"
+estado: vigente
+
+manifiesto:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  required: [id, version, apiContrato, tiposDeSegmento, capacidades]
+  additionalProperties: false
+  properties:
+    id: { type: string, pattern: '^adaptador-[a-z0-9-]+$' }
+    version: { type: string, description: SemVer del complemento }
+    apiContrato: { type: string, pattern: '^1\.[0-9]+$' }
+    tiposDeSegmento:
+      type: array
+      minItems: 1
+      items: { type: string }
+    estandar:
+      type: string
+      description: Estándar de la API del proveedor.
+      examples: [IATA NDC, OTA, HTNG, OSDM]
+    capacidades:
+      type: object
+      required: [push, sondeo, cancelaciones, cuotaPorMinuto]
+      properties:
+        push: { type: boolean, description: El proveedor notifica por webhook }
+        sondeo: { type: boolean, description: Admite consultas programadas }
+        cancelaciones: { type: boolean }
+        cuotaPorMinuto:
+          type: integer
+          minimum: 1
+          description: Cuota publicada. El limitador se fija al 80 % (ADR-0024).
+
+definiciones:
+  Credencial:
+    type: object
+    description: La resuelve el anfitrión; el complemento nunca la persiste.
+    required: [tipo, valor]
+    properties:
+      tipo: { type: string, enum: [apiKey, oauthCliente, certificado] }
+      valor: { type: string }
+  CambioObservado:
+    type: object
+    required: [referencia, observacion]
+    properties:
+      referencia:
+        type: string
+        description: Referencia de la reserva en el proveedor; `seguimiento` la resuelve a `(usuarioId, reservaId)`.
+      observacion: { $ref: '../openapi/comun.yaml#/components/schemas/ObservacionCanonica' }
+  Disrupcion:
+    type: object
+    required: [id, severidad, descripcion, referenciasAfectadas]
+    properties:
+      id: { type: string }
+      severidad: { type: string, enum: [alta, media, baja] }
+      descripcion: { type: string }
+      referenciasAfectadas:
+        type: array
+        items: { type: string }
+
+operaciones:
+  obtenerReserva:
+    descripcion: Consulta una reserva puntual.
+    entrada:
+      type: object
+      required: [credencial, referencia]
+      properties:
+        credencial: { $ref: '#/definiciones/Credencial' }
+        referencia: { type: string }
+    salida: { $ref: '../openapi/comun.yaml#/components/schemas/ObservacionCanonica' }
+    errores: [NoEncontrada, CuotaExcedida, ProveedorNoDisponible]
+
+  traducirNotificacion:
+    descripcion: Traduce la carga de un webhook entrante (`provider-sync-webhooks.yaml`). No llama a la red.
+    entrada:
+      type: object
+      required: [cabeceras, cuerpo]
+      properties:
+        cabeceras: { type: object, additionalProperties: { type: string } }
+        cuerpo: { description: Carga nativa del proveedor }
+    salida:
+      type: array
+      items: { $ref: '#/definiciones/CambioObservado' }
+    errores: [CargaInvalida]
+
+  sondear:
+    descripcion: Trabajo programado para proveedores sin notificación.
+    entrada:
+      type: object
+      required: [credencial, desde]
+      properties:
+        credencial: { $ref: '#/definiciones/Credencial' }
+        desde: { type: string, format: date-time }
+    salida:
+      type: array
+      items: { $ref: '#/definiciones/CambioObservado' }
+    errores: [CuotaExcedida, ProveedorNoDisponible]
+
+  detectarDisrupcion:
+    descripcion: Reconoce si un cambio forma parte de una disrupción masiva (UC-5).
+    entrada: { $ref: '#/definiciones/CambioObservado' }
+    salida:
+      oneOf:
+        - { $ref: '#/definiciones/Disrupcion' }
+        - { type: 'null' }
+
+reglas:
+  - Toda salida usa `fuente: proveedor` y `versionDeFuente` igual a la fecha de emisión en el proveedor.
+  - Una cancelación se informa con `cancelada: true`; prevalece siempre (ADR-0013).
+  - El complemento no reintenta ni abre cortacircuitos; eso lo hace el anfitrión (módulo `proteccion`, ADR-0024).
+  - Ante `429` del proveedor, devuelve `CuotaExcedida` con el `Retry-After` recibido.
+  - Ningún tipo del modelo del proveedor sale del complemento (regla R3).
+
+conformidad:
+  descripcion: Suite común que todo adaptador debe pasar antes de registrarse (ADR-0017).
+  verificaciones:
+    - El manifiesto valida contra `manifiesto`.
+    - Cada salida valida contra su esquema y contra el descriptor de cada tipo de segmento.
+    - Las grabaciones de respuestas reales del proveedor se reproducen y producen las mismas observaciones.
+    - Registrar el adaptador no modifica ningún archivo de otro adaptador ni de un servicio de dominio (QA-10).

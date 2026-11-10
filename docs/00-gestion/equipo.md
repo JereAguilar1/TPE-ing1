@@ -9,11 +9,6 @@
 | Juan Emilio Pardo | Interoperabilidad e integración | Adaptadores de proveedores, contratos, ingesta de correo |
 | Ivo Iriarte | Seguridad, privacidad y modelo de dominio | Identidad, delegación OAuth, compartición, modelo canónico de viaje |
 
-> **Pendiente de confirmar con el grupo.** El `README.md` original del repositorio mencionaba
-> «ivo irirate + benicio». *Benicio* no figura en la lista de integrantes acordada, de modo que
-> esta tabla refleja los cuatro integrantes confirmados. Si el grupo es de cinco, agregar la fila
-> correspondiente antes de la entrega.
-
 Los roles indican **quién lidera** cada área, no quién trabaja en exclusiva: toda decisión
 arquitectónica se revisa entre los cuatro antes de pasar un ADR a estado `aceptado`.
 

@@ -172,3 +172,12 @@ conexiones de los demás ni propaga su falla al dominio.
 * Análisis comparativo: [iteración 1, paso 4, D6](../02-proceso-add/iteracion-1/paso-4-alternativas.md#d6--integración-con-sistemas-externos)
 * Riesgo que genera: [R-2 (fragilidad de la extracción desde correo)](../02-proceso-add/iteracion-1/paso-7-analisis.md#riesgos-residuales)
 * Relacionados: el modelo canónico que este ADR presupone se diseña en la [iteración 2](../02-proceso-add/iteracion-2-plan.md); el versionado del contrato de adaptador, en la [iteración 4](../02-proceso-add/iteracion-4-plan.md)
+
+## Nota de actualización (iteración 2, 2026-10-28)
+
+La decisión no cambia. Se precisa qué eventos publica la capa de anticorrupción
+([ajuste 1 de la iteración 2](../02-proceso-add/iteracion-2/paso-7-analisis.md#ajustes-a-la-iteración-1)):
+`provider-sync` publica **`ReservaObservada`** (la observación traducida al modelo canónico), y
+`ReservaActualizada` / `ReservaCancelada` pasan a publicarse **solo desde `itinerary`**, ya
+fusionadas. Así ningún consumidor recibe un dato sin deduplicar ni sin pasar por la resolución de
+conflictos ([ADR-0013](ADR-0013-deduplicacion-y-conflictos.md)).

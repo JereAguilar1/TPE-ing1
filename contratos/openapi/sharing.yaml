@@ -1,0 +1,173 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — sharing
+  version: 1.0.0
+  description: |
+    Compartición de un viaje con personas designadas (RF-11, QA-12) y publicación de un resumen en
+    redes sociales (RF-13). En la iteración 2 este contrato era un borrador; se completó en la
+    iteración 4 (ADR-0028, iteración 4 §5.4).
+
+    Reglas que el contrato hace explícitas:
+    - Todo acceso no autorizado, a una compartición inexistente, vencida o revocada responde
+      **el mismo `404`**, sin cuerpo informativo (cero fugas de existencia).
+    - La revocación surte efecto en 60 s o menos (vales de 60 s e invalidación de caché en < 5 s).
+    - `ResumenPublicable` solo admite cuatro atributos (`additionalProperties: false`): los
+      localizadores, horarios exactos, precios, direcciones y correos son irrepresentables.
+servers:
+  - url: https://api.trotamundos.app
+security:
+  - oidc: []
+paths:
+  /viajes/{id}/comparticiones:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ViajeId'
+    get:
+      operationId: listarComparticiones
+      summary: Comparticiones del viaje (solo el dueño)
+      responses:
+        '200':
+          description: Comparticiones.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Comparticion' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+    post:
+      operationId: compartirViaje
+      summary: Comparte el viaje con una lista nominal de designados
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/vnd.trotamundos.v1+json:
+            schema:
+              type: object
+              required: [designados]
+              properties:
+                designados:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items: { type: string, format: email }
+                expiraEn:
+                  type: string
+                  format: date-time
+                  description: Por omisión y como máximo, fin del viaje + 30 días.
+      responses:
+        '201':
+          description: Compartición creada; los designados reciben el enlace.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: '#/components/schemas/Comparticion' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /viajes/{id}/comparticiones/{cid}:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ViajeId'
+      - { name: cid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    delete:
+      operationId: revocarComparticion
+      summary: Revoca la compartición (efecto en 60 s o menos)
+      responses:
+        '204': { description: Revocada. }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /comparticiones/{cid}:
+    parameters:
+      - { name: cid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    get:
+      operationId: verViajeCompartido
+      summary: Un designado ve el viaje compartido
+      description: |
+        Acepta la sesión OIDC de un designado con cuenta o el token de invitado con alcance
+        `lectura:comparticion:{cid}` emitido por `identity-access`. Cada acceso, permitido o no,
+        queda en la bitácora de auditoría (ADR-0030).
+      security:
+        - oidc: []
+      responses:
+        '200':
+          description: Viaje compartido, en solo lectura.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: 'private, no-store' }
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: 'comun.yaml#/components/schemas/Viaje' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /viajes/{id}/publicaciones:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ViajeId'
+    post:
+      operationId: publicarResumen
+      summary: Publica un resumen del viaje en una red social, tras previsualización y confirmación explícita
+      description: Se apaga automáticamente en el modo `Pico elevado` (ADR-0020).
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/vnd.trotamundos.v1+json:
+            schema:
+              type: object
+              required: [red, resumen, confirmado]
+              properties:
+                red: { type: string, examples: [instagram, facebook, x] }
+                resumen: { $ref: '#/components/schemas/ResumenPublicable' }
+                confirmado:
+                  type: boolean
+                  const: true
+                  description: El viajero confirmó la previsualización.
+      responses:
+        '202': { description: Publicación enviada al conector de la red (E-13). }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '503': { $ref: 'comun.yaml#/components/responses/NoDisponible' }
+
+  /viajes/{id}/publicaciones/previsualizacion:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ViajeId'
+    get:
+      operationId: previsualizarResumen
+      summary: Construye el `ResumenPublicable` del viaje para que el viajero lo revise
+      responses:
+        '200':
+          description: Resumen propuesto.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: '#/components/schemas/ResumenPublicable' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+components:
+  securitySchemes:
+    oidc:
+      $ref: 'comun.yaml#/components/securitySchemes/oidc'
+  schemas:
+    Comparticion:
+      type: object
+      required: [id, viajeId, designados, expiraEn, estado]
+      properties:
+        id: { $ref: 'comun.yaml#/components/schemas/Id' }
+        viajeId: { $ref: 'comun.yaml#/components/schemas/Id' }
+        designados:
+          type: array
+          items: { type: string, format: email }
+        expiraEn: { type: string, format: date-time }
+        estado: { type: string, enum: [Activa, Revocada, Vencida] }
+    ResumenPublicable:
+      type: object
+      description: Lista blanca estricta (ADR-0028, AMB-10). Cualquier otro atributo invalida el contrato.
+      additionalProperties: false
+      required: [tituloViaje, ciudadesDestino, mesAnio, tiposTransporte]
+      properties:
+        tituloViaje: { type: string, maxLength: 80 }
+        ciudadesDestino:
+          type: array
+          items: { type: string }
+        mesAnio: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        tiposTransporte:
+          type: array
+          items: { type: string }

@@ -1,0 +1,25 @@
+# Descriptor del tipo «tren». Declarado, sin adaptadores ni extractores implementados (CON-A3).
+# Es el caso de prueba de QA-15: guía de extensión de la iteración 4, paso 1.
+# Los boletos abiertos usan `precision: dia` en inicio y fin (hallazgo de la iteración 2, paso 7).
+tipo: tren
+version: 1
+rolEnViaje: traslado
+esquemaDeDetalle:
+  type: object
+  required: [numeroDeTren]
+  additionalProperties: false
+  properties:
+    numeroDeTren: { type: string }
+    coche: { type: string }
+    asiento: { type: string }
+    clase: { type: string }
+    anden: { type: string }
+camposRelevantes:
+  - { campo: inicio.instante, severidad: critica, umbralMinutos: 15 }
+  - { campo: detalle.anden, severidad: critica }
+presentacion:
+  icono: tren
+  titulo: "{operador} {referencia}"
+  filas: [coche, asiento, clase]
+dimension:
+  atributos: [operador, clase]

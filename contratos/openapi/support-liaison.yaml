@@ -1,0 +1,91 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — support-liaison
+  version: 1.0.0
+  description: |
+    Derivación de casos de soporte a la agencia preferida del usuario (RF-12, UC-7).
+
+    Trazabilidad: iteración 2, §5.7 («support-liaison — caso de soporte»). La creación es
+    idempotente (ADR-0014) y lleva testigo transregional síncrono (ADR-0018). El caso guarda una
+    instantánea inmutable del viaje tomada de `itinerary`. La conexión con cada agencia es un
+    adaptador cargado como complemento (ADR-0006).
+servers:
+  - url: https://api.trotamundos.app
+security:
+  - oidc: []
+paths:
+  /casos:
+    post:
+      operationId: abrirCaso
+      summary: Pide ayuda sobre un viaje; el caso se deriva a la agencia preferida
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/vnd.trotamundos.v1+json:
+            schema:
+              type: object
+              required: [viajeId, motivo]
+              properties:
+                viajeId: { $ref: 'comun.yaml#/components/schemas/Id' }
+                reservaId: { $ref: 'comun.yaml#/components/schemas/Id' }
+                motivo: { type: string, enum: [cancelacion, cambioDeHorario, reprogramacion, otro] }
+                descripcion: { type: string, maxLength: 2000 }
+                idDeCausa:
+                  type: string
+                  description: Presente si el pedido nace de un aviso de disrupción (UC-5).
+      responses:
+        '201':
+          description: Caso creado y derivado; se publica `CasoDerivado`.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: '#/components/schemas/Caso' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '422':
+          description: El usuario no tiene agencia preferida; el cuerpo indica cómo configurarla.
+          content:
+            application/problem+json:
+              schema: { $ref: 'comun.yaml#/components/schemas/Problema' }
+  /casos/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    get:
+      operationId: verCaso
+      responses:
+        '200':
+          description: Caso y estado.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: '#/components/schemas/Caso' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+  /casos/{id}/resolucion:
+    parameters:
+      - { name: id, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    post:
+      operationId: marcarCasoResuelto
+      summary: El usuario marca el caso como resuelto cuando la agencia no ofrece interfaz de estado
+      responses:
+        '200':
+          description: Caso resuelto.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: '#/components/schemas/Caso' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
+components:
+  securitySchemes:
+    oidc:
+      $ref: 'comun.yaml#/components/securitySchemes/oidc'
+  schemas:
+    Caso:
+      type: object
+      required: [id, viajeId, motivo, agencia, estado, abiertoEn]
+      properties:
+        id: { $ref: 'comun.yaml#/components/schemas/Id' }
+        viajeId: { $ref: 'comun.yaml#/components/schemas/Id' }
+        motivo: { type: string }
+        agencia: { type: string }
+        estado: { type: string, enum: [Abierto, Derivado, EnGestion, Resuelto, Cerrado] }
+        abiertoEn: { type: string, format: date-time }
+        referenciaAgencia: { type: string }

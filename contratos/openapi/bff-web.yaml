@@ -1,0 +1,281 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — bff-web
+  version: 1.0.0
+  description: |
+    Operaciones que el BFF expone a `app-web` a través de `api-gateway` (RF-09).
+    Componen datos de `itinerary` y de la copia local de `preferences`; no contienen lógica de
+    dominio (regla R4 de la vista de módulos N1, ADR-0005).
+
+    Representación: `application/vnd.trotamundos.v1+json`. Un cambio incompatible publica `v2` en
+    la misma ruta y anuncia el retiro de `v1` con `Deprecation` y `Sunset` (ADR-0027).
+
+    Trazabilidad: iteración 2, §5.7 («bff-web y bff-mobile — operaciones expuestas»); UC-3, UC-4.
+servers:
+  - url: https://api.trotamundos.app
+security:
+  - oidc: []
+tags:
+  - name: panel
+  - name: reservas
+  - name: viajes
+  - name: catalogo
+paths:
+  /panel:
+    get:
+      tags: [panel]
+      operationId: obtenerPanel
+      summary: Viajes activos, reservas por confirmar y conflictos abiertos, en una sola ida y vuelta (UC-3)
+      description: Presupuesto p95 de 800 ms (QA-02). Respuesta privada, validada por `ETag` (ADR-0019).
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/MinVersion'
+        - $ref: 'comun.yaml#/components/parameters/AcceptLanguage'
+        - $ref: 'comun.yaml#/components/parameters/Traceparent'
+        - name: If-None-Match
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Panel del usuario.
+          headers:
+            ETag: { $ref: 'comun.yaml#/components/headers/ETag' }
+            Cache-Control:
+              schema: { type: string, const: 'private, no-cache' }
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: 'comun.yaml#/components/schemas/Panel' }
+        '304': { description: Sin cambios desde el `ETag` enviado. }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
+        '429': { $ref: 'comun.yaml#/components/responses/DemasiadasPeticiones' }
+
+  /viajes:
+    get:
+      tags: [viajes]
+      operationId: listarViajes
+      summary: Lista los viajes del usuario; con `estado=Archivado` sirve la sección «Archivo» (RF-08)
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          schema: { $ref: 'comun.yaml#/components/schemas/EstadoViaje' }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limite
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Página de viajes.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema:
+                type: object
+                required: [viajes]
+                properties:
+                  viajes:
+                    type: array
+                    items: { $ref: 'comun.yaml#/components/schemas/ViajeResumen' }
+                  siguienteCursor: { type: [string, 'null'] }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
+
+  /viajes/{id}:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ViajeId'
+    get:
+      tags: [viajes]
+      operationId: obtenerViaje
+      summary: Detalle del viaje
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/MinVersion'
+      responses:
+        '200':
+          description: Viaje con sus reservas y segmentos.
+          headers:
+            ETag: { $ref: 'comun.yaml#/components/headers/ETag' }
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: 'comun.yaml#/components/schemas/Viaje' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+    delete:
+      tags: [viajes]
+      operationId: eliminarViaje
+      summary: El usuario elimina el viaje (estado `Eliminado`)
+      responses:
+        '204':
+          description: Eliminado.
+          headers:
+            X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /viajes/{id}/archivo:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ViajeId'
+    post:
+      tags: [viajes]
+      operationId: archivarViaje
+      summary: Archiva el viaje manualmente (el archivado automático lo hace el ciclo de vida, RF-08)
+      responses:
+        '204':
+          description: Archivado.
+          headers:
+            X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
+
+  /viajes/{vid}/reservas/{rid}:
+    parameters:
+      - { name: vid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+      - { name: rid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    put:
+      tags: [viajes]
+      operationId: moverReservaAViaje
+      summary: Mueve una reserva a otro viaje; la asignación queda fijada (iteración 2, §5.1)
+      responses:
+        '204':
+          description: Movida.
+          headers:
+            X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /reservas:
+    post:
+      tags: [reservas]
+      operationId: crearReserva
+      summary: Alta manual de una reserva (UC-4, RF-06)
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/vnd.trotamundos.v1+json:
+            schema: { $ref: 'comun.yaml#/components/schemas/ReservaNueva' }
+      responses:
+        '201':
+          description: Estado resultante. Si coincidió por identificador con una reserva existente, se devuelve esa reserva.
+          headers:
+            X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
+        '429': { $ref: 'comun.yaml#/components/responses/DemasiadasPeticiones' }
+
+  /reservas/{id}:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ReservaId'
+    put:
+      tags: [reservas]
+      operationId: editarReserva
+      summary: Edición manual; fija los campos tocados (ADR-0013)
+      requestBody:
+        required: true
+        content:
+          application/vnd.trotamundos.v1+json:
+            schema: { $ref: 'comun.yaml#/components/schemas/EdicionReserva' }
+      responses:
+        '200':
+          description: Estado resultante.
+          headers:
+            X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
+    delete:
+      tags: [reservas]
+      operationId: eliminarReserva
+      summary: Baja manual de una reserva
+      responses:
+        '204':
+          description: Eliminada.
+          headers:
+            X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /reservas/{id}/confirmacion:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ReservaId'
+    post:
+      tags: [reservas]
+      operationId: confirmarReserva
+      summary: Confirma, corrige o descarta una reserva `PorConfirmar` (banda media, ADR-0015)
+      requestBody:
+        required: true
+        content:
+          application/vnd.trotamundos.v1+json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [confirmar, descartar] }
+                correccion: { $ref: 'comun.yaml#/components/schemas/EdicionReserva' }
+      responses:
+        '200':
+          description: Estado resultante.
+          headers:
+            X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
+
+  /reservas/{id}/conflictos/{cid}/resolucion:
+    parameters:
+      - $ref: 'comun.yaml#/components/parameters/ReservaId'
+      - { name: cid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    post:
+      tags: [reservas]
+      operationId: resolverConflicto
+      summary: El usuario elige el valor de un conflicto de fuentes (CRN-11, ADR-0013)
+      requestBody:
+        required: true
+        content:
+          application/vnd.trotamundos.v1+json:
+            schema:
+              type: object
+              required: [eleccion]
+              properties:
+                eleccion: { type: string, enum: [mantenerFijado, aceptarFuente] }
+                fuente: { $ref: 'comun.yaml#/components/schemas/Fuente' }
+      responses:
+        '200':
+          description: Estado resultante.
+          headers:
+            X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
+
+  /tipos-de-segmento:
+    get:
+      tags: [catalogo]
+      operationId: listarTiposDeSegmento
+      summary: Descriptores de tipo para renderizar segmentos sin código por tipo (ADR-0011)
+      description: Catálogo público cacheable en `edge` (ADR-0019).
+      security: []
+      responses:
+        '200':
+          description: Descriptores vigentes.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: 'public, max-age=300, stale-while-revalidate=3600' }
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema:
+                type: array
+                items: { $ref: 'comun.yaml#/components/schemas/DescriptorTipoDeSegmento' }
+components:
+  securitySchemes:
+    oidc:
+      $ref: 'comun.yaml#/components/securitySchemes/oidc'

@@ -1,0 +1,81 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — mail-ingest (filtros y whitelists)
+  version: 1.0.0
+  description: |
+    Gestión de las listas de remitentes del usuario (RF-04).
+
+    Trazabilidad: iteración 2, §5.4. Hay tres listas: el catálogo de remitentes reconocidos
+    (derivado del registro de extractores, solo lectura), las **permitidas** y las **bloqueadas**
+    por el usuario. Precedencia: bloqueadas > permitidas > catálogo. Los filtros se evalúan sobre
+    los metadatos **antes** de descargar el cuerpo del mensaje.
+
+    Nota: este contrato no figura en la tabla de contratos de la iteración 2, que solo lista los
+    webhooks de `mail-ingest`. Se agrega porque RF-04 necesita una interfaz para que el usuario
+    administre sus listas, y la iteración 2 ubica los filtros en `mail-ingest` y no en `preferences`.
+servers:
+  - url: https://api.trotamundos.app
+security:
+  - oidc: []
+paths:
+  /filtros-de-correo:
+    get:
+      operationId: verFiltrosDeCorreo
+      responses:
+        '200':
+          description: Listas del usuario.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: '#/components/schemas/FiltrosDeCorreo' }
+    put:
+      operationId: guardarFiltrosDeCorreo
+      requestBody:
+        required: true
+        content:
+          application/vnd.trotamundos.v1+json:
+            schema: { $ref: '#/components/schemas/FiltrosDeCorreo' }
+      responses:
+        '200':
+          description: Listas guardadas.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: '#/components/schemas/FiltrosDeCorreo' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+  /filtros-de-correo/catalogo:
+    get:
+      operationId: verCatalogoDeRemitentes
+      summary: Remitentes que algún extractor reconoce (solo lectura)
+      responses:
+        '200':
+          description: Patrones de remitente reconocidos.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [patron, extractorId]
+                  properties:
+                    patron: { type: string, examples: ['*@aerolineas.com.ar'] }
+                    extractorId: { type: string }
+components:
+  securitySchemes:
+    oidc:
+      $ref: 'comun.yaml#/components/securitySchemes/oidc'
+  schemas:
+    FiltrosDeCorreo:
+      type: object
+      required: [permitidos, bloqueados]
+      properties:
+        permitidos:
+          type: array
+          description: Remitentes seguros del usuario (por ejemplo, su agencia).
+          items: { $ref: '#/components/schemas/PatronDeRemitente' }
+        bloqueados:
+          type: array
+          items: { $ref: '#/components/schemas/PatronDeRemitente' }
+    PatronDeRemitente:
+      type: string
+      description: Dirección exacta o comodín de dominio.
+      pattern: '^(\*@)?[^@\s]*@?[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+      examples: [reservas@miagencia.com, '*@miagencia.com']

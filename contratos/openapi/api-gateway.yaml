@@ -1,0 +1,109 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — API pública (api-gateway)
+  version: 1.0.0
+  description: |
+    Superficie HTTP pública completa que `api-gateway` publica para `app-web` y `app-movil`.
+    Este documento no redefine operaciones: referencia las de cada servicio, de modo que hay una
+    sola fuente de verdad por operación (ADR-0009). La columna `x-backend` indica a qué elemento
+    se enruta cada ruta.
+
+    Responsabilidades transversales del gateway (ADR-0005, ADR-0018, ADR-0020, ADR-0025, ADR-0027):
+    - Verifica el JWT OIDC y resuelve la `region_primaria` del usuario.
+    - Aplica la cubeta de fichas por usuario (60 req/min, ráfaga 20) → `429` con `Retry-After`.
+    - Fija `X-Deadline-Ms` (800 ms en modo normal, 1.500 ms en disrupción) hacia los servicios.
+    - Propaga o crea `traceparent`.
+    - Negocia la versión de representación con `Accept: application/vnd.trotamundos.v{N}+json`
+      (por omisión `v1`) y anuncia retiros con `Deprecation` y `Sunset`.
+
+    Los webhooks entrantes de terceros no pasan por este gateway: tienen su propio dominio
+    (`mail-ingest-webhooks.yaml`, `provider-sync-webhooks.yaml`). Las operaciones internas
+    (`itinerary.yaml` y las marcadas `x-interna` en `identity-access.yaml`) tampoco se publican.
+servers:
+  - url: https://api.trotamundos.app
+security:
+  - oidc: []
+paths:
+  # bff-web / bff-mobile (el gateway elige el BFF por tipo de cliente)
+  /panel:
+    $ref: 'bff-web.yaml#/paths/~1panel'
+  /panel/resumen:
+    $ref: 'bff-mobile.yaml#/paths/~1panel~1resumen'
+  /viajes:
+    $ref: 'bff-web.yaml#/paths/~1viajes'
+  /viajes/{id}:
+    $ref: 'bff-web.yaml#/paths/~1viajes~1{id}'
+  /viajes/{id}/archivo:
+    $ref: 'bff-web.yaml#/paths/~1viajes~1{id}~1archivo'
+  /viajes/{vid}/reservas/{rid}:
+    $ref: 'bff-web.yaml#/paths/~1viajes~1{vid}~1reservas~1{rid}'
+  /reservas:
+    $ref: 'bff-web.yaml#/paths/~1reservas'
+  /reservas/{id}:
+    $ref: 'bff-web.yaml#/paths/~1reservas~1{id}'
+  /reservas/{id}/confirmacion:
+    $ref: 'bff-web.yaml#/paths/~1reservas~1{id}~1confirmacion'
+  /reservas/{id}/conflictos/{cid}/resolucion:
+    $ref: 'bff-web.yaml#/paths/~1reservas~1{id}~1conflictos~1{cid}~1resolucion'
+  /tipos-de-segmento:
+    $ref: 'bff-web.yaml#/paths/~1tipos-de-segmento'
+  # identity-access
+  /sesiones:
+    $ref: 'identity-access.yaml#/paths/~1sesiones'
+  /sesiones/invitado/codigo:
+    $ref: 'identity-access.yaml#/paths/~1sesiones~1invitado~1codigo'
+  /sesiones/invitado/verificacion:
+    $ref: 'identity-access.yaml#/paths/~1sesiones~1invitado~1verificacion'
+  /buzones:
+    $ref: 'identity-access.yaml#/paths/~1buzones'
+  /buzones/{id}:
+    $ref: 'identity-access.yaml#/paths/~1buzones~1{id}'
+  /privacidad/exportaciones:
+    $ref: 'identity-access.yaml#/paths/~1privacidad~1exportaciones'
+  /privacidad/cuenta:
+    $ref: 'identity-access.yaml#/paths/~1privacidad~1cuenta'
+  # sharing
+  /viajes/{id}/comparticiones:
+    $ref: 'sharing.yaml#/paths/~1viajes~1{id}~1comparticiones'
+  /viajes/{id}/comparticiones/{cid}:
+    $ref: 'sharing.yaml#/paths/~1viajes~1{id}~1comparticiones~1{cid}'
+  /comparticiones/{cid}:
+    $ref: 'sharing.yaml#/paths/~1comparticiones~1{cid}'
+  /viajes/{id}/publicaciones:
+    $ref: 'sharing.yaml#/paths/~1viajes~1{id}~1publicaciones'
+  /viajes/{id}/publicaciones/previsualizacion:
+    $ref: 'sharing.yaml#/paths/~1viajes~1{id}~1publicaciones~1previsualizacion'
+  # support-liaison
+  /casos:
+    $ref: 'support-liaison.yaml#/paths/~1casos'
+  /casos/{id}:
+    $ref: 'support-liaison.yaml#/paths/~1casos~1{id}'
+  /casos/{id}/resolucion:
+    $ref: 'support-liaison.yaml#/paths/~1casos~1{id}~1resolucion'
+  # preferences
+  /preferencias:
+    $ref: 'preferences.yaml#/paths/~1preferencias'
+  # mail-ingest (filtros)
+  /filtros-de-correo:
+    $ref: 'mail-ingest-filtros.yaml#/paths/~1filtros-de-correo'
+  /filtros-de-correo/catalogo:
+    $ref: 'mail-ingest-filtros.yaml#/paths/~1filtros-de-correo~1catalogo'
+components:
+  securitySchemes:
+    oidc:
+      $ref: 'comun.yaml#/components/securitySchemes/oidc'
+x-backend:
+  /panel: bff-web | bff-mobile → itinerary-lectura
+  /panel/resumen: bff-mobile → itinerary-lectura
+  /viajes*: bff-web | bff-mobile → itinerary
+  /reservas*: bff-web | bff-mobile → itinerary-escritura
+  /tipos-de-segmento: bff-web | bff-mobile → itinerary-lectura (cacheado en edge)
+  /sesiones*: identity-access
+  /buzones*: identity-access
+  /privacidad*: identity-access
+  /viajes/{id}/comparticiones*: sharing
+  /comparticiones/{cid}: sharing
+  /viajes/{id}/publicaciones*: sharing
+  /casos*: support-liaison
+  /preferencias: preferences
+  /filtros-de-correo*: mail-ingest

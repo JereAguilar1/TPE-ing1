@@ -109,7 +109,40 @@ flowchart TB
     style IT_W fill:#2d6a4f,color:#fff
     style VAULT fill:#6a040f,color:#fff
     style CTRL fill:#f1faee
+
+    subgraph LEYENDA["Leyenda — tipos de elemento"]
+        direction LR
+        LEY_INS["instancias de servicio (3 AZs)"]
+        LEY_NUC["instancias de itinerary"]
+        LEY_BOR["borde regional"]
+        LEY_DB[("instancia de DB / caché / cola")]
+        LEY_SEC[("bóveda HSM / KMS")]
+        LEY_BRK{{"broker regional"}}
+        LEY_EXT(["actor o sistema externo"])
+        LEY_INS ~~~ LEY_NUC ~~~ LEY_BOR ~~~ LEY_DB ~~~ LEY_SEC ~~~ LEY_BRK ~~~ LEY_EXT
+    end
+    style LEY_NUC fill:#2d6a4f,color:#fff
+    style LEY_BOR fill:#1d3557,color:#fff
+    style LEY_SEC fill:#6a040f,color:#fff
+    style LEYENDA fill:#ffffff,stroke:#888,stroke-dasharray: 3 3
 ```
+
+**Leyenda**
+
+| Notación | Significado en esta vista |
+|---|---|
+| Recuadro con título | Agrupación de despliegue dentro de **una región**, repartida en 3 zonas de disponibilidad |
+| Recuadro de fondo claro | Plano de control y observabilidad (no atiende tráfico de usuarios) |
+| Rectángulo | **Instancias** de un servicio, replicadas en AZ-1, AZ-2 y AZ-3 |
+| Verde | Instancias de `itinerary` en sus dos modos (lectura y escritura) |
+| Azul | Nodos de borde regional (CDN + WAF, `api-gateway`) |
+| Cilindro | **Instancia de base de datos**, caché, cola persistente o almacenamiento de objetos |
+| Cilindro rojo | Bóveda de secretos sobre HSM/KMS regional |
+| Hexágono | *Broker* de eventos regional |
+| Óvalo | Clientes o sistemas externos |
+| `-->` flecha | Petición o llamada (rotulada cuando importa el tipo) |
+| `---` línea sin punta | Acceso a un almacén propio |
+| `-.->` punteada | Acción asíncrona o de control: invalidación, descarga a frío, despliegue canario, autoescalado, telemetría |
 
 ---
 
@@ -177,7 +210,36 @@ flowchart TB
     style PRI_DB fill:#2d6a4f,color:#fff
     style BKP_WIT fill:#6a040f,color:#fff
     style OLAP fill:#f1faee
+
+    subgraph LEYENDA["Leyenda — tipos de elemento"]
+        direction LR
+        LEY_INS["instancias de servicio"]
+        LEY_PRI[("shard primario (escritura)")]
+        LEY_DB[("réplica de DB")]
+        LEY_WIT[("registro testigo")]
+        LEY_INF{{"DNS / broker"}}
+        LEY_EXT(["sondas externas"])
+        LEY_INS ~~~ LEY_PRI ~~~ LEY_DB ~~~ LEY_WIT ~~~ LEY_INF ~~~ LEY_EXT
+    end
+    style LEY_PRI fill:#2d6a4f,color:#fff
+    style LEY_WIT fill:#6a040f,color:#fff
+    style LEYENDA fill:#ffffff,stroke:#888,stroke-dasharray: 3 3
 ```
+
+**Leyenda**
+
+| Notación | Significado en esta vista |
+|---|---|
+| Recuadro con título | **Nodo de despliegue**: región (primaria, de respaldo o tercera) o plano analítico global |
+| Rectángulo | **Instancias** de servicios |
+| Cilindro verde | **Instancia de base de datos** primaria del *bucket* del usuario (recibe las escrituras) |
+| Cilindro | Réplica de base de datos (caliente o de lectura) o almacenamiento columnar |
+| Cilindro rojo | Registro testigo transregional de comandos manuales |
+| Hexágono | DNS geográfico (azul) o *broker* regional |
+| Óvalo | Sondas sintéticas externas |
+| `==>` flecha gruesa | Escritura **síncrona** entre regiones (testigo, RPO = 0) |
+| `-.->` punteada | Flujo **asíncrono**: replicación, reenvío de webhooks o flujo de eventos |
+| `-->` flecha | Enrutamiento o acceso dentro de la región |
 
 ### Reglas de asignación que cierran `R-1` y `R-4`
 

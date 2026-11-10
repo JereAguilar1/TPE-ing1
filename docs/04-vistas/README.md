@@ -11,8 +11,10 @@ estructuras del sistema»).
 |---|---|---|
 | [Contexto](vista-contexto.md) | — (el sistema como caja negra) | ¿Dónde empieza y termina el sistema? ¿Con quién habla? |
 | [Módulos — nivel 1](vista-modulos-nivel-1.md) | **Estática**: unidades de implementación | ¿Cómo se divide el código? ¿Qué puede depender de qué? |
+| [Módulos — nivel 2 (funcionalidad primaria)](vista-modulos-nivel-2.md) | **Estática refinada**: interior de `itinerary`, `booking-extraction` y `mail-ingest` | ¿Qué módulo interno puede depender de cuál? ¿Cómo se separan lectura y escritura de `itinerary`? |
 | [Módulos — nivel 2 (adaptadores, identidad y extensión)](vista-modulos-adaptadores.md) | **Estática refinada**: complementos versionados, `identity-access`, `sharing`, `locales-icu` y punto de extensión | ¿Por qué agregar un proveedor (`QA-10`), transporte (`QA-15`), región (`QA-18`) o el módulo avanzado (`CON-06`) no toca el dominio? |
 | [Componentes y conectores — nivel 1](vista-cyc-nivel-1.md) | **Dinámica**: elementos en ejecución | ¿Qué corre en tiempo de ejecución y cómo se comunica? |
+| [Secuencias de los casos primarios](secuencias-casos-primarios.md) | **Dinámica refinada**: comportamiento de UC-1 a UC-7 | ¿Qué recorrido sigue cada caso de uso entre los componentes y por qué interfaces pasa? |
 | [Despliegue — nivel 1](vista-despliegue-nivel-1.md) | **De asignación**: software sobre hardware | ¿Dónde corre cada cosa a escala global? |
 | [Despliegue — nivel 2](vista-despliegue-nivel-2.md) | **De asignación refinada**: interior regional, plano de datos y elasticidad | ¿Cómo se despliega en 3 AZs, cómo cierra `R-1`/`R-4`, cuántas réplicas corren y cómo escala? |
 | [Seguridad, privacidad y residencia de datos](vista-seguridad-y-datos.md) | **Transversal híbrida** (C&C + asignación de datos y claves) | ¿Dónde están las fronteras de confianza, cómo se protegen 9 M de buzones (`QA-13`), cómo cierra `R-6` y cómo se suprime PII en ambos planos (`QA-14`)? |
@@ -46,6 +48,6 @@ de ADD. Las vistas y recorridos de **nivel 2** detallan el interior de los módu
 
 | Vista | Nivel 1 (iteración 1) | Nivel 2 / Refinamiento (iteraciones 2 a 4) |
 |---|---|---|
-| Módulos | Subsistemas y dependencias ([nivel 1](vista-modulos-nivel-1.md)) | Interior de `itinerary` ([iteración 2 §5](../02-proceso-add/iteracion-2/README.md#paso-5--instanciar-elementos-asignar-responsabilidades-y-definir-interfaces)) y subsistema de adaptadores, `identity-access`, `sharing`, `locales-icu` y extensión ([nivel 2](vista-modulos-adaptadores.md)) |
-| C&C | Componentes y tipos de conector ([nivel 1](vista-cyc-nivel-1.md)) | Secuencias de los casos de uso UC-1…UC-7 ([iteración 2, paso 7](../02-proceso-add/iteracion-2/paso-7-analisis.md)) y secuencia de supresión en dos planos ([seguridad y datos §5](vista-seguridad-y-datos.md#5-secuencia-de-supresión-verificable-en-ambos-planos--30-días--adr-0030)) |
+| Módulos | Subsistemas y dependencias ([nivel 1](vista-modulos-nivel-1.md)) | Interior de `itinerary`, `booking-extraction` y `mail-ingest` ([nivel 2](vista-modulos-nivel-2.md)) y subsistema de adaptadores, `identity-access`, `sharing`, `locales-icu` y extensión ([nivel 2](vista-modulos-adaptadores.md)) |
+| C&C | Componentes y tipos de conector ([nivel 1](vista-cyc-nivel-1.md)) | Secuencias de los casos de uso UC-1…UC-7 ([secuencias](secuencias-casos-primarios.md)) y secuencia de supresión en dos planos ([seguridad y datos §5](vista-seguridad-y-datos.md#5-secuencia-de-supresión-verificable-en-ambos-planos--30-días--adr-0030)) |
 | Despliegue y datos | Tres regiones y asignación gruesa ([nivel 1](vista-despliegue-nivel-1.md)) | Dimensionamiento, autoescalado y plano de datos ([nivel 2](vista-despliegue-nivel-2.md)) + fronteras de confianza, claves y residencia normativa ([seguridad y datos](vista-seguridad-y-datos.md)) |

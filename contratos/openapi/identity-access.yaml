@@ -1,0 +1,315 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — identity-access
+  version: 1.0.0
+  description: |
+    Identidad, consentimiento de buzones, custodia de tokens delegados, autorización y derechos
+    sobre datos personales.
+
+    Trazabilidad:
+    - Sesiones OIDC y consentimiento de buzones: ADR-0007; máquina de estados del buzón en la iteración 2, §5.7 (RF-01).
+    - Buzones sin OAuth (reenvío verificado, IMAP con credencial delegada): ADR-0035.
+    - Código de un solo uso para designados sin cuenta y evaluación ABAC con vales firmados: ADR-0028.
+    - Tokens efímeros de buzón solo por mTLS hacia `mail-ingest` (TTL ≤ 15 min): ADR-0029.
+    - Exportación y supresión de datos personales: ADR-0030.
+
+    Las operaciones marcadas `x-interna: true` no se publican en `api-gateway`.
+servers:
+  - url: https://api.trotamundos.app
+    description: Operaciones públicas, a través de api-gateway
+  - url: https://identity-access.interno
+    description: Operaciones internas (mTLS)
+tags:
+  - name: sesiones
+  - name: buzones
+  - name: autorizacion
+  - name: privacidad
+paths:
+  /sesiones:
+    post:
+      tags: [sesiones]
+      operationId: crearSesion
+      summary: Intercambia el código de autorización OIDC por una sesión (SLO-01, < 500 ms)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [codigo, verificadorPkce, uriRedireccion]
+              properties:
+                codigo: { type: string }
+                verificadorPkce: { type: string }
+                uriRedireccion: { type: string, format: uri }
+      responses:
+        '201':
+          description: Sesión creada. El token incluye `region_primaria` (ADR-0018).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sesion' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
+
+  /sesiones/invitado/codigo:
+    post:
+      tags: [sesiones]
+      operationId: solicitarCodigoInvitado
+      summary: Un designado sin cuenta pide un código de un solo uso para ver una compartición
+      description: |
+        La respuesta es **siempre** la misma, figure o no el correo como designado, para impedir la
+        enumeración (ADR-0028). Solo si figura se envía un código de 6 dígitos (TTL 10 min, 3 intentos).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comparticionId, correo]
+              properties:
+                comparticionId: { $ref: 'comun.yaml#/components/schemas/Id' }
+                correo: { type: string, format: email }
+      responses:
+        '202': { description: 'Respuesta neutra: «Si tu correo está autorizado, recibirás un código».' }
+        '429': { $ref: 'comun.yaml#/components/responses/DemasiadasPeticiones' }
+
+  /sesiones/invitado/verificacion:
+    post:
+      tags: [sesiones]
+      operationId: verificarCodigoInvitado
+      summary: Canjea el código por un token efímero con alcance `lectura:comparticion:{id}`
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comparticionId, correo, codigo]
+              properties:
+                comparticionId: { $ref: 'comun.yaml#/components/schemas/Id' }
+                correo: { type: string, format: email }
+                codigo: { type: string, pattern: '^[0-9]{6}$' }
+      responses:
+        '201':
+          description: Token de invitado sin perfil permanente.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sesion' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /buzones:
+    get:
+      tags: [buzones]
+      operationId: listarBuzones
+      security: [{ oidc: [] }]
+      responses:
+        '200':
+          description: Buzones conectados y su estado.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Buzon' }
+    post:
+      tags: [buzones]
+      operationId: conectarBuzon
+      summary: Inicia la conexión de un buzón (estado `Solicitado`, RF-01)
+      security: [{ oidc: [] }]
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [via]
+              properties:
+                via:
+                  type: string
+                  enum: [oauth, reenvio, imapDelegado]
+                  description: |
+                    `oauth` es la vía preferida. `reenvio` asigna un alias dedicado verificado por
+                    DKIM/SPF/ARC. `imapDelegado` solo acepta `XOAUTH2` o contraseña de aplicación
+                    revocable; **nunca** la contraseña principal (ADR-0035, CON-08).
+                proveedor: { type: string, examples: [gmail, outlook] }
+                credencialDelegada:
+                  type: string
+                  writeOnly: true
+                  description: Solo para `imapDelegado`. Se cifra bajo `DEK_u` (ADR-0029).
+      responses:
+        '201':
+          description: Buzón creado. Para `oauth` incluye la URL de autorización; para `reenvio`, el alias asignado.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Buzon'
+                  - type: object
+                    properties:
+                      urlAutorizacion: { type: string, format: uri }
+                      aliasReenvio: { type: string, format: email }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+
+  /buzones/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    delete:
+      tags: [buzones]
+      operationId: desconectarBuzon
+      summary: Revoca el token en el proveedor, lo destruye en la bóveda y baja la suscripción (estado `Revocado`)
+      security: [{ oidc: [] }]
+      responses:
+        '204': { description: Revocado; se publica `EstadoDeBuzonCambiado`. }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /buzones/{id}/token-efimero:
+    parameters:
+      - { name: id, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    post:
+      tags: [buzones]
+      operationId: emitirTokenEfimeroDeBuzon
+      summary: Entrega a `mail-ingest` un token de acceso de uso acotado (UC-1)
+      x-interna: true
+      description: Solo el certificado mTLS de `mail-ingest` está autorizado (regla R5, ADR-0029). Cada emisión queda auditada (ADR-0030).
+      security: [{ mtls: [] }]
+      responses:
+        '200':
+          description: Token efímero.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, expiraEn]
+                properties:
+                  token: { type: string }
+                  expiraEn: { type: string, format: date-time, description: 15 minutos o menos }
+        '409':
+          description: El buzón no está `Activo` (por ejemplo, `RequiereReautorizacion`).
+
+  /autorizaciones/evaluar:
+    post:
+      tags: [autorizacion]
+      operationId: evaluarAutorizacion
+      summary: Evalúa una política ABAC y emite un vale JWS de 60 s ligado al recurso (ADR-0028)
+      x-interna: true
+      security: [{ mtls: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sujeto, accion, recurso]
+              properties:
+                sujeto:
+                  type: object
+                  required: [usuarioId]
+                  properties:
+                    usuarioId: { $ref: 'comun.yaml#/components/schemas/Id' }
+                    correoVerificado: { type: string, format: email }
+                    alcances: { type: array, items: { type: string } }
+                accion: { type: string, examples: [leer, modificar, compartir] }
+                recurso:
+                  type: object
+                  required: [tipo, id]
+                  properties:
+                    tipo: { type: string, enum: [viaje, reserva, comparticion, caso] }
+                    id: { $ref: 'comun.yaml#/components/schemas/Id' }
+      responses:
+        '200':
+          description: Decisión. Si es `permitir`, incluye el vale.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [decision]
+                properties:
+                  decision: { type: string, enum: [permitir, denegar] }
+                  vale: { type: string, description: 'JWS con TTL de 60 s' }
+
+  /privacidad/exportaciones:
+    get:
+      tags: [privacidad]
+      operationId: listarExportaciones
+      security: [{ oidc: [] }]
+      responses:
+        '200':
+          description: Exportaciones pedidas y su estado.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Exportacion' }
+    post:
+      tags: [privacidad]
+      operationId: pedirExportacion
+      summary: Pide el paquete firmado de acceso y portabilidad (< 2 h, ADR-0030)
+      security: [{ oidc: [] }]
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Exportación en curso.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exportacion' }
+
+  /privacidad/cuenta:
+    delete:
+      tags: [privacidad]
+      operationId: suprimirCuenta
+      summary: Supresión verificable en dos fases (operacional < 24 h, analítica ≤ 30 días, ADR-0030)
+      description: Al cerrar la fase 1 se publica `CuentaSuprimida` con el seudónimo analítico, sin datos personales.
+      security: [{ oidc: [] }]
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Supresión iniciada.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [solicitudId, plazoFase1, plazoFase2]
+                properties:
+                  solicitudId: { $ref: 'comun.yaml#/components/schemas/Id' }
+                  plazoFase1: { type: string, format: date-time }
+                  plazoFase2: { type: string, format: date-time }
+
+components:
+  securitySchemes:
+    oidc:
+      $ref: 'comun.yaml#/components/securitySchemes/oidc'
+    mtls:
+      type: mutualTLS
+      description: Certificado de carga de trabajo del servicio llamante.
+  schemas:
+    Sesion:
+      type: object
+      required: [tokenAcceso, expiraEn, regionPrimaria]
+      properties:
+        tokenAcceso: { type: string }
+        tokenRefresco: { type: string }
+        expiraEn: { type: string, format: date-time }
+        regionPrimaria: { type: string, enum: [AM, EU, AP] }
+    Buzon:
+      type: object
+      required: [id, via, estado]
+      properties:
+        id: { $ref: 'comun.yaml#/components/schemas/Id' }
+        via: { type: string, enum: [oauth, reenvio, imapDelegado] }
+        direccion: { type: string, format: email }
+        estado:
+          type: string
+          enum: [Solicitado, Activo, RequiereReautorizacion, Revocado]
+    Exportacion:
+      type: object
+      required: [id, estado]
+      properties:
+        id: { $ref: 'comun.yaml#/components/schemas/Id' }
+        estado: { type: string, enum: [EnCurso, Lista, Vencida] }
+        urlDescarga: { type: string, format: uri }
+        firma: { type: string }

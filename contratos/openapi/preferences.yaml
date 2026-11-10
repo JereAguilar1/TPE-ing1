@@ -1,0 +1,76 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — preferences
+  version: 1.0.0
+  description: |
+    Preferencias del usuario (RF-15) que habilitan RF-08, RF-10, RF-12 y QA-18.
+
+    Trazabilidad: iteración 2, §5.6. Cada cambio publica `PreferenciasActualizadas` y los
+    consumidores (`notification`, `itinerary`, `support-liaison`, los BFF) mantienen una copia
+    local, de modo que no hay llamadas sincrónicas a este servicio durante un pico (QA-04).
+    Los filtros de correo (RF-04) **no** están aquí: viven en `mail-ingest`
+    (ver `mail-ingest-filtros.yaml`).
+servers:
+  - url: https://api.trotamundos.app
+security:
+  - oidc: []
+paths:
+  /preferencias:
+    get:
+      operationId: verPreferencias
+      responses:
+        '200':
+          description: Preferencias actuales.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: '#/components/schemas/Preferencias' }
+    put:
+      operationId: guardarPreferencias
+      requestBody:
+        required: true
+        content:
+          application/vnd.trotamundos.v1+json:
+            schema: { $ref: '#/components/schemas/Preferencias' }
+      responses:
+        '200':
+          description: Preferencias guardadas; se publica `PreferenciasActualizadas`.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: '#/components/schemas/Preferencias' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+components:
+  securitySchemes:
+    oidc:
+      $ref: 'comun.yaml#/components/securitySchemes/oidc'
+  schemas:
+    Preferencias:
+      type: object
+      required: [idioma, zonaHoraria, region]
+      properties:
+        agenciaPreferida:
+          type: [object, 'null']
+          description: Destino de los casos de soporte (RF-12).
+          required: [id, nombre]
+          properties:
+            id: { type: string }
+            nombre: { type: string }
+        idioma: { type: string, description: Etiqueta BCP 47 (ADR-0032), examples: [es-AR] }
+        zonaHoraria: { type: string, description: Zona IANA }
+        region: { type: string, enum: [AM, EU, AP] }
+        diasDeGraciaArchivado:
+          type: integer
+          minimum: 0
+          maximum: 365
+          default: 3
+          description: Días entre `Completado` y `Archivado` (RF-08).
+        canales:
+          type: object
+          properties:
+            push: { type: boolean, default: true }
+            correo: { type: boolean, default: true }
+        horasDeSilencio:
+          type: object
+          description: No se aplican a los avisos críticos (iteración 2, §5.7).
+          properties:
+            desde: { type: string, pattern: '^[0-2][0-9]:[0-5][0-9]$', default: '22:00' }
+            hasta: { type: string, pattern: '^[0-2][0-9]:[0-5][0-9]$', default: '07:00' }

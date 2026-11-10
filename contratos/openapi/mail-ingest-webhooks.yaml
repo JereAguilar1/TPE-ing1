@@ -1,0 +1,75 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — mail-ingest (webhooks entrantes)
+  version: 1.0.0
+  description: |
+    Entradas de `mail-ingest` desde los proveedores de correo (E-06) y desde el receptor de
+    reenvío dedicado.
+
+    Trazabilidad:
+    - Notificación *push* con reconciliación periódica: ADR-0004 (módulo `receptor`).
+    - Receptor liviano: valida la firma, encola en 15 ms o menos y responde `202` (ADR-0020).
+    - Reenvío verificado por DKIM/SPF/ARC para buzones sin OAuth: ADR-0035.
+
+    El receptor **no** descarga ni interpreta el mensaje: solo encola «buzón con cambios»
+    (vista de módulos N2, §3).
+servers:
+  - url: https://ingesta.trotamundos.app
+paths:
+  /webhooks/correo:
+    post:
+      operationId: recibirAvisoDeCorreo
+      summary: Aviso del proveedor de correo de que un buzón tiene cambios
+      security:
+        - firmaWebhook: []
+      parameters:
+        - name: X-Proveedor-Correo
+          in: header
+          required: true
+          schema: { type: string, examples: [gmail, outlook] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Carga del proveedor; cada proveedor tiene su forma y el receptor solo extrae la referencia de suscripción.
+              required: [suscripcionId]
+              properties:
+                suscripcionId: { type: string }
+                historialDesde: { type: string }
+              additionalProperties: true
+      responses:
+        '202': { description: Encolado. }
+        '401': { description: Firma inválida. }
+        '429': { $ref: 'comun.yaml#/components/responses/DemasiadasPeticiones' }
+
+  /webhooks/correo/reenvio:
+    post:
+      operationId: recibirCorreoReenviado
+      summary: El servidor de correo entrante entrega un mensaje reenviado a un alias dedicado
+      description: |
+        Se verifica DKIM/SPF/ARC y que el remitente coincida con el correo verificado del dueño
+        del alias. El mensaje sigue el mismo camino `MensajeNormalizado` → `booking-extraction`.
+      security:
+        - mtaInterno: []
+      requestBody:
+        required: true
+        content:
+          message/rfc822:
+            schema: { type: string, format: binary }
+      parameters:
+        - name: X-Alias-Destino
+          in: header
+          required: true
+          schema: { type: string, format: email }
+      responses:
+        '202': { description: Encolado. }
+        '403': { description: Autenticación del remitente no superada; el mensaje se descarta y se audita. }
+components:
+  securitySchemes:
+    firmaWebhook:
+      $ref: 'comun.yaml#/components/securitySchemes/firmaWebhook'
+    mtaInterno:
+      type: mutualTLS
+      description: Solo el servidor de correo entrante propio.

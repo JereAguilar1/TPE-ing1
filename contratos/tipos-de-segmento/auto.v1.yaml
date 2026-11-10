@@ -1,0 +1,23 @@
+# Descriptor del tipo «auto» (implementado). Validación del modelo: iteración 2, paso 7.
+# Un segmento; inicio = retiro, fin = devolución; los lugares pueden diferir.
+tipo: auto
+version: 1
+rolEnViaje: movilidadLocal
+esquemaDeDetalle:
+  type: object
+  required: [categoria]
+  additionalProperties: false
+  properties:
+    categoria: { type: string, examples: [economico, compacto, suv] }
+    kilometraje: { type: string, enum: [ilimitado, limitado] }
+    cobertura: { type: string }
+camposRelevantes:
+  - { campo: inicio.instante, severidad: critica, umbralMinutos: 30 }
+  - { campo: inicio.lugar, severidad: critica }
+  - { campo: fin.lugar, severidad: informativa }
+presentacion:
+  icono: auto
+  titulo: "{operador}"
+  filas: [categoria, kilometraje, cobertura]
+dimension:
+  atributos: [operador, categoria]

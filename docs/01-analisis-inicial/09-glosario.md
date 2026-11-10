@@ -72,6 +72,21 @@ erDiagram
 | **Modelo canónico** | Representación interna única de reserva/segmento/viaje, independiente de cualquier proveedor. Es lo que los adaptadores producen y lo que el dominio consume | — |
 | **Capa de anticorrupción** | Conjunto de adaptadores que traducen entre los modelos de los sistemas externos y el modelo canónico, impidiendo que los conceptos ajenos se filtren al dominio | — |
 
+### Términos incorporados en la iteración 2
+
+| Término | Definición en este trabajo | Qué **no** es |
+|---|---|---|
+| **Observación** | Lo que una fuente afirma sobre una reserva en un momento, identificada por `(fuente, idDeFuente)` y ordenada por la versión de la fuente. Solo se agrega; la vista consolidada de la reserva se deriva de las observaciones ([ADR-0010](../03-adr/ADR-0010-modelo-canonico-reserva-segmento-viaje.md)) | No es la reserva: una reserva acumula varias observaciones |
+| **Identificador** | Par `(emisor, código)` que identifica una reserva ante un emisor (localizador de aerolínea, número de orden de agencia). Una reserva tiene un **conjunto** de identificadores ([ADR-0013](../03-adr/ADR-0013-deduplicacion-y-conflictos.md)) | No es el id interno de la reserva |
+| **Campo fijado** | Campo de un segmento que el usuario editó manualmente. Ninguna fuente automática lo sobrescribe; un valor distinto y nuevo abre un conflicto | — |
+| **Conflicto** | Discrepancia abierta entre el valor fijado por el usuario y uno nuevo traído por una fuente. La resuelve el usuario | No es una diferencia entre fuentes automáticas, que se resuelve por precedencia |
+| **Banda de confianza** | Clasificación del resultado de una extracción (alta, media o baja) según los umbrales del extractor. La banda media entra como `PorConfirmar` y la baja no entra ([ADR-0015](../03-adr/ADR-0015-politica-de-confianza-de-extraccion.md)) | — |
+| **Descriptor de tipo** | Declaración versionada de un tipo de segmento: esquema del detalle, rol en el viaje, campos relevantes para notificar, presentación y dimensión analítica ([ADR-0011](../03-adr/ADR-0011-extensibilidad-del-tipo-de-segmento.md)) | No es código: agregar un tipo no agrega lógica de dominio |
+| **Rol en el viaje** | `traslado`, `alojamiento` o `movilidadLocal`. La agrupación de reservas en viajes razona por rol y lugar, nunca por tipo | — |
+| **Bandeja de entrada** (*inbox*) | Registro de los mensajes o eventos ya procesados por un consumidor, con clave única, que descarta las entregas repetidas ([ADR-0014](../03-adr/ADR-0014-idempotencia-de-la-ingesta.md)) | No detecta contenido repetido en mensajes distintos: eso lo resuelve la fusión determinista |
+| **Bandeja de salida** (*outbox*) | Tabla donde se escribe el evento a publicar en la misma transacción que el cambio que lo origina | — |
+| **Proyección del panel** | Modelo de lectura `panel_usuario`, mantenido por eventos, que sirve el camino de lectura en una sola consulta | No es la fuente de verdad: se reconstruye desde los eventos |
+
 ## Convención de identificadores
 
 | Prefijo | Qué identifica | Fijado en |

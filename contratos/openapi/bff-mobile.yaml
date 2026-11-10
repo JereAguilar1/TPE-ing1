@@ -1,0 +1,64 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — bff-mobile
+  version: 1.0.0
+  description: |
+    Operaciones que el BFF expone a `app-movil` (RF-09, ADR-0005). Reutiliza las operaciones de
+    `bff-web` y agrega `GET /panel/resumen`, la variante compacta para el arranque en frío
+    (primer despliegue de contenido < 1,4 s, QA-03; cuerpo de 15 KB o menos, ADR-0019).
+
+    La evaluación de geocercas ocurre en el dispositivo y no tiene contrato de servidor (ADR-0033).
+servers:
+  - url: https://api.trotamundos.app
+security:
+  - oidc: []
+paths:
+  /panel/resumen:
+    get:
+      tags: [panel]
+      operationId: obtenerPanelResumen
+      summary: Panel compacto para el arranque móvil
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/MinVersion'
+        - $ref: 'comun.yaml#/components/parameters/AcceptLanguage'
+        - name: If-None-Match
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Resumen del panel.
+          headers:
+            ETag: { $ref: 'comun.yaml#/components/headers/ETag' }
+            Cache-Control:
+              schema: { type: string, const: 'private, no-cache' }
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: 'comun.yaml#/components/schemas/PanelResumen' }
+        '304': { description: Sin cambios. }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
+        '429': { $ref: 'comun.yaml#/components/responses/DemasiadasPeticiones' }
+  /panel:
+    $ref: 'bff-web.yaml#/paths/~1panel'
+  /viajes:
+    $ref: 'bff-web.yaml#/paths/~1viajes'
+  /viajes/{id}:
+    $ref: 'bff-web.yaml#/paths/~1viajes~1{id}'
+  /viajes/{id}/archivo:
+    $ref: 'bff-web.yaml#/paths/~1viajes~1{id}~1archivo'
+  /viajes/{vid}/reservas/{rid}:
+    $ref: 'bff-web.yaml#/paths/~1viajes~1{vid}~1reservas~1{rid}'
+  /reservas:
+    $ref: 'bff-web.yaml#/paths/~1reservas'
+  /reservas/{id}:
+    $ref: 'bff-web.yaml#/paths/~1reservas~1{id}'
+  /reservas/{id}/confirmacion:
+    $ref: 'bff-web.yaml#/paths/~1reservas~1{id}~1confirmacion'
+  /reservas/{id}/conflictos/{cid}/resolucion:
+    $ref: 'bff-web.yaml#/paths/~1reservas~1{id}~1conflictos~1{cid}~1resolucion'
+  /tipos-de-segmento:
+    $ref: 'bff-web.yaml#/paths/~1tipos-de-segmento'
+components:
+  securitySchemes:
+    oidc:
+      $ref: 'comun.yaml#/components/securitySchemes/oidc'

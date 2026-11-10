@@ -81,7 +81,35 @@ flowchart TB
     style S_KMS fill:#6a040f,color:#fff
     style S_AUD fill:#1d3557,color:#fff
     style Z4 fill:#f1faee,stroke:#2d6a4f
+
+    subgraph LEYENDA["Leyenda — tipos de elemento"]
+        direction LR
+        LEY_CMP["componente (instancias)"]
+        LEY_DB[("instancia de DB / almacén")]
+        LEY_KMS[("custodia de claves")]
+        LEY_AUD[("bitácora de auditoría")]
+        LEY_EXT(["actor o sistema externo"])
+        LEY_CMP ~~~ LEY_DB ~~~ LEY_KMS ~~~ LEY_AUD ~~~ LEY_EXT
+    end
+    style LEY_KMS fill:#6a040f,color:#fff
+    style LEY_AUD fill:#1d3557,color:#fff
+    style LEYENDA fill:#ffffff,stroke:#888,stroke-dasharray: 3 3
 ```
+
+**Leyenda**
+
+| Notación | Significado en esta vista |
+|---|---|
+| Recuadro «ZONA n» | **Zona de confianza**; cruzar de una zona a otra exige autenticación |
+| Recuadro con borde rojo | Zona de custodia restringida (solo `identity-access`) |
+| Rectángulo | **Componente** en ejecución |
+| Cilindro | **Instancia de base de datos** o almacén |
+| Cilindro rojo | Custodia de claves (bóveda HSM/KMS) |
+| Cilindro azul | Bitácora de auditoría inmutable |
+| Óvalo | Actor o sistema externo, no confiable |
+| `==>` flecha gruesa | Tráfico que **cruza una frontera de confianza**; el rótulo indica cómo se autentica |
+| `-->` flecha | Llamada dentro de la misma zona |
+| `-.->` punteada | Flujo asíncrono o registro de auditoría |
 
 ### Controles defensivos en profundidad sobre las fronteras
 
@@ -131,7 +159,36 @@ flowchart LR
     style R1_STORE fill:#6a040f,color:#fff
     style WIT_CIPH fill:#1d3557,color:#fff
     style AN_GLB fill:#2d6a4f,color:#fff
+
+    subgraph LEYENDA["Leyenda — tipos de elemento"]
+        direction LR
+        LEY_R1[("datos Clase R1 / claves")]
+        LEY_R2[("almacén Clase R2")]
+        LEY_WIT[("copia cifrada sin clave")]
+        LEY_R3[("datos Clase R3 desidentificados")]
+        LEY_CMP["componente"]
+        LEY_R1 ~~~ LEY_R2 ~~~ LEY_WIT ~~~ LEY_R3 ~~~ LEY_CMP
+    end
+    style LEY_R1 fill:#6a040f,color:#fff
+    style LEY_WIT fill:#1d3557,color:#fff
+    style LEY_R3 fill:#2d6a4f,color:#fff
+    style LEYENDA fill:#ffffff,stroke:#888,stroke-dasharray: 3 3
 ```
+
+**Leyenda**
+
+| Notación | Significado en esta vista |
+|---|---|
+| Recuadro con título | Jurisdicción o región donde residen físicamente los datos |
+| Cilindro rojo | Datos Clase R1 (identificables) o claves; nunca salen de su jurisdicción |
+| Cilindro | **Instancia de base de datos** Clase R2 (operacional) |
+| Cilindro azul | Copia cifrada en otra región, sin acceso a la clave |
+| Cilindro verde | Datos Clase R3, desidentificados, de alcance global |
+| Rectángulo | **Componente** en ejecución |
+| `==>` flecha gruesa | Replicación **síncrona** cifrada en origen |
+| `-.->` punteada | Provisión de claves, o flujo **prohibido** cuando está rotulado con ✖ |
+| `-->` flecha | Flujo desidentificado hacia el plano global |
+| `---` línea sin punta | Custodia: la clave protege ese almacén |
 
 ---
 
@@ -198,3 +255,14 @@ sequenceDiagram
     AN-->>ID: Hash de verificación de particiones compactadas (0 filas del seudónimo)
     ID->>ID: Registra acta firmada de supresión completa en registro_auditoria
 ```
+
+**Leyenda**
+
+| Notación | Significado en esta secuencia |
+|---|---|
+| Caja superior | **Participante**: componente en ejecución; `DOM` agrupa los servicios que guardan datos del usuario |
+| Muñeco (*actor*) | Titular de los datos que pide la supresión |
+| `->>` flecha continua | Llamada sincrónica, comando o acción interna del participante |
+| `-->>` flecha punteada | Respuesta o confirmación |
+| Número en la flecha | Orden del paso |
+| Nota amarilla | Trabajo programado que no es un mensaje |

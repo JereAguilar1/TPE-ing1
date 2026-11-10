@@ -1,0 +1,96 @@
+# Contrato de complemento: Extractor
+#
+# Lo implementa cada complemento `extractor-<formato>` cargado por `registro-de-extractores` en
+# `booking-extraction` (vista de módulos N2, §2).
+#
+# Trazabilidad:
+#   - Complementos y capa de anticorrupción: ADR-0006.
+#   - Umbrales por extractor y tres bandas: ADR-0015.
+#   - Salida validada contra el descriptor del tipo de segmento: ADR-0011.
+#   - Suite de conformidad común a todos los extractores: ADR-0017.
+#   - SemVer del contrato (`apiContrato`) y puente de una versión mayor: ADR-0027.
+#
+# Los esquemas siguen JSON Schema 2020-12. Las referencias a `comun.yaml` y `eventos-de-dominio.yaml`
+# reutilizan los tipos canónicos, de modo que extractor y evento no pueden divergir.
+
+contrato: Extractor
+apiContrato: "1.0"
+estado: vigente
+
+manifiesto:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  description: Lo que el complemento declara al cargarse. El anfitrión rechaza el complemento si `apiContrato` no es compatible.
+  required: [id, version, apiContrato, remitentesQueReconoce, tiposDeSegmento, umbrales]
+  additionalProperties: false
+  properties:
+    id: { type: string, pattern: '^extractor-[a-z0-9-]+$' }
+    version: { type: string, description: SemVer del complemento }
+    apiContrato: { type: string, pattern: '^1\.[0-9]+$' }
+    remitentesQueReconoce:
+      type: array
+      minItems: 1
+      description: Patrones de remitente. Alimentan el catálogo de remitentes reconocidos de los filtros (RF-04).
+      items: { type: string }
+    tiposDeSegmento:
+      type: array
+      minItems: 1
+      items: { type: string, description: Clave de un descriptor registrado en contratos/tipos-de-segmento/ }
+    umbrales:
+      type: object
+      required: [alto, bajo]
+      description: Valores iniciales 0,90 / 0,60; se calibran por extractor con su corpus (ADR-0015).
+      properties:
+        alto: { type: number, minimum: 0, maximum: 1 }
+        bajo: { type: number, minimum: 0, maximum: 1 }
+    corpus:
+      type: string
+      description: Ubicación del corpus de referencia anonimizado de este extractor.
+
+operaciones:
+  reconoce:
+    descripcion: Indica si el extractor aplica al mensaje. Debe ser barata; no extrae.
+    entrada:
+      $ref: '../asyncapi/eventos-de-dominio.yaml#/components/schemas/MensajeNormalizado'
+    salida:
+      type: object
+      required: [aplica]
+      properties:
+        aplica: { type: boolean }
+
+  extrae:
+    descripcion: |
+      Extrae una o más observaciones canónicas del mensaje. No decide la banda: devuelve la
+      confianza y el anfitrión (`evaluador-de-confianza`) fija la banda con los umbrales del manifiesto.
+    entrada:
+      $ref: '../asyncapi/eventos-de-dominio.yaml#/components/schemas/MensajeNormalizado'
+    salida:
+      type: object
+      required: [observaciones, confianza]
+      properties:
+        observaciones:
+          type: array
+          items: { $ref: '../openapi/comun.yaml#/components/schemas/ObservacionCanonica' }
+        confianza: { $ref: '../asyncapi/eventos-de-dominio.yaml#/components/schemas/Confianza' }
+        advertencias:
+          type: array
+          items: { type: string }
+    errores:
+      - FormatoNoSoportado    # equivale a banda baja: no entra nada
+      - MensajeCorrupto
+
+reglas:
+  - La salida de `extrae` usa `fuente: correo` e `idDeFuente` derivado de `(buzonId, idDeMensaje)`.
+  - Cada segmento de la salida valida contra `esquemaDeDetalle` de su `(tipo, versionTipo)`.
+  - El extractor no inventa campos obligatorios; si no los encuentra, baja su confianza por campo.
+  - El extractor no accede a la red ni a otros servicios; es una función pura del mensaje.
+  - Ningún tipo del formato externo sale del complemento (regla R3 de la vista de módulos N1).
+
+conformidad:
+  descripcion: Suite común que todo extractor debe pasar antes de registrarse (ADR-0017).
+  verificaciones:
+    - El manifiesto valida contra `manifiesto`.
+    - La salida de `extrae` valida contra el esquema de salida y contra el descriptor de cada tipo.
+    - Sobre su corpus, acierto ≥ 95 % en los campos obligatorios y cero errores en la banda alta (QA-11).
+    - Con el corpus degradado, el disyuntor de calidad del anfitrión pasa el extractor a «solo confirmación».
+    - Un mensaje fuera de sus remitentes devuelve `aplica: false`.
