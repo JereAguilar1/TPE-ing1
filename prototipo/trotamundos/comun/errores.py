@@ -15,7 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 TIPO_MEDIO_PROBLEMA = "application/problem+json"
 
 # Títulos de los errores que genera el framework (el detalle original viene en inglés).
-_TITULOS = {404: "No encontrado", 405: "Método no permitido"}
+_TITULOS = {404: "No encontrado", 405: "Método no permitido", 500: "Error interno"}
 
 
 class Problema(Exception):
@@ -91,3 +91,10 @@ def instalar_manejadores(app: FastAPI) -> None:
         titulo = _TITULOS.get(error.status_code, str(error.detail))
         problema = Problema(error.status_code, titulo, cabeceras=dict(error.headers or {}))
         return await _problema(request, problema)
+
+    @app.exception_handler(Exception)
+    async def _inesperado(request: Request, error: Exception) -> JSONResponse:
+        # Un error no previsto también sale como Problema, sin revelar el mensaje interno (que
+        # puede contener datos personales, ADR-0030). Starlette lo vuelve a lanzar después de
+        # responder, así que igual queda registrado.
+        return await _problema(request, Problema(500, "Error interno"))

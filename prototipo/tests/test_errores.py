@@ -67,3 +67,19 @@ def test_el_404_por_falta_de_acceso_es_identico_al_de_inexistente(cliente):
 
 def test_el_405_conserva_la_cabecera_allow(cliente):
     assert cliente.post("/numero/1").headers["allow"] == "GET"
+
+
+def test_un_error_inesperado_sale_como_problema_sin_revelar_el_mensaje():
+    app = FastAPI()
+    instalar_manejadores(app)
+
+    @app.get("/falla")
+    def falla():
+        raise RuntimeError("usuario ana@ejemplo.com sin buzón")
+
+    respuesta = TestClient(app, raise_server_exceptions=False).get("/falla")
+
+    assert respuesta.status_code == 500
+    assert respuesta.headers["content-type"] == TIPO_MEDIO_PROBLEMA
+    contratos_por_omision().validar(PROBLEMA, respuesta.json())
+    assert "ana@ejemplo.com" not in respuesta.text

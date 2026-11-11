@@ -2,14 +2,9 @@
 
 import pytest
 
-from trotamundos.comun.contratos import Contratos, ErrorDeContrato, contratos_por_omision
+from trotamundos.comun.contratos import ErrorDeContrato
 
 RESERVA = "openapi/comun.yaml#/components/schemas/Reserva"
-
-
-@pytest.fixture(scope="module")
-def contratos() -> Contratos:
-    return contratos_por_omision()
 
 
 def reserva_valida() -> dict:
