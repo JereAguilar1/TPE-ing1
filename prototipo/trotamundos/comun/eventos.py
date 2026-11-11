@@ -27,7 +27,7 @@ _REFERENCIA_SOBRE = "asyncapi/eventos-de-dominio.yaml#/components/schemas/Sobre"
 # cabeceras: otras que agregue la infraestructura (por ejemplo, de trazas) no forman parte del sobre.
 _CABECERAS = (
     "idDeEvento", "tipo", "versionEsquema", "usuarioId", "ocurridoEn",
-    "productor", "regionOrigen", "idDeCausa", "traceparent",
+    "productor", "regionOrigen", "idDeCausa", "idDeCorrelacion", "traceparent",
 )
 
 
@@ -53,7 +53,14 @@ class Evento:
         region: str | None = None,
         id_de_causa: str | None = None,
         traceparent: str | None = None,
+        id_de_correlacion: str | None = None,
     ) -> "Evento":
+        """Evento nuevo con su sobre.
+
+        `id_de_correlacion` es el identificador que `edge` inyectó en la petición de origen
+        (iteración 3, §5.8). Si no se indica, se copia `traceparent`, que es como lo recibe el
+        servicio y lo que devuelve `correlationId` en los errores HTTP.
+        """
         sobre: dict[str, Any] = {
             "idDeEvento": str(uuid.uuid4()),
             "tipo": tipo,
@@ -65,6 +72,7 @@ class Evento:
             "usuarioId": usuario_id,
             "regionOrigen": region,
             "idDeCausa": id_de_causa,
+            "idDeCorrelacion": id_de_correlacion or traceparent,
             "traceparent": traceparent,
         }
         sobre.update({k: v for k, v in opcionales.items() if v is not None})
@@ -93,14 +101,24 @@ class Evento:
 
     @classmethod
     def desde_kafka(cls, valor: bytes, cabeceras: list[tuple[str, bytes]]) -> "Evento":
-        """Reconstruye el evento. Lanza `ErrorDeContrato` si el mensaje no trae sobre o carga."""
-        sobre = {k: v.decode() for k, v in cabeceras if k in _CABECERAS}
+        """Reconstruye el evento.
+
+        Lanza `ErrorDeContrato` ante cualquier mensaje mal formado (sin `tipo`, con cabeceras que
+        no son UTF-8 o con una carga que no es un objeto JSON), para que el consumidor lo descarte
+        con un solo tipo de error en lugar de caerse.
+        """
+        try:
+            sobre = {k: v.decode() for k, v in cabeceras if k in _CABECERAS}
+        except UnicodeDecodeError as error:
+            raise ErrorDeContrato(_REFERENCIA_SOBRE, [f"una cabecera no es UTF-8: {error}"]) from error
         if "tipo" not in sobre:
             raise ErrorDeContrato(_REFERENCIA_SOBRE, ["el mensaje no trae la cabecera 'tipo'"])
         try:
             carga = json.loads(valor)
-        except ValueError as error:
+        except ValueError as error:  # incluye UnicodeDecodeError
             raise ErrorDeContrato(_REFERENCIA_SOBRE, [f"la carga no es JSON: {error}"]) from error
+        if not isinstance(carga, dict):
+            raise ErrorDeContrato(_REFERENCIA_SOBRE, ["la carga no es un objeto JSON"])
         return cls(tipo=sobre["tipo"], sobre=sobre, carga=carga)
 
 

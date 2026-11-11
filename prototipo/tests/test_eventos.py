@@ -4,15 +4,10 @@ import uuid
 
 import pytest
 
-from trotamundos.comun.contratos import ErrorDeContrato, contratos_por_omision
+from trotamundos.comun.contratos import ErrorDeContrato
 from trotamundos.comun.eventos import Evento
 
 USUARIO = str(uuid.uuid4())
-
-
-@pytest.fixture(scope="module")
-def contratos():
-    return contratos_por_omision()
 
 
 def reserva_extraida(banda: str = "alta") -> Evento:
@@ -101,11 +96,30 @@ def test_cuenta_suprimida_se_particiona_por_seudonimo():
 
 @pytest.mark.parametrize(
     ("valor", "cabeceras"),
-    [(b"{}", []), (b"no es json", [("tipo", b"ReservaExtraida")])],
+    [
+        (b"{}", []),
+        (b"no es json", [("tipo", b"ReservaExtraida")]),
+        (b"[]", [("tipo", b"CuentaSuprimida")]),  # JSON válido, pero no un objeto
+        (b"\xff", [("tipo", b"ReservaExtraida")]),  # cuerpo que no es UTF-8
+        (b"{}", [("tipo", b"\xff")]),  # cabecera que no es UTF-8
+    ],
 )
 def test_un_mensaje_mal_formado_se_rechaza(valor, cabeceras):
     with pytest.raises(ErrorDeContrato):
         Evento.desde_kafka(valor, cabeceras)
+
+
+def test_el_productor_copia_la_correlacion_al_sobre(contratos):
+    # Iteración 3, §5.8: todo productor copia el identificador de edge a `idDeCorrelacion`.
+    evento = Evento.nuevo("CuentaSuprimida",
+                          {"seudonimoAnalitico": "s-1", "suprimidaEn": "2026-11-11T00:00:00Z"},
+                          productor="identity-access", usuario_id=None,
+                          traceparent="00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
+    evento.validar(contratos)
+    assert evento.sobre["idDeCorrelacion"] == evento.sobre["traceparent"]
+
+    _, valor, cabeceras = evento.a_kafka()
+    assert Evento.desde_kafka(valor, cabeceras).sobre["idDeCorrelacion"] == evento.sobre["idDeCorrelacion"]
 
 
 def test_las_cabeceras_ajenas_al_sobre_se_ignoran():

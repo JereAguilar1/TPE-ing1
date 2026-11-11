@@ -1,13 +1,15 @@
 asyncapi: 3.0.0
 info:
   title: Trotamundos — eventos de dominio
-  version: 1.1.0
+  version: 1.2.0
   description: |
     Catálogo de eventos publicados en el *broker* (ADR-0001, ADR-0009).
 
     - `1.0.0`: los 15 eventos de la iteración 2 (§5.10 del README de la iteración 2).
     - `1.1.0`: se agrega `CuentaSuprimida` (iteración 4, ADR-0030), con un sobre que prohíbe
       `usuarioId`. Agregar un tipo de evento es un cambio compatible (ADR-0027).
+    - `1.2.0`: se agrega al sobre el atributo opcional `idDeCorrelacion` que pide la iteración 3
+      (§5.8, ADR-0025). Agregar un campo opcional es un cambio compatible (ADR-0027).
 
     Reglas comunes:
     - **Entrega al menos una vez.** Todo consumidor aplica una bandeja de entrada por
@@ -442,7 +444,12 @@ components:
         productor: { type: string }
         regionOrigen: { type: string, enum: [AM, EU, AP] }
         idDeCausa: { type: string, description: 'Correlaciona una disrupción con los cambios que provoca (iteración 2, §5.7)' }
-        traceparent: { type: string }
+        idDeCorrelacion:
+          type: string
+          description: |
+            Correlación de punta a punta (iteración 3, §5.8; ADR-0025): el `correlation_id` que
+            `edge` inyecta en la petición que originó el cambio, copiado por cada productor.
+        traceparent: { type: string, description: Contexto de traza W3C para OpenTelemetry }
     SobreSinUsuario:
       type: object
       description: |
@@ -456,7 +463,12 @@ components:
         versionEsquema: { type: string, pattern: '^[0-9]+\.[0-9]+$' }
         ocurridoEn: { type: string, format: date-time }
         productor: { type: string }
-        traceparent: { type: string }
+        idDeCorrelacion:
+          type: string
+          description: |
+            Correlación de punta a punta (iteración 3, §5.8; ADR-0025): el `correlation_id` que
+            `edge` inyecta en la petición que originó el cambio, copiado por cada productor.
+        traceparent: { type: string, description: Contexto de traza W3C para OpenTelemetry }
     EstadoBuzon:
       type: string
       enum: [Solicitado, Activo, RequiereReautorizacion, Revocado]
