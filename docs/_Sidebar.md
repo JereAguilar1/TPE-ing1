@@ -42,5 +42,8 @@
 **Contratos**
 - [Índice de contratos](../contratos/README.md)
 
+**Prototipo (2da entrega)**
+- [Alcance y plan](../prototipo/README.md)
+
 **Trazabilidad**
 - [Matriz de drivers](05-trazabilidad/matriz-drivers-decisiones.md)
