@@ -6,8 +6,8 @@ info:
     Catálogo de eventos publicados en el *broker* (ADR-0001, ADR-0009).
 
     - `1.0.0`: los 15 eventos de la iteración 2 (§5.10 del README de la iteración 2).
-    - `1.1.0`: se agrega `CuentaSuprimida` (iteración 4, ADR-0030). Agregar un tipo de evento es un
-      cambio compatible (ADR-0027).
+    - `1.1.0`: se agrega `CuentaSuprimida` (iteración 4, ADR-0030), con un sobre que prohíbe
+      `usuarioId`. Agregar un tipo de evento es un cambio compatible (ADR-0027).
 
     Reglas comunes:
     - **Entrega al menos una vez.** Todo consumidor aplica una bandeja de entrada por
@@ -445,7 +445,11 @@ components:
         traceparent: { type: string }
     SobreSinUsuario:
       type: object
+      description: |
+        Sobre de los eventos que no pueden identificar al usuario (CuentaSuprimida, ADR-0030).
+        Prohíbe `usuarioId` para que el dato personal no pueda viajar ni por error.
       required: [idDeEvento, tipo, versionEsquema, ocurridoEn, productor]
+      not: { required: [usuarioId] }
       properties:
         idDeEvento: { $ref: '#/components/schemas/Id' }
         tipo: { type: string }
