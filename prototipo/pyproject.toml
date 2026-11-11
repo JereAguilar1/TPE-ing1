@@ -1,0 +1,41 @@
+[project]
+name = "trotamundos"
+version = "0.1.0"
+description = "Prototipo de la arquitectura Trotamundos (2da entrega del TPE). Ver ADR-0034 y ADR-0036."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.32.1",
+    "pydantic==2.10.3",
+    "httpx==0.28.1",
+    "pyyaml==6.0.2",
+    # El extra format-nongpl trae los validadores de formato (date-time, uri, ...). Sin él,
+    # jsonschema ignora esos formatos y los contratos se aplicarían a medias.
+    "jsonschema[format-nongpl]==4.23.0",
+    "jsonschema-specifications==2025.9.1",  # metaesquemas; se importa directamente en comun.contratos
+    "referencing==0.35.1",
+    "psycopg[binary]==3.2.3",
+    "aiokafka==0.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.24.0",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["trotamundos*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    # Aviso interno de starlette.testclient con anyio reciente; no afecta al código del prototipo.
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]

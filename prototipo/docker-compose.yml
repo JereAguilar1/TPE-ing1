@@ -1,0 +1,37 @@
+# Infraestructura local del prototipo (ADR-0036).
+# Reemplaza los servicios gestionados de nube que supone CON-A2 por equivalentes con la misma
+# interfaz. Los servicios de Trotamundos se agregan en los commits siguientes.
+
+services:
+  postgres:
+    # Almacén operacional relacional con JSONB para el detalle por tipo (ADR-0012).
+    image: postgres:16.4
+    environment:
+      POSTGRES_USER: trotamundos
+      POSTGRES_PASSWORD: trotamundos
+      POSTGRES_DB: trotamundos
+    ports:
+      - "55432:5432"  # 55432 para no chocar con un PostgreSQL local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trotamundos"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  broker:
+    # Broker de eventos con API de Kafka (protocolo del contrato AsyncAPI, ADR-0001).
+    image: redpandadata/redpanda:v24.2.7
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://broker:9092,external://localhost:19092
+    ports:
+      - "19092:19092"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
