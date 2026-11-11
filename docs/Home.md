@@ -88,6 +88,7 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 | [ADR-0033](03-adr/ADR-0033-capacidades-nativas-gps-y-degradacion.md) | Evaluación espacial en el dispositivo móvil con geocodificación previa y degradación sin GPS | 4 |
 | [ADR-0034](03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) | Punto de extensión del módulo avanzado nº 14 (Opción A y B) y recorte del prototipo por ASRs | 4 |
 | [ADR-0035](03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) | Ingesta sin OAuth mediante reenvío verificado / credenciales delegadas y flujo asistido ante formato desconocido | 4 |
+| [ADR-0036](03-adr/ADR-0036-tecnologia-del-prototipo.md) | Prototipo en Python 3.12 + FastAPI, PostgreSQL y broker compatible con Kafka | 2da entrega |
 
 ## 4. Vistas arquitectónicas
 

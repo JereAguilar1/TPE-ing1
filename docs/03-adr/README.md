@@ -87,6 +87,12 @@ El análisis comparativo de estas decisiones está en
 | [ADR-0034](ADR-0034-punto-de-extension-modulo-avanzado.md) | Integración del módulo avanzado de la 2da entrega como elemento autónomo nº 14 y recorte del prototipo por ASRs | `aceptado` | CON-06, CON-05, CON-A4, QA-04 |
 | [ADR-0035](ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) | Ingesta sin OAuth mediante reenvío verificado / credenciales delegadas y flujo asistido ante formato desconocido | `aceptado` | CON-08, QA-11, QA-13, RF-01, RF-03 |
 
+### 2da entrega — Prototipo
+
+| ADR | Decisión | Estado | Drivers principales |
+|---|---|---|---|
+| [ADR-0036](ADR-0036-tecnologia-del-prototipo.md) | Prototipo en Python 3.12 con FastAPI, PostgreSQL y un *broker* compatible con Kafka, validado en ejecución contra `contratos/` | `aceptado` | CON-04, CON-05, CON-09, QA-16 |
+
 ## Plantilla
 
 → [plantilla-madr.md](plantilla-madr.md)
