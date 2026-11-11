@@ -30,16 +30,41 @@ PostgreSQL 16, Redpanda (API de Kafka) y Docker Compose.
 ```
 prototipo/
 ├── trotamundos/
-│   ├── comun/              # lo único compartido (equivale a modelo-canonico + contratos)
-│   │   ├── config.py       # configuración por entorno
-│   │   ├── contratos.py    # validación en ejecución contra contratos/   (ADR-0009, ADR-0017)
-│   │   ├── eventos.py      # sobre, carga y representación en el broker  (AsyncAPI, ADR-0014)
-│   │   └── errores.py      # application/problem+json                    (comun.yaml)
-│   └── servicios/          # un subpaquete por servicio; ninguno importa a otro (ADR-0036)
+│   ├── comun/                  # lo único compartido (equivale a modelo-canonico + contratos)
+│   │   ├── config.py           # configuración por entorno
+│   │   ├── contratos.py        # validación en ejecución contra contratos/   (ADR-0009, ADR-0017)
+│   │   ├── eventos.py          # sobre, carga y representación en el broker  (AsyncAPI, ADR-0014)
+│   │   ├── errores.py          # application/problem+json                    (comun.yaml)
+│   │   ├── modelo.py           # modelo-canonico: ObservacionCanonica, Lugar, Extremo (ADR-0010)
+│   │   └── tipos_de_segmento.py # registro de descriptores de tipo           (ADR-0011, ADR-0027)
+│   └── servicios/              # un subpaquete por servicio; ninguno importa a otro (ADR-0036)
 ├── tests/
 ├── docker-compose.yml      # PostgreSQL + broker
 └── Makefile
 ```
+
+### Reglas verificadas por las pruebas
+
+`tests/test_arquitectura.py` comprueba en cada corrida las reglas de las vistas de módulos:
+
+| Regla | Origen |
+|---|---|
+| Ningún servicio importa a otro; solo comparten `trotamundos.comun` | ADR-0036, ADR-0001 |
+| `comun/modelo.py` solo usa la biblioteca estándar | R7, vista de módulos N1 |
+| Ningún módulo menciona un tipo de segmento concreto (`vuelo`, `tren`…). Solo pueden hacerlo los complementos (adaptadores y extractores), que van en carpetas `complementos/` | I4, vista de módulos N2; ADR-0011 |
+
+### Decisiones de implementación
+
+Decisiones menores que los documentos de arquitectura no fijan explícitamente. Ninguna contradice
+un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
+
+| Decisión | Por qué | Respaldo en la documentación |
+|---|---|---|
+| El registro de tipos de segmento vive en `comun/tipos_de_segmento.py`, no dentro de `itinerary` | Lo usan `itinerary` y también los extractores y adaptadores para validar su salida (QA-10, QA-11); como un servicio no puede importar a otro (ADR-0036), tiene que estar en lo compartido | La vista de módulos de adaptadores muestra los descriptores como «artefacto común transversal» usado por `booking-extraction`. La vista N2 lo ubica en `itinerary`: en el prototipo ese módulo es la exposición de `GET /tipos-de-segmento` |
+| `CuentaSuprimida` se particiona por `seudonimoAnalitico` | El contrato prohíbe `usuarioId` en ese evento (ADR-0030); el seudónimo es el único identificador que trae, y mantiene en orden los eventos de supresión de una misma cuenta | Contrato AsyncAPI, `SobreSinUsuario` y carga de `CuentaSuprimida` |
+| Los adaptadores y extractores van en carpetas `complementos/`, y son lo único que puede nombrar un tipo de segmento concreto | Traducen un formato externo a un tipo, así que necesitan conocerlo; el resto del código razona por descriptor (regla I4) | Vista de módulos N2 (regla I4) y vista de adaptadores (complementos aislados, reglas R2 y R3) |
+| Los eventos y las respuestas se validan en el mismo proceso contra los archivos de `contratos/`, sin un registro de esquemas | Da la misma garantía (nada sale del servicio sin cumplir el contrato) sin agregar otro servidor a la infraestructura local. La compatibilidad entre versiones se comprueba con pruebas (paso 16) | La iteración 4 prevé un registro de esquemas AsyncAPI con compatibilidad `BACKWARD_TRANSITIVE` (ADR-0027); el prototipo lo reemplaza, no lo contradice |
+| El campo `type` de los errores es `https://errores.trotamundos.app/{status}` | RFC 9457 pide una URI que identifique el tipo de problema; una por código de estado alcanza para el prototipo | `comun.yaml`, esquema `Problema` (`type` con `format: uri`) |
 
 ## Cómo correrlo
 
@@ -63,7 +88,7 @@ Cada paso es un commit. La columna «Trazabilidad» indica qué decisiones imple
 | # | Paso | Trazabilidad | Estado |
 |---|---|---|---|
 | 1 | Base: tecnología, infraestructura, validación contra `contratos/` | ADR-0009, ADR-0036 | ✅ |
-| 2 | Registro de tipos de segmento y modelos canónicos | ADR-0010, ADR-0011 | ⬜ |
+| 2 | Registro de tipos de segmento y modelos canónicos | ADR-0010, ADR-0011 | ✅ |
 | 3 | `itinerary`: agregado `Reserva` y fusión determinista | ADR-0010, ADR-0013 | ⬜ |
 | 4 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | ⬜ |
 | 5 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | ⬜ |

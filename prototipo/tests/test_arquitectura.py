@@ -5,7 +5,10 @@ separación de ADR-0001 se mantiene aunque el prototipo sea un solo paquete Pyth
 """
 
 import ast
+import sys
 from pathlib import Path
+
+from trotamundos.comun.tipos_de_segmento import registro_por_omision
 
 PAQUETE = Path(__file__).resolve().parents[1] / "trotamundos"
 
@@ -70,3 +73,53 @@ def test_la_regla_detecta_importaciones_absolutas_y_relativas(tmp_path):
     assert sorted({v.split(" ")[0] for v in encontradas}) == [
         "a/absoluta.py", "a/relativa.py", "a/subpaquete.py",
     ]
+
+
+# --- R7: modelo-canonico no depende de nada (vista de módulos N1) ---------------------------
+
+def test_comun_no_importa_ningun_servicio():
+    # `comun` es la base de todos (ADR-0036, regla 2): si importara un servicio, ese servicio
+    # pasaría a ser dependencia de todos los demás.
+    encontradas = sorted(
+        f"{archivo.relative_to(PAQUETE)} importa {nombre}"
+        for archivo in (PAQUETE / "comun").rglob("*.py")
+        for nombre in _importaciones(PAQUETE, archivo)
+        if nombre.split(".")[:2] == ["trotamundos", "servicios"]
+    )
+    assert encontradas == []
+
+
+def test_el_modelo_canonico_solo_usa_la_biblioteca_estandar():
+    externas = {nombre.split(".")[0] for nombre in _importaciones(PAQUETE, PAQUETE / "comun" / "modelo.py")
+                if nombre.split(".")[0] not in sys.stdlib_module_names}
+    assert externas == set()
+
+
+# --- I4: ningún módulo menciona un tipo de segmento concreto (vista N2, ADR-0011, QA-15) ----
+
+def menciones_de_tipos(raiz: Path, tipos: set[str]) -> list[str]:
+    """Literales de texto iguales a un tipo de segmento, fuera de los complementos.
+
+    Los complementos (adaptadores y extractores, en carpetas `complementos/`) sí conocen tipos
+    concretos: traducen un formato externo a un tipo. Todo lo demás razona por descriptor.
+    """
+    encontradas = []
+    for archivo in raiz.rglob("*.py"):
+        if "complementos" in archivo.relative_to(raiz).parts:
+            continue
+        for nodo in ast.walk(ast.parse(archivo.read_text(encoding="utf-8"))):
+            if isinstance(nodo, ast.Constant) and nodo.value in tipos:
+                encontradas.append(f"{archivo.relative_to(raiz)}:{nodo.lineno} menciona {nodo.value!r}")
+    return sorted(encontradas)
+
+
+def test_ningun_modulo_menciona_un_tipo_de_segmento_concreto():
+    assert menciones_de_tipos(PAQUETE, set(registro_por_omision().tipos())) == []
+
+
+def test_la_regla_de_tipos_ignora_los_complementos(tmp_path):
+    (tmp_path / "viajes.py").write_text("ROL = {'vuelo': 'traslado'}\n")
+    (tmp_path / "complementos").mkdir()
+    (tmp_path / "complementos" / "extractor.py").write_text("TIPO = 'vuelo'\n")
+
+    assert menciones_de_tipos(tmp_path, {"vuelo"}) == ["viajes.py:1 menciona 'vuelo'"]
