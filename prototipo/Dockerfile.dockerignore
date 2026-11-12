@@ -1,0 +1,7 @@
+# Contexto de la imagen (la raíz del repositorio): solo el paquete y los contratos.
+*
+!contratos/
+!prototipo/pyproject.toml
+!prototipo/trotamundos/
+**/__pycache__
+**/*.egg-info

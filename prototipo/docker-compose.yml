@@ -1,6 +1,6 @@
 # Infraestructura local del prototipo (ADR-0036).
 # Reemplaza los servicios gestionados de nube que supone CON-A2 por equivalentes con la misma
-# interfaz. Los servicios de Trotamundos se agregan en los commits siguientes.
+# interfaz, y corre los servicios de Trotamundos, cada uno en su proceso, desde la misma imagen.
 
 services:
   postgres:
@@ -32,6 +32,32 @@ services:
       - "19092:19092"
     healthcheck:
       test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  itinerary:
+    # Núcleo del dominio (paso 4): API interna de reservas. Consumir del broker y publicar la
+    # outbox llegan con el paso 6.
+    build:
+      context: ..
+      dockerfile: prototipo/Dockerfile
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.itinerary.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TROTAMUNDOS_DSN: postgresql://trotamundos:trotamundos@postgres:5432/trotamundos
+      TROTAMUNDOS_BROKER: broker:9092
+      TROTAMUNDOS_REGION: AM
+    ports:
+      - "18101:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # GET /tipos-de-segmento no necesita usuario (contrato de itinerary).
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/tipos-de-segmento')"]
       interval: 5s
       timeout: 3s
       retries: 20

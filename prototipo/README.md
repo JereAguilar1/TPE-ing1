@@ -36,15 +36,24 @@ prototipo/
 │   │   ├── eventos.py          # sobre, carga y representación en el broker  (AsyncAPI, ADR-0014)
 │   │   ├── errores.py          # application/problem+json                    (comun.yaml)
 │   │   ├── modelo.py           # modelo-canonico: ObservacionCanonica, Lugar, Extremo (ADR-0010)
+│   │   ├── persistencia.py     # PostgreSQL: outbox, bandeja de entrada, Idempotency-Key (ADR-0012, ADR-0014)
 │   │   └── tipos_de_segmento.py # registro de descriptores de tipo           (ADR-0011, ADR-0027)
 │   └── servicios/              # un subpaquete por servicio; ninguno importa a otro (ADR-0036)
-│       └── itinerary/          # un módulo por cada módulo de la vista N2
-│           ├── reservas.py     # agregado Reserva: observaciones, fijados, estados  (ADR-0010)
-│           └── fusion/
-│               ├── consolidacion.py # precedencia por fuente, fijados y conflictos (ADR-0013)
-│               └── identidad.py     # identificadores múltiples, unificación, sugerencias
+│       └── itinerary/          # un módulo por cada módulo de la vista N2, más servicio.py
+│           ├── reservas/       # agregado Reserva (ADR-0010) y su repositorio PostgreSQL (ADR-0012)
+│           ├── fusion/
+│           │   ├── consolidacion.py # precedencia por fuente, fijados y conflictos (ADR-0013)
+│           │   ├── identidad.py     # identificadores múltiples, unificación, sugerencias
+│           │   └── eventos.py       # ReservaActualizada, ReservaCancelada, ConflictoDeFuentesDetectado
+│           ├── gestion_manual.py    # alta, edición, baja, confirmación y conflictos (RF-06)
+│           ├── ingesta.py           # ReservaExtraida y ReservaObservada con bandeja de entrada (ADR-0014)
+│           ├── publicacion.py       # outbox (ADR-0012)
+│           ├── proyeccion_panel.py  # lectura mantenida por eventos internos
+│           ├── api.py               # API interna (openapi/itinerary.yaml)
+│           └── servicio.py          # arma los módulos y define las transacciones
 ├── tests/
-├── docker-compose.yml      # PostgreSQL + broker
+├── Dockerfile              # una imagen para todos los servicios (se construye desde la raíz)
+├── docker-compose.yml      # PostgreSQL, broker y servicios
 └── Makefile
 ```
 
@@ -57,7 +66,7 @@ prototipo/
 | Ningún servicio importa a otro; solo comparten `trotamundos.comun` | ADR-0036, ADR-0001 |
 | `comun/modelo.py` solo usa la biblioteca estándar | R7, vista de módulos N1 |
 | Ningún módulo menciona un tipo de segmento concreto (`vuelo`, `tren`…). Solo pueden hacerlo los complementos (adaptadores y extractores), que van en carpetas `complementos/` | I4, vista de módulos N2; ADR-0011 |
-| Dentro de `itinerary`, cada módulo importa solo los módulos que la vista N2 le permite (`reservas` no conoce a `fusion` ni a `viajes`; `proyeccion_panel` y `publicacion` no importan dominio). Un módulo que no está en la vista hace fallar la prueba | I1, I3, I5, vista de módulos N2 |
+| Dentro de `itinerary`, cada módulo importa solo los módulos que la vista N2 le permite (`reservas` no conoce a `fusion` ni a `viajes`; `ingesta` solo conoce a `fusion`; `api` solo a `gestion_manual` y `proyeccion_panel`; `proyeccion_panel` y `publicacion` no importan dominio). La excepción declarada es `servicio`, el punto de armado, que ningún módulo importa. Un módulo que no está en la tabla hace fallar la prueba | I1, I3, I5, vista de módulos N2 |
 
 ### Decisiones de implementación
 
@@ -76,11 +85,24 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | Los segmentos se alinean por posición. Una observación aporta valores a un segmento solo si tiene la misma cantidad de segmentos y el mismo tipo y versión del tipo en esa posición | Evita mezclar tramos (un vuelo con escala informado como uno o como dos) y detalles de versiones distintas del tipo | `ConflictoDeFuentes.campo` usa rutas por posición (`segmentos[0].inicio.instante`) |
 | Un conflicto se abre si una observación automática **posterior al fijado** (por `versionDeFuente`) trae otro valor. Resolverlo es fijar de nuevo: el mismo valor (`mantenerFijado`) o el de la fuente elegida (`aceptarFuente`) | «Después» se mide con la versión de la fuente, no con la llegada, para que el resultado no dependa del orden (ADR-0010). Elegir un valor es una edición del usuario, y la edición fija | ADR-0013, filas «Edición manual» y «Cancelación del proveedor»; `resolverConflicto` en `itinerary.yaml` |
 | Los ids de los segmentos y de los conflictos se derivan del id de la reserva (UUID v5) | Las mismas entradas dan la misma vista, ids incluidos | `Segmento.id` y `ConflictoDeFuentes.id` son `uuid` en `comun.yaml` |
-| Si una observación liga dos reservas y alguna es manual, la observación va a la más antigua, la otra vuelve como `posiblesDuplicados` y sus identificadores no se copian | ADR-0013 pide confirmación del usuario, pero no dice dónde queda la observación mientras tanto. Así no se pierde y cada identificador sigue siendo de una sola reserva | Iteración 2 §5.8: `reserva_identificador` único por `(usuario_id, emisor, codigo)` |
+| Si una observación liga dos reservas y alguna es manual, o el usuario la descartó o dio de baja, no se unifican: la observación va a la más antigua que el usuario ve, las otras visibles vuelven como `posiblesDuplicados` y sus identificadores no se copian | ADR-0013 pide confirmación del usuario, pero no dice dónde queda la observación mientras tanto. Así no se pierde, cada identificador sigue siendo de una sola reserva y una reserva dada de baja no absorbe a una que el usuario ve | Iteración 2 §5.8: `reserva_identificador` único por `(usuario_id, emisor, codigo)` |
 | La sugerencia por parecido compara tipo, fecha local de inicio y lugar de inicio (código o, si no hay, nombre), entre reservas sin identificadores en común | Es el criterio mínimo que distingue la prueba negativa de ADR-0013 (dos habitaciones iguales la misma noche) y nunca fusiona: solo sugiere | ADR-0013 (M2 solo como sugerencia) |
 | Las pruebas basadas en propiedades usan Hypothesis directamente (dependencia solo de desarrollo) | ADR-0017 y ADR-0010 las piden para comprobar que la fusión es determinista e idempotente. Hypothesis es el motor de Schemathesis, así que no suma una tecnología nueva; la versión fijada es compatible con la que pide Schemathesis | ADR-0036 elige `pytest` y Schemathesis para las pruebas |
 | Una observación del proveedor, una manual o un correo de banda alta confirman la reserva. Una vez confirmada, los correos de banda media se guardan (y aportan identificadores) pero no cambian valores. Mientras está `PorConfirmar`, una cancelación no la lleva a `Cancelada`; `ReservaCancelada` se decide por el cambio de estado, no por la vista | Ningún dato dudoso entra como confirmado. La máquina de estados va de `PorConfirmar` a `Confirmada` y de ahí a `Cancelada`; la banda media no entra al itinerario confirmado ni dispara avisos críticos. Se decidió al revisar el paso 3: los documentos no cubren este caso | Iteración 2 §5.2 (estados de la reserva); ADR-0015 |
 | Un extremo con `precision: dia` lleva como instante la medianoche UTC de la fecha del boleto | El contrato no fija cómo se escribe «ese día» en un `date-time`; así la fecha se lee igual en cualquier zona horaria. Es la convención que ya usan las pruebas del paso 2 | ADR-0011 (boletos abiertos); `Extremo` en `comun.yaml` |
+| Cada servicio tiene su propio esquema de PostgreSQL en la misma instancia. La *outbox*, la bandeja de entrada y las claves de idempotencia son tablas iguales en todos, que crea `comun/persistencia.py` dentro del esquema de cada servicio | Cada servicio es dueño de sus datos, y todo productor y todo consumidor necesita esas tablas. Una instancia alcanza para el prototipo | ADR-0001, ADR-0012, ADR-0014 |
+| Las transacciones de un mismo usuario se serializan con un bloqueo consultivo de PostgreSQL por `usuario_id` | Es lo que da en producción la partición por usuario en su región primaria: la bandeja de entrada y la resolución de identidad suponen que nada más escribe a la vez para ese usuario | ADR-0018 (riesgo R-4) |
+| `servicio.py` arma los módulos de `itinerary` y define cada transacción (cambio, *outbox*, lectura y `versionUsuario`, todo o nada). No es un módulo de la vista N2 | La vista N2 describe módulos que no se importan entre sí (I1, I3), pero ADR-0012 exige que el cambio y su evento se escriban juntos: alguien tiene que componerlos | Vista de módulos N2; ADR-0012 |
+| Los «eventos internos» de la vista N2 son los mismos eventos de dominio que van a la *outbox*. `publicacion` y `proyeccion_panel` reaccionan a ellos dentro de la misma transacción | Así esos módulos no importan dominio (I3), y la lectura queda al día con la escritura (*read-your-writes*) | Vista de módulos N2 (flechas dobles); ADR-0018 |
+| `GET /reservas/{id}` se sirve de `reserva_lectura`, que mantiene `proyeccion_panel`, y no de las tablas del agregado. Una reserva descartada, dada de baja o absorbida responde 404 | La lectura se puede desplegar sola, sin la fusión (`itinerary-lectura`) | Regla I3; ADR-0021 |
+| De las tablas de §5.8 ya están las de reservas, la bandeja de entrada y la *outbox* (las de viajes y `panel_usuario` llegan con el paso 5). Hay tres que §5.8 no lista: `comando_idempotente`, `usuario_version` y `reserva_lectura`. `reserva` guarda también `cancelada` y los fijados, con su valor y su instante | `Idempotency-Key` y `versionUsuario` las necesitan, y un conflicto se deriva del instante del fijado | Iteración 2 §5.8; ADR-0014; ADR-0018 |
+| Una `Idempotency-Key` repetida con la misma solicitud devuelve la respuesta guardada; con otra solicitud, responde 400. Las claves duran 14 días, como la bandeja de entrada: `persistencia.purgar` borra lo vencido, y la ejecución periódica llega con los trabajos programados del ciclo de vida (paso 5) | El contrato pide «un solo efecto y la misma respuesta»; reutilizar la clave para otra cosa es un error del cliente | `comun.yaml` (`Idempotency-Key`); ADR-0014 |
+| La baja manual (`DELETE /reservas/{id}`) pasa la reserva a `Descartada` desde cualquier estado y publica `ReservaActualizada`. La reserva se conserva: un correo posterior con el mismo localizador no la revive, pero un alta manual sí | «Baja como observación de fuente manual», sin perder la identidad. Se decidió al implementar el paso 4: los contratos no tienen un estado ni un evento de baja | Iteración 2, paso 7 (RF-06) |
+| Una edición no agrega, quita ni cambia el tipo de los tramos, y quitar un campo del detalle no lo fija. La corrección al confirmar una reserva `PorConfirmar` se aplica como una edición, y con eso ya queda confirmada | Cambiar la estructura de una reserva automática sería pisar a sus fuentes. El usuario «confirma, corrige o descarta» la banda media | ADR-0013; ADR-0015 |
+| `itinerary.yaml` 1.1.0 declara los `400`, `404` y `409` que los comandos sobre reservas ya podían devolver | Un error sin declarar sería una respuesta fuera del contrato | ADR-0027 (cambio compatible) |
+| La API de `itinerary` todavía no verifica el vale interno (`X-Vale-Autorizacion`) ni descuenta `X-Deadline-Ms`, y `POST /reservas` ignora `viajeId` | Dependen de otras partes del plan: el vale lo emite `identity-access` (ADR-0028), que se construye desde el paso 7; los plazos son del paso 11 (ADR-0020) y la asignación a un viaje, del paso 5. Quedan anotadas para no darlas por cumplidas | Contrato `itinerary.yaml` (`security`, `X-Deadline-Ms`, `ReservaNueva.viajeId`) |
+| Las pruebas que necesitan PostgreSQL se saltean, con el motivo, si no está levantado | Las del dominio corren en cualquier máquina; las de persistencia piden `make infra-arriba` | ADR-0017 |
+| Todos los servicios usan la misma imagen, construida desde la raíz del repositorio para incluir `contratos/`; cada uno es un proceso con su comando | Un solo paquete y un proceso por servicio | ADR-0036 |
 
 ## Cómo correrlo
 
@@ -89,10 +111,17 @@ Requisitos: Python 3.12, Docker con Compose.
 ```bash
 cd prototipo
 make instalar        # crea .venv e instala dependencias
-make pruebas         # corre las pruebas
 make infra-arriba    # levanta PostgreSQL (puerto 55432) y el broker (puerto 19092)
+make pruebas         # corre las pruebas (las de PostgreSQL se saltean si no está arriba)
+make servicios-arriba # además construye la imagen y levanta los servicios
 make infra-abajo
 ```
+
+Servicios que levanta `make servicios-arriba`:
+
+| Servicio | Puerto local | Contrato |
+|---|---|---|
+| `itinerary` | 18101 | [`openapi/itinerary.yaml`](../contratos/openapi/itinerary.yaml): reservas y tipos de segmento (las rutas de viajes y panel llegan en el paso 5) |
 
 Variables de entorno opcionales: `TROTAMUNDOS_CONTRATOS`, `TROTAMUNDOS_DSN`, `TROTAMUNDOS_BROKER`,
 `TROTAMUNDOS_REGION`.
@@ -107,7 +136,7 @@ implementa.
 | 1 | Base: tecnología, infraestructura, validación contra `contratos/` | ADR-0009, ADR-0036 | ✅ |
 | 2 | Registro de tipos de segmento y modelos canónicos | ADR-0010, ADR-0011 | ✅ |
 | 3 | `itinerary`: agregado `Reserva` y fusión determinista | ADR-0010, ADR-0013 | ✅ |
-| 4 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | ⬜ |
+| 4 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | ✅ |
 | 5 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | ⬜ |
 | 6 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | ⬜ |
 | 7 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | ⬜ |
