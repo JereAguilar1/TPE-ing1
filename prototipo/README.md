@@ -38,6 +38,11 @@ prototipo/
 │   │   ├── modelo.py           # modelo-canonico: ObservacionCanonica, Lugar, Extremo (ADR-0010)
 │   │   └── tipos_de_segmento.py # registro de descriptores de tipo           (ADR-0011, ADR-0027)
 │   └── servicios/              # un subpaquete por servicio; ninguno importa a otro (ADR-0036)
+│       └── itinerary/          # un módulo por cada módulo de la vista N2
+│           ├── reservas.py     # agregado Reserva: observaciones, fijados, estados  (ADR-0010)
+│           └── fusion/
+│               ├── consolidacion.py # precedencia por fuente, fijados y conflictos (ADR-0013)
+│               └── identidad.py     # identificadores múltiples, unificación, sugerencias
 ├── tests/
 ├── docker-compose.yml      # PostgreSQL + broker
 └── Makefile
@@ -52,6 +57,7 @@ prototipo/
 | Ningún servicio importa a otro; solo comparten `trotamundos.comun` | ADR-0036, ADR-0001 |
 | `comun/modelo.py` solo usa la biblioteca estándar | R7, vista de módulos N1 |
 | Ningún módulo menciona un tipo de segmento concreto (`vuelo`, `tren`…). Solo pueden hacerlo los complementos (adaptadores y extractores), que van en carpetas `complementos/` | I4, vista de módulos N2; ADR-0011 |
+| Dentro de `itinerary`, cada módulo importa solo los módulos que la vista N2 le permite (`reservas` no conoce a `fusion` ni a `viajes`; `proyeccion_panel` y `publicacion` no importan dominio). Un módulo que no está en la vista hace fallar la prueba | I1, I3, I5, vista de módulos N2 |
 
 ### Decisiones de implementación
 
@@ -65,6 +71,16 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | Los adaptadores y extractores van en carpetas `complementos/`, y son lo único que puede nombrar un tipo de segmento concreto | Traducen un formato externo a un tipo, así que necesitan conocerlo; el resto del código razona por descriptor (regla I4) | Vista de módulos N2 (regla I4) y vista de adaptadores (complementos aislados, reglas R2 y R3) |
 | Los eventos y las respuestas se validan en el mismo proceso contra los archivos de `contratos/`, sin un registro de esquemas | Da la misma garantía (nada sale del servicio sin cumplir el contrato) sin agregar otro servidor a la infraestructura local. La compatibilidad entre versiones se comprueba con pruebas (paso 16) | La iteración 4 prevé un registro de esquemas AsyncAPI con compatibilidad `BACKWARD_TRANSITIVE` (ADR-0027); el prototipo lo reemplaza, no lo contradice |
 | El campo `type` de los errores es `https://errores.trotamundos.app/{status}` | RFC 9457 pide una URI que identifique el tipo de problema; una por código de estado alcanza para el prototipo | `comun.yaml`, esquema `Problema` (`type` con `format: uri`) |
+| Por cada clave `(fuente, idDeFuente)` la reserva guarda una sola observación: la de mayor `versionDeFuente` (ante un empate, decide el contenido). Repetirla o recibir una versión vieja no cambia nada | ADR-0014 identifica la observación por esa clave y la ordena por la versión de la fuente; así se cubren el duplicado de entrega y la reversión de estado | Iteración 2 §5.8: `observacion` única por `(reserva_id, fuente, id_de_fuente)` |
+| De cada fuente cuenta solo su observación vigente (la de mayor `versionDeFuente`). Entre fuentes, la fusión es campo a campo: proveedor, correo y manual. El alta manual no fija campos: solo la edición los fija | Es la tabla de ADR-0013: gana la mayor versión de la fuente, el proveedor gana en los hechos operativos, el correo completa lo que el proveedor no informa y el usuario es la autoridad si la reserva es solo manual o si fijó el campo. Como la compactación conserva solo la vigente por fuente, compactar no cambia la vista (lo comprueba una prueba de propiedades) | ADR-0012 y ADR-0023 (compactación); `EdicionReserva` dice «cada campo tocado queda fijado» y `ReservaNueva` no |
+| Los segmentos se alinean por posición. Una observación aporta valores a un segmento solo si tiene la misma cantidad de segmentos y el mismo tipo y versión del tipo en esa posición | Evita mezclar tramos (un vuelo con escala informado como uno o como dos) y detalles de versiones distintas del tipo | `ConflictoDeFuentes.campo` usa rutas por posición (`segmentos[0].inicio.instante`) |
+| Un conflicto se abre si una observación automática **posterior al fijado** (por `versionDeFuente`) trae otro valor. Resolverlo es fijar de nuevo: el mismo valor (`mantenerFijado`) o el de la fuente elegida (`aceptarFuente`) | «Después» se mide con la versión de la fuente, no con la llegada, para que el resultado no dependa del orden (ADR-0010). Elegir un valor es una edición del usuario, y la edición fija | ADR-0013, filas «Edición manual» y «Cancelación del proveedor»; `resolverConflicto` en `itinerary.yaml` |
+| Los ids de los segmentos y de los conflictos se derivan del id de la reserva (UUID v5) | Las mismas entradas dan la misma vista, ids incluidos | `Segmento.id` y `ConflictoDeFuentes.id` son `uuid` en `comun.yaml` |
+| Si una observación liga dos reservas y alguna es manual, la observación va a la más antigua, la otra vuelve como `posiblesDuplicados` y sus identificadores no se copian | ADR-0013 pide confirmación del usuario, pero no dice dónde queda la observación mientras tanto. Así no se pierde y cada identificador sigue siendo de una sola reserva | Iteración 2 §5.8: `reserva_identificador` único por `(usuario_id, emisor, codigo)` |
+| La sugerencia por parecido compara tipo, fecha local de inicio y lugar de inicio (código o, si no hay, nombre), entre reservas sin identificadores en común | Es el criterio mínimo que distingue la prueba negativa de ADR-0013 (dos habitaciones iguales la misma noche) y nunca fusiona: solo sugiere | ADR-0013 (M2 solo como sugerencia) |
+| Las pruebas basadas en propiedades usan Hypothesis directamente (dependencia solo de desarrollo) | ADR-0017 y ADR-0010 las piden para comprobar que la fusión es determinista e idempotente. Hypothesis es el motor de Schemathesis, así que no suma una tecnología nueva; la versión fijada es compatible con la que pide Schemathesis | ADR-0036 elige `pytest` y Schemathesis para las pruebas |
+| Una observación del proveedor, una manual o un correo de banda alta confirman la reserva. Una vez confirmada, los correos de banda media se guardan (y aportan identificadores) pero no cambian valores. Mientras está `PorConfirmar`, una cancelación no la lleva a `Cancelada`; `ReservaCancelada` se decide por el cambio de estado, no por la vista | Ningún dato dudoso entra como confirmado. La máquina de estados va de `PorConfirmar` a `Confirmada` y de ahí a `Cancelada`; la banda media no entra al itinerario confirmado ni dispara avisos críticos. Se decidió al revisar el paso 3: los documentos no cubren este caso | Iteración 2 §5.2 (estados de la reserva); ADR-0015 |
+| Un extremo con `precision: dia` lleva como instante la medianoche UTC de la fecha del boleto | El contrato no fija cómo se escribe «ese día» en un `date-time`; así la fecha se lee igual en cualquier zona horaria. Es la convención que ya usan las pruebas del paso 2 | ADR-0011 (boletos abiertos); `Extremo` en `comun.yaml` |
 
 ## Cómo correrlo
 
@@ -83,13 +99,14 @@ Variables de entorno opcionales: `TROTAMUNDOS_CONTRATOS`, `TROTAMUNDOS_DSN`, `TR
 
 ## Plan de construcción
 
-Cada paso es un commit. La columna «Trazabilidad» indica qué decisiones implementa.
+Cada paso se entrega en uno o más commits chicos. La columna «Trazabilidad» indica qué decisiones
+implementa.
 
 | # | Paso | Trazabilidad | Estado |
 |---|---|---|---|
 | 1 | Base: tecnología, infraestructura, validación contra `contratos/` | ADR-0009, ADR-0036 | ✅ |
 | 2 | Registro de tipos de segmento y modelos canónicos | ADR-0010, ADR-0011 | ✅ |
-| 3 | `itinerary`: agregado `Reserva` y fusión determinista | ADR-0010, ADR-0013 | ⬜ |
+| 3 | `itinerary`: agregado `Reserva` y fusión determinista | ADR-0010, ADR-0013 | ✅ |
 | 4 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | ⬜ |
 | 5 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | ⬜ |
 | 6 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | ⬜ |

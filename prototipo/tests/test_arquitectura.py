@@ -123,3 +123,65 @@ def test_la_regla_de_tipos_ignora_los_complementos(tmp_path):
     (tmp_path / "complementos" / "extractor.py").write_text("TIPO = 'vuelo'\n")
 
     assert menciones_de_tipos(tmp_path, {"vuelo"}) == ["viajes.py:1 menciona 'vuelo'"]
+
+
+# --- I1, I3, I5: dependencias entre los módulos de `itinerary` (vista de módulos N2, §1) ------
+
+# Qué módulos de `itinerary` puede importar cada uno: las flechas finas de la vista N2. Los
+# eventos internos (flechas dobles) y las referencias por id (punteadas) no son importaciones.
+# El registro de tipos (`tipos-de-segmento`, I5) está en `comun`, que todos pueden importar.
+DEPENDENCIAS_DE_ITINERARY = {
+    "reservas": set(),                     # I1: no conoce a `viajes`
+    "fusion": {"reservas"},
+    "viajes": set(),                       # I1: a las reservas las conoce solo por id
+    "gestion_manual": {"reservas", "fusion", "viajes"},
+    "ingesta": {"fusion"},
+    "proyeccion_panel": set(),             # I3: no importa lógica de dominio
+    "publicacion": set(),                  # I3
+    "api": {"gestion_manual", "proyeccion_panel"},
+}
+
+
+def violaciones_internas(raiz: Path, servicio: str, permitidas: dict[str, set[str]]) -> list[str]:
+    """Importaciones entre módulos de un servicio que su vista de módulos no permite."""
+    carpeta = raiz / "servicios" / servicio
+    prefijo = ["trotamundos", "servicios", servicio]
+    encontradas = []
+    for archivo in carpeta.rglob("*.py"):
+        relativa = archivo.relative_to(carpeta)
+        modulo = relativa.parts[0].removesuffix(".py")
+        if modulo == "__init__":
+            continue
+        if modulo not in permitidas:
+            encontradas.append(f"{relativa}: el módulo {modulo} no está en la vista de módulos")
+            continue
+        for nombre in _importaciones(raiz, archivo):
+            partes = nombre.split(".")
+            if partes[:3] == prefijo and len(partes) > 3:
+                destino = partes[3]
+                if destino != modulo and destino not in permitidas[modulo]:
+                    encontradas.append(f"{relativa} importa {nombre}")
+    return sorted(set(encontradas))
+
+
+def test_los_modulos_de_itinerary_respetan_la_vista_n2():
+    assert violaciones_internas(PAQUETE, "itinerary", DEPENDENCIAS_DE_ITINERARY) == []
+
+
+def test_la_regla_interna_detecta_dependencias_no_permitidas(tmp_path):
+    carpeta = tmp_path / "servicios" / "itinerary"
+    (carpeta / "fusion").mkdir(parents=True)
+    (carpeta / "reservas.py").write_text("from .fusion import consolidacion\n")
+    (carpeta / "fusion" / "a.py").write_text(
+        "from trotamundos.servicios.itinerary.reservas import Reserva\n"
+        "from trotamundos.servicios.itinerary import viajes\n")
+    (carpeta / "suelto.py").write_text("")
+
+    encontradas = violaciones_internas(tmp_path, "itinerary", DEPENDENCIAS_DE_ITINERARY)
+
+    assert encontradas == [
+        "fusion/a.py importa trotamundos.servicios.itinerary.viajes",
+        "reservas.py importa trotamundos.servicios.itinerary.fusion",
+        "reservas.py importa trotamundos.servicios.itinerary.fusion.consolidacion",
+        "suelto.py: el módulo suelto no está en la vista de módulos",
+    ]
