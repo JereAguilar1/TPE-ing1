@@ -1,10 +1,14 @@
 """Datos de prueba compartidos."""
 
 import shutil
+import uuid
 from pathlib import Path
 
+import psycopg
 import pytest
+from psycopg import sql
 
+from trotamundos.comun.config import Configuracion
 from trotamundos.comun.contratos import Contratos, contratos_por_omision
 
 
@@ -19,6 +23,26 @@ def copia_de_contratos(tmp_path) -> Path:
     destino = tmp_path / "contratos"
     shutil.copytree(contratos_por_omision().ruta, destino)
     return destino
+
+
+@pytest.fixture(scope="session")
+def dsn() -> str:
+    """PostgreSQL de `docker-compose.yml`. Sin él, las pruebas que lo usan se saltean."""
+    dsn = Configuracion.desde_entorno().dsn_postgres
+    try:
+        psycopg.connect(dsn, connect_timeout=2).close()
+    except psycopg.OperationalError:
+        pytest.skip("PostgreSQL no disponible: correr `make infra-arriba`")
+    return dsn
+
+
+@pytest.fixture
+def esquema(dsn) -> str:
+    """Esquema vacío y propio de la prueba; se borra al terminar."""
+    nombre = f"prueba_{uuid.uuid4().hex[:12]}"
+    yield nombre
+    with psycopg.connect(dsn, autocommit=True) as conexion:
+        conexion.execute(sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(nombre)))
 
 
 def _extremo(instante: str, lugar: str, zona: str, precision: str = "instante") -> dict:
