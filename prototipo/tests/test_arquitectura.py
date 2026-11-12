@@ -139,6 +139,10 @@ DEPENDENCIAS_DE_ITINERARY = {
     "proyeccion_panel": set(),             # I3: no importa lógica de dominio
     "publicacion": set(),                  # I3
     "api": {"gestion_manual", "proyeccion_panel"},
+    # No es un módulo de la vista: es el punto de armado del elemento, que define las
+    # transacciones y por eso conoce a todos. Ningún módulo lo importa a él.
+    "servicio": {"reservas", "fusion", "viajes", "gestion_manual", "ingesta",
+                 "proyeccion_panel", "publicacion", "api"},
 }
 
 
