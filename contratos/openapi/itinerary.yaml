@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — itinerary (API interna)
-  version: 1.0.0
+  version: 1.1.0
   description: |
     API REST interna del núcleo del dominio, servida por el módulo `api` de `itinerary`
     (vista de módulos N2). La consumen los BFF y `support-liaison`; no se expone en `api-gateway`.
@@ -13,6 +13,11 @@ info:
 
     Toda llamada lleva `X-Usuario-Id` (clave de partición, ADR-0012), un vale interno firmado
     (ADR-0028), mTLS y `X-Deadline-Ms` (ADR-0020).
+
+    - `1.1.0`: se declaran las respuestas de error que los comandos sobre reservas ya podían
+      devolver (`400` por un cuerpo o un detalle inválido, `404` por una reserva o un conflicto
+      inexistente, `409` por versión o estado). Agregar respuestas es un cambio compatible
+      (ADR-0027).
 servers:
   - url: https://itinerary.interno
 security:
@@ -180,6 +185,7 @@ paths:
           content:
             application/json:
               schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
         '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
     delete:
@@ -212,6 +218,8 @@ paths:
           content:
             application/json:
               schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
         '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
 
   /reservas/{id}/conflictos/{cid}/resolucion:
@@ -238,6 +246,9 @@ paths:
           content:
             application/json:
               schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
 
   /tipos-de-segmento:
     get:
