@@ -8,8 +8,9 @@ esa misma observación `(fuente, idDeFuente)` (ADR-0014). Entonces:
   reservas parecidas, las devuelve como posibles duplicados para que decida el usuario (M2).
 * Coincide una → la observación se agrega a esa reserva.
 * Coinciden varias → la observación las liga y se unifican: la más antigua conserva el id y
-  absorbe a las demás. Si alguna es manual no se unifican: la observación va a la más antigua y
-  las otras se devuelven como posibles duplicados, para que el usuario confirme.
+  absorbe a las demás. Si alguna es manual, o el usuario la descartó o dio de baja, no se
+  unifican: la observación va a la más antigua que el usuario ve, y las otras visibles se
+  devuelven como posibles duplicados, para que el usuario confirme.
 
 La unicidad de los identificadores por usuario se mantiene: un identificador que ya es de otra
 reserva no se copia a la que recibe la observación.
@@ -23,24 +24,41 @@ from typing import Any, Callable, Iterable, Mapping, Protocol
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from trotamundos.comun.modelo import Fuente, Identificador, instante_desde_texto
+from trotamundos.comun.modelo import (
+    Fuente,
+    Identificador,
+    ObservacionCanonica,
+    instante_desde_texto,
+)
 from trotamundos.servicios.itinerary.fusion.consolidacion import Consolidacion, reconsolidar
-from trotamundos.servicios.itinerary.reservas import EstadoReserva, ObservacionRegistrada, Reserva
+from trotamundos.servicios.itinerary.reservas import (
+    Banda,
+    EstadoReserva,
+    ObservacionRegistrada,
+    Reserva,
+)
 
 MOTIVO_IDENTIFICADOR = "Comparten un identificador, pero una es manual: unificarlas requiere confirmación"
 MOTIVO_PARECIDO = "Mismo tipo, fecha y lugar de inicio, sin identificadores en común"
 
 
 class RepositorioDeReservas(Protocol):
-    """Lo que la resolución de identidad necesita leer. Lo implementa la persistencia (paso 4)."""
+    """Lo que la fusión necesita del almacenamiento. Lo cumple `reservas.repositorio`."""
+
+    def obtener(self, usuario_id: UUID, reserva_id: UUID) -> Reserva | None: ...
 
     def por_identificador(self, usuario_id: UUID, identificador: Identificador) -> Reserva | None: ...
 
     def por_observacion(self, usuario_id: UUID, clave: tuple[Fuente, str]) -> Reserva | None: ...
 
     def candidatas(self, usuario_id: UUID, desde: date, hasta: date) -> Iterable[Reserva]:
-        """Reservas con algún segmento que empieza entre `desde` y `hasta` (fechas locales)."""
+        """Reservas con algún segmento que empieza entre `desde` y `hasta` (fechas locales).
+        Puede devolver de más: `sugerencias` compara después la fecha exacta."""
         ...
+
+    def guardar(self, reserva: Reserva) -> None: ...
+
+    def eliminar(self, reserva: Reserva) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -85,14 +103,20 @@ def ingerir(repositorio: RepositorioDeReservas, usuario_id: UUID, registrada: Ob
     if not coincidentes:
         reserva, creada = Reserva(nuevo_id(), usuario_id, ahora), True
     else:
-        reserva, *otras = sorted(coincidentes.values(), key=lambda r: (r.creada_en, str(r.id)))
+        ordenadas = sorted(coincidentes.values(), key=lambda r: (r.creada_en, str(r.id)))
+        # Una reserva descartada o dada de baja es, como una manual, una decisión del usuario:
+        # no se unifica sola. La observación va a la más antigua que el usuario ve.
+        visibles = [r for r in ordenadas if not r.descartada]
+        reserva = (visibles or ordenadas)[0]
+        otras = [r for r in ordenadas if r is not reserva]
         creada = False
-        if otras and not any(r.es_manual for r in (reserva, *otras)):
+        if otras and not any(r.es_manual or r.descartada for r in ordenadas):
             for otra in otras:
                 reserva.unir(otra)
             unificadas = tuple(otras)
         else:
-            duplicados += [PosibleDuplicado(otra.id, MOTIVO_IDENTIFICADOR) for otra in otras]
+            duplicados += [PosibleDuplicado(otra.id, MOTIVO_IDENTIFICADOR)
+                           for otra in otras if not otra.descartada]
             ajenos = {i for otra in otras for i in otra.identificadores}
 
     aplicada = reserva.registrar(registrada)
@@ -107,6 +131,25 @@ def ingerir(repositorio: RepositorioDeReservas, usuario_id: UUID, registrada: Ob
 
     return ResultadoDeIngesta(reserva, creada, aplicada, unificadas, consolidacion,
                               tuple(duplicados))
+
+
+def ingerir_observacion(repositorio: RepositorioDeReservas, usuario_id: UUID,
+                        observacion: ObservacionCanonica, ahora: datetime, *,
+                        banda: str | None = None, confianza: float | None = None,
+                        nuevo_id: Callable[[], UUID] = uuid4) -> ResultadoDeIngesta:
+    """`ingerir` para quien recibe la observación de afuera y no conoce el agregado (`ingesta`
+    solo depende de `fusion`, vista N2). `banda` y `confianza` vienen con las del correo."""
+    registrada = ObservacionRegistrada(observacion, banda=Banda(banda) if banda else None,
+                                       confianza=confianza)
+    return ingerir(repositorio, usuario_id, registrada, ahora, nuevo_id)
+
+
+def persistir(repositorio: RepositorioDeReservas, resultado: ResultadoDeIngesta) -> None:
+    """Guarda el resultado. Primero borra las absorbidas: sus identificadores pasan a la reserva
+    que queda, y cada identificador es de una sola reserva del usuario (ADR-0012)."""
+    for absorbida in resultado.unificadas:
+        repositorio.eliminar(absorbida)
+    repositorio.guardar(resultado.reserva)
 
 
 # --- coincidencia difusa: solo sugerencias (M2) ----------------------------------------------

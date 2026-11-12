@@ -18,7 +18,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 from uuid import UUID
 
 from trotamundos.comun.modelo import (
@@ -57,7 +57,9 @@ class ReservaInvalida(ValueError):
 
 # Campos fijables: `cancelada` (el estado de la reserva) o una hoja de un segmento, con la forma
 # de `ConflictoDeFuentes.campo` en `comun.yaml` (por ejemplo, `segmentos[0].inicio.instante`).
-_CAMPO_FIJABLE = re.compile(r"^(cancelada|segmentos\[(0|[1-9]\d*)\]\.[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*)$")
+# Las partes admiten cualquier carácter salvo los separadores de la ruta: las claves del detalle
+# las define cada descriptor, y un tipo nuevo no debe obligar a tocar este código (QA-15).
+_CAMPO_FIJABLE = re.compile(r"^(cancelada|segmentos\[(0|[1-9]\d*)\]\.[^.\[\]]+(\.[^.\[\]]+)*)$")
 CAMPO_CANCELADA = "cancelada"
 
 
@@ -185,6 +187,25 @@ class Reserva:
         self._vista: VistaConsolidada | None = None
         self._pendiente = False
 
+    @classmethod
+    def restaurar(cls, *, id: UUID, usuario_id: UUID, creada_en: datetime, version: int,
+                  observaciones: Iterable[ObservacionRegistrada], fijados: Iterable[Fijado],
+                  identificadores: Iterable[Identificador], confirmada_por_usuario: bool,
+                  descartada: bool, vista: VistaConsolidada,
+                  registro: RegistroDeTipos | None = None) -> Reserva:
+        """Reconstruye una reserva guardada, tal como quedó (sin validar de nuevo ni subir la
+        versión): lo que se guardó ya cumplió las invariantes al entrar."""
+        reserva = cls(id, usuario_id, creada_en, registro)
+        reserva.version = version
+        reserva._observaciones = {o.clave: o for o in observaciones}
+        reserva._fijados = {f.campo: f for f in fijados}
+        reserva._identificadores = set(identificadores)
+        reserva._confirmada_por_usuario = confirmada_por_usuario
+        reserva._descartada = descartada
+        reserva._vista = vista
+        reserva._estado_consolidado = reserva.estado
+        return reserva
+
     # --- entradas de la consolidación ----------------------------------------------------
 
     def registrar(self, registrada: ObservacionRegistrada) -> bool:
@@ -198,6 +219,10 @@ class Reserva:
         if actual is not None and actual.orden >= registrada.orden:
             return False
         self._observaciones[registrada.clave] = registrada
+        if registrada.fuente == Fuente.MANUAL:
+            # Un alta del usuario sobre una reserva que él descartó o dio de baja la vuelve a
+            # mostrar: manda su última decisión. Una fuente automática no la revive.
+            self._descartada = False
         self._pendiente = True
         return True
 
@@ -225,6 +250,17 @@ class Reserva:
     def descartar(self) -> None:
         """El usuario descarta una reserva de banda media (`PorConfirmar` → `Descartada`)."""
         self._exigir_estado(EstadoReserva.POR_CONFIRMAR)
+        self._descartada = True
+        self._pendiente = True
+
+    def dar_de_baja(self) -> None:
+        """Baja manual (RF-06): la reserva pasa a `Descartada` desde cualquier estado.
+
+        La reserva y sus observaciones se conservan, así que un correo posterior con el mismo
+        localizador no la revive: se agrega a esta reserva, que sigue descartada.
+        """
+        if self._descartada:
+            raise TransicionInvalida("La reserva ya está dada de baja")
         self._descartada = True
         self._pendiente = True
 
@@ -307,6 +343,14 @@ class Reserva:
     @property
     def fijados(self) -> dict[str, Fijado]:
         return dict(self._fijados)
+
+    @property
+    def confirmada_por_usuario(self) -> bool:
+        return self._confirmada_por_usuario
+
+    @property
+    def descartada(self) -> bool:
+        return self._descartada
 
     @property
     def identificadores(self) -> frozenset[Identificador]:

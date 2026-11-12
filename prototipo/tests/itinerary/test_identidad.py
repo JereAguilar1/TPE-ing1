@@ -17,6 +17,8 @@ from trotamundos.servicios.itinerary.fusion.identidad import (
     PosibleDuplicado,
     fecha_local,
     ingerir,
+    ingerir_observacion,
+    persistir,
 )
 from trotamundos.servicios.itinerary.reservas import Banda, ObservacionRegistrada
 
@@ -42,7 +44,7 @@ def ingesta():
 
     def ingerir_y_guardar(registrada: ObservacionRegistrada):
         resultado = ingerir(repositorio, USUARIO, registrada, next(reloj), ids)
-        repositorio.guardar(resultado)
+        persistir(repositorio, resultado)
         return resultado
 
     ingerir_y_guardar.repositorio = repositorio
@@ -108,6 +110,21 @@ def test_si_alguna_es_manual_no_se_unifican_y_se_pide_confirmacion(ingesta, regi
     assert len(ingesta.repositorio.reservas) == 2
 
 
+def test_una_reserva_dada_de_baja_no_se_traga_a_una_visible(ingesta, registrada):
+    dada_de_baja = ingesta(registrada(id_de_fuente="aerolinea", identificadores=(AEROLINEA,)))
+    dada_de_baja.reserva.dar_de_baja()
+    visible = ingesta(registrada(id_de_fuente="agencia", identificadores=(AGENCIA,),
+                                 version=instante(11)))
+
+    liga = ingesta(registrada(fuente="proveedor", id_de_fuente="x",
+                              identificadores=(AEROLINEA, AGENCIA)))
+
+    assert liga.unificadas == () and liga.posibles_duplicados == ()
+    assert liga.reserva.id == visible.reserva.id  # la observación va a la que el usuario ve
+    assert Identificador(*AEROLINEA) not in liga.reserva.identificadores
+    assert len(ingesta.repositorio.reservas) == 2
+
+
 def test_dos_habitaciones_del_mismo_hotel_la_misma_noche_no_se_fusionan(ingesta, registrada):
     # Prueba negativa de ADR-0013: sin código común, el sistema solo sugiere.
     def habitacion(id_de_fuente: str) -> ObservacionRegistrada:
@@ -134,6 +151,18 @@ def test_no_se_sugiere_lo_que_empieza_otro_dia_o_en_otro_lugar(ingesta, registra
                                                               "zonaHoraria": "America/Argentina/Mendoza"}}))
 
     assert otro_dia.posibles_duplicados == () and otro_lugar.posibles_duplicados == ()
+
+
+def test_ingerir_una_observacion_recibida_de_afuera(registrada):
+    repositorio = RepositorioEnMemoria()
+    correo = registrada(banda="media").observacion
+
+    resultado = ingerir_observacion(repositorio, USUARIO, correo, instante(1), banda="media",
+                                    confianza=0.7)
+
+    [guardada] = resultado.reserva.observaciones
+    assert (guardada.banda, guardada.confianza) == (Banda.MEDIA, 0.7)
+    assert resultado.reserva.estado.value == "PorConfirmar"
 
 
 def test_la_fecha_local_respeta_la_zona_y_los_boletos_abiertos(segmento_de_tren):
@@ -188,8 +217,8 @@ def test_sin_manuales_el_resultado_no_depende_del_orden_de_llegada(observacion, 
     for orden in (entradas, permutadas):
         repositorio, ids = RepositorioEnMemoria(), _Ids()
         for minuto, registrada in enumerate(orden):
-            repositorio.guardar(ingerir(repositorio, USUARIO, registrada,
-                                        instante(1) + timedelta(minutes=minuto), ids))
+            persistir(repositorio, ingerir(repositorio, USUARIO, registrada,
+                                           instante(1) + timedelta(minutes=minuto), ids))
         resultados.append(_contenido(repositorio))
 
     assert resultados[0] == resultados[1]

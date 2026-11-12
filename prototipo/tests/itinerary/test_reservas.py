@@ -129,6 +129,7 @@ def test_la_version_sube_una_vez_por_cambio_aplicado(reserva, registrada):
 def test_solo_se_fijan_campos_con_ruta_valida():
     Fijado("segmentos[0].inicio.instante", "2026-12-01T14:00:00Z", instante(12))
     Fijado("cancelada", False, instante(12))
+    Fijado("segmentos[0].detalle.andén-2", "4", instante(12))  # claves de un descriptor futuro
     for campo in ("segmentos[-1].operador", "segmentos[0]", "estado", "segmentos[01].operador"):
         with pytest.raises(ReservaInvalida):
             Fijado(campo, "x", instante(12))
@@ -168,6 +169,34 @@ def test_el_usuario_confirma_o_descarta_solo_lo_que_esta_por_confirmar(registrad
     assert descartada.estado == EstadoReserva.DESCARTADA
     with pytest.raises(TransicionInvalida):
         descartada.confirmar()
+
+
+@pytest.mark.parametrize("banda", ["alta", "media"])
+def test_la_baja_manual_descarta_la_reserva_desde_cualquier_estado(reserva, registrada, banda):
+    observacion = registrada(banda=banda)
+    reserva.registrar(observacion)
+    reserva.establecer_vista(_vista(observacion))
+    version = reserva.version
+
+    reserva.dar_de_baja()
+    reserva.establecer_vista(reserva.vista)
+
+    assert reserva.estado == EstadoReserva.DESCARTADA and reserva.version == version + 1
+    with pytest.raises(TransicionInvalida):
+        reserva.dar_de_baja()
+
+
+def test_solo_un_alta_manual_revive_una_reserva_dada_de_baja(reserva, registrada):
+    observacion = registrada()
+    reserva.registrar(observacion)
+    reserva.establecer_vista(_vista(observacion))
+    reserva.dar_de_baja()
+
+    reserva.registrar(registrada(id_de_fuente="mensaje-2", version=instante(12)))
+    assert reserva.estado == EstadoReserva.DESCARTADA
+
+    reserva.registrar(registrada(fuente="manual", id_de_fuente="alta/1", version=instante(13)))
+    assert reserva.estado == EstadoReserva.CONFIRMADA
 
 
 def test_la_vista_cancelada_lleva_la_reserva_a_cancelada(reserva, registrada):
