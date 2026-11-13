@@ -1,7 +1,7 @@
 asyncapi: 3.0.0
 info:
   title: Trotamundos — eventos de dominio
-  version: 1.2.0
+  version: 1.3.0
   description: |
     Catálogo de eventos publicados en el *broker* (ADR-0001, ADR-0009).
 
@@ -10,6 +10,9 @@ info:
       `usuarioId`. Agregar un tipo de evento es un cambio compatible (ADR-0027).
     - `1.2.0`: se agrega al sobre el atributo opcional `idDeCorrelacion` que pide la iteración 3
       (§5.8, ADR-0025). Agregar un campo opcional es un cambio compatible (ADR-0027).
+    - `1.3.0`: `ViajeArmado` se publica al crearse el viaje y en cada cambio de miembros, período,
+      título o estado, y agrega el campo opcional `version` para que los consumidores ordenen las
+      actualizaciones (como `ReservaCancelada`). Cambio compatible (ADR-0027).
 
     Reglas comunes:
     - **Entrega al menos una vez.** Todo consumidor aplica una bandeja de entrada por
@@ -320,6 +323,10 @@ components:
           reservaIds:
             type: array
             items: { $ref: '#/components/schemas/Id' }
+          version:
+            type: integer
+            format: int64
+            description: Versión del agregado `Viaje`; crece con cada cambio (ADR-0010).
     ViajeCompletado:
       name: ViajeCompletado
       headers: { $ref: '#/components/schemas/Sobre' }
