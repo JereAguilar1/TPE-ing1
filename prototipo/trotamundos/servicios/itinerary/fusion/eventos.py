@@ -14,26 +14,15 @@ Los eventos son también los «eventos internos» de la vista N2: `publicacion` 
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable
 
-from trotamundos.comun.eventos import Evento
+from trotamundos.comun.eventos import Causa, Evento
 from trotamundos.comun.modelo import Fuente, instante_a_texto
 from trotamundos.servicios.itinerary.fusion.consolidacion import Cambio, Consolidacion
 from trotamundos.servicios.itinerary.reservas import CAMPO_CANCELADA, Reserva
 
 PRODUCTOR = "itinerary"
-
-
-@dataclass(frozen=True)
-class Causa:
-    """Lo que el sobre copia del origen del cambio (iteración 3 §5.8, ADR-0025)."""
-
-    region: str | None = None
-    traceparent: str | None = None
-    id_de_correlacion: str | None = None
-    id_de_causa: str | None = None  # la disrupción que provocó el cambio, si la hubo
 
 
 def eventos_del_cambio(reserva: Reserva, consolidacion: Consolidacion, fuente: Fuente,

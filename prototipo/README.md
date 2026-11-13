@@ -41,6 +41,7 @@ prototipo/
 │   └── servicios/              # un subpaquete por servicio; ninguno importa a otro (ADR-0036)
 │       └── itinerary/          # un módulo por cada módulo de la vista N2, más servicio.py
 │           ├── reservas/       # agregado Reserva (ADR-0010) y su repositorio PostgreSQL (ADR-0012)
+│           ├── viajes/         # agregado Viaje: agrupación y ciclo de vida (RF-07, RF-08) y su repositorio
 │           ├── fusion/
 │           │   ├── consolidacion.py # precedencia por fuente, fijados y conflictos (ADR-0013)
 │           │   ├── identidad.py     # identificadores múltiples, unificación, sugerencias
@@ -48,7 +49,7 @@ prototipo/
 │           ├── gestion_manual.py    # alta, edición, baja, confirmación y conflictos (RF-06)
 │           ├── ingesta.py           # ReservaExtraida y ReservaObservada con bandeja de entrada (ADR-0014)
 │           ├── publicacion.py       # outbox (ADR-0012)
-│           ├── proyeccion_panel.py  # lectura mantenida por eventos internos
+│           ├── proyeccion_panel.py  # lecturas de reserva, viaje y panel, mantenidas por eventos internos
 │           ├── api.py               # API interna (openapi/itinerary.yaml)
 │           └── servicio.py          # arma los módulos y define las transacciones
 ├── tests/
@@ -95,12 +96,23 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | `servicio.py` arma los módulos de `itinerary` y define cada transacción (cambio, *outbox*, lectura y `versionUsuario`, todo o nada). No es un módulo de la vista N2 | La vista N2 describe módulos que no se importan entre sí (I1, I3), pero ADR-0012 exige que el cambio y su evento se escriban juntos: alguien tiene que componerlos | Vista de módulos N2; ADR-0012 |
 | Los «eventos internos» de la vista N2 son los mismos eventos de dominio que van a la *outbox*. `publicacion` y `proyeccion_panel` reaccionan a ellos dentro de la misma transacción | Así esos módulos no importan dominio (I3), y la lectura queda al día con la escritura (*read-your-writes*) | Vista de módulos N2 (flechas dobles); ADR-0018 |
 | `GET /reservas/{id}` se sirve de `reserva_lectura`, que mantiene `proyeccion_panel`, y no de las tablas del agregado. Una reserva descartada, dada de baja o absorbida responde 404 | La lectura se puede desplegar sola, sin la fusión (`itinerary-lectura`) | Regla I3; ADR-0021 |
-| De las tablas de §5.8 ya están las de reservas, la bandeja de entrada y la *outbox* (las de viajes y `panel_usuario` llegan con el paso 5). Hay tres que §5.8 no lista: `comando_idempotente`, `usuario_version` y `reserva_lectura`. `reserva` guarda también `cancelada` y los fijados, con su valor y su instante | `Idempotency-Key` y `versionUsuario` las necesitan, y un conflicto se deriva del instante del fijado | Iteración 2 §5.8; ADR-0014; ADR-0018 |
-| Una `Idempotency-Key` repetida con la misma solicitud devuelve la respuesta guardada; con otra solicitud, responde 400. Las claves duran 14 días, como la bandeja de entrada: `persistencia.purgar` borra lo vencido, y la ejecución periódica llega con los trabajos programados del ciclo de vida (paso 5) | El contrato pide «un solo efecto y la misma respuesta»; reutilizar la clave para otra cosa es un error del cliente | `comun.yaml` (`Idempotency-Key`); ADR-0014 |
+| Están las diez tablas de §5.8 y cinco más: `comando_idempotente`, `usuario_version`, `evento_interno`, `reserva_lectura` y `viaje_lectura`. `reserva` guarda también `cancelada` y los fijados, con su valor y su instante; `viaje`, lo derivado de sus reservas y la próxima transición | `Idempotency-Key`, `versionUsuario` y la coordinación entre agregados las necesitan, y un conflicto se deriva del instante del fijado | Iteración 2 §5.8; ADR-0014; ADR-0018 |
+| Una `Idempotency-Key` repetida con la misma solicitud devuelve la respuesta guardada; con otra solicitud, responde 400. Las claves duran 14 días, como la bandeja de entrada: el trabajo periódico borra lo vencido | El contrato pide «un solo efecto y la misma respuesta»; reutilizar la clave para otra cosa es un error del cliente | `comun.yaml` (`Idempotency-Key`); ADR-0014 |
 | La baja manual (`DELETE /reservas/{id}`) pasa la reserva a `Descartada` desde cualquier estado y publica `ReservaActualizada`. La reserva se conserva: un correo posterior con el mismo localizador no la revive, pero un alta manual sí | «Baja como observación de fuente manual», sin perder la identidad. Se decidió al implementar el paso 4: los contratos no tienen un estado ni un evento de baja | Iteración 2, paso 7 (RF-06) |
 | Una edición no agrega, quita ni cambia el tipo de los tramos, y quitar un campo del detalle no lo fija. La corrección al confirmar una reserva `PorConfirmar` se aplica como una edición, y con eso ya queda confirmada | Cambiar la estructura de una reserva automática sería pisar a sus fuentes. El usuario «confirma, corrige o descarta» la banda media | ADR-0013; ADR-0015 |
 | `itinerary.yaml` 1.1.0 declara los `400`, `404` y `409` que los comandos sobre reservas ya podían devolver | Un error sin declarar sería una respuesta fuera del contrato | ADR-0027 (cambio compatible) |
-| La API de `itinerary` todavía no verifica el vale interno (`X-Vale-Autorizacion`) ni descuenta `X-Deadline-Ms`, y `POST /reservas` ignora `viajeId` | Dependen de otras partes del plan: el vale lo emite `identity-access` (ADR-0028), que se construye desde el paso 7; los plazos son del paso 11 (ADR-0020) y la asignación a un viaje, del paso 5. Quedan anotadas para no darlas por cumplidas | Contrato `itinerary.yaml` (`security`, `X-Deadline-Ms`, `ReservaNueva.viajeId`) |
+| La API de `itinerary` todavía no verifica el vale interno (`X-Vale-Autorizacion`) ni descuenta `X-Deadline-Ms` | Dependen de otras partes del plan: el vale lo emite `identity-access` (ADR-0028), que se construye desde el paso 7, y los plazos son del paso 11 (ADR-0020). Quedan anotadas para no darlas por cumplidas | Contrato `itinerary.yaml` (`security`, `X-Deadline-Ms`) |
+| `Reserva` y `Viaje` nunca se escriben en la misma transacción. Cada `ReservaActualizada` queda también en `evento_interno` (en la transacción del cambio) y `viajes` la procesa en una segunda. Un comando espera a las dos para responder con su `viajeId`. Si la segunda falla, el evento sigue en la cola y lo procesa el trabajo periódico | Es la coordinación por eventos internos de ADR-0010, sin perder el evento si algo falla entre las dos transacciones; responder con el estado resultante es la mitigación que prevé el mismo ADR | ADR-0010; vista N2 (regla I1) |
+| `viajes` conoce cada reserva por un resumen (estado, tipo, inicio y fin de sus segmentos) que toma de `ReservaActualizada`, y el rol lo pide al registro de tipos | Así no importa a `reservas` (I1) ni nombra un tipo concreto (I4) | ADR-0010; ADR-0011 |
+| Agrupación: una reserva se une al viaje activo que, ampliado 72 h, toca su período **y** con el que tiene continuidad (empieza en la misma ciudad que una llegada del viaje: el fin de un traslado, un alojamiento o una movilidad local). Si hay varios, el más cercano en el tiempo. La asignación se decide **una vez**: si la reserva cambia después, el viaje recalcula su período pero ella no cambia de viaje. Las `PorConfirmar` no entran y las `Descartada` salen | Es la regla 1 de §5.1, con la continuidad tomada en sentido amplio para incluir «un alojamiento en la ciudad de destino». Que no se reagrupe se decidió al implementar el paso 5, para que las reservas no salten de viaje sin que el usuario lo pida | Iteración 2 §5.1 y §5.11; ADR-0015 |
+| «Misma ciudad»: a 50 km o menos si los dos lugares tienen coordenadas; si no, el mismo código; si no, el mismo nombre | `Lugar` no tiene ciudad. Los 50 km son un supuesto a calibrar, como los 72 h. Se decidió al implementar el paso 5 | Iteración 2 §5.1; iteración 4, paso 7 (RF-07) |
+| El destino principal es el fin del primer traslado; si no hay, el alojamiento más largo; si no, el primer lugar del viaje. El título es «Viaje a {nombre del destino}» | El título y el período «se derivan de las reservas», sin más precisión | Iteración 2 §5.1 |
+| Un viaje que se queda sin reservas pasa a `Eliminado`. Eliminar un viaje no toca sus reservas: quedan ocultas con él | Un viaje vacío no tiene qué mostrar, y ADR-0010 separa los dos agregados. Lo de las reservas se decidió al implementar el paso 5 | ADR-0010; iteración 2 §5.1 (RF-08) |
+| El archivo manual se admite en cualquier estado salvo `Archivado` y `Eliminado` (si no, 409). Un viaje `Cancelado` no se completa solo: queda visible hasta que el usuario lo archiva o lo elimina | Es la fila `Cancelado` de la tabla del ciclo de vida | Iteración 2 §5.1 (RF-08) |
+| `ViajeArmado` se publica al crearse el viaje y en cada cambio de miembros, período, título o estado, con su `version` | Así `event-pipeline` y la proyección del panel se enteran de cada cambio, en orden. Se decidió al implementar el paso 5; agregar `version` es un cambio compatible del contrato (AsyncAPI 1.3.0) | ADR-0027; contrato AsyncAPI |
+| La gracia entre `Completado` y `Archivado` es de 3 días para todos | Es el valor por omisión de `diasDeGraciaArchivado`. El del usuario llegaría con `PreferenciasActualizadas`, pero `preferences` no está en el plan del prototipo | Iteración 2 §5.11; `preferences.yaml` |
+| Un trabajo periódico (cada `TROTAMUNDOS_INTERVALO_TAREAS` segundos, 60 por omisión) procesa los eventos internos pendientes, avanza los viajes cuya `proxima_transicion` venció y purga la bandeja de entrada y las claves de idempotencia. Las transiciones se calculan en UTC a partir del fin local de cada tramo | §5.1 habla de trabajos «por zona horaria»: con un solo proceso no hace falta repartirlos, alcanza con que el instante de cada transición respete la zona del lugar | Iteración 2 §5.1; ADR-0014 |
+| `panel_usuario` es una fila por usuario con el `Panel` completo, que se rearma con cada evento del usuario. Como se actualiza en la misma transacción que el cambio, `X-Min-Version` siempre se cumple en una sola región | UC-3 pide el panel en una sola ida y vuelta, y QA-02, un acceso | ADR-0018; ADR-0019; QA-02 |
 | Las pruebas que necesitan PostgreSQL se saltean, con el motivo, si no está levantado | Las del dominio corren en cualquier máquina; las de persistencia piden `make infra-arriba` | ADR-0017 |
 | Todos los servicios usan la misma imagen, construida desde la raíz del repositorio para incluir `contratos/`; cada uno es un proceso con su comando | Un solo paquete y un proceso por servicio | ADR-0036 |
 
@@ -121,10 +133,11 @@ Servicios que levanta `make servicios-arriba`:
 
 | Servicio | Puerto local | Contrato |
 |---|---|---|
-| `itinerary` | 18101 | [`openapi/itinerary.yaml`](../contratos/openapi/itinerary.yaml): reservas y tipos de segmento (las rutas de viajes y panel llegan en el paso 5) |
+| `itinerary` | 18101 | [`openapi/itinerary.yaml`](../contratos/openapi/itinerary.yaml): panel, viajes, reservas y tipos de segmento |
 
 Variables de entorno opcionales: `TROTAMUNDOS_CONTRATOS`, `TROTAMUNDOS_DSN`, `TROTAMUNDOS_BROKER`,
-`TROTAMUNDOS_REGION`.
+`TROTAMUNDOS_REGION` y `TROTAMUNDOS_INTERVALO_TAREAS` (segundos entre corridas del trabajo
+periódico; 0 lo apaga).
 
 ## Plan de construcción
 
@@ -137,7 +150,7 @@ implementa.
 | 2 | Registro de tipos de segmento y modelos canónicos | ADR-0010, ADR-0011 | ✅ |
 | 3 | `itinerary`: agregado `Reserva` y fusión determinista | ADR-0010, ADR-0013 | ✅ |
 | 4 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | ✅ |
-| 5 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | ⬜ |
+| 5 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | ✅ |
 | 6 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | ⬜ |
 | 7 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | ⬜ |
 | 8 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | ⬜ |

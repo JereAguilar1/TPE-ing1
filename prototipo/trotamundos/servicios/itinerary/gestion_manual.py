@@ -1,7 +1,8 @@
-"""Módulo `gestion-manual` (vista N2): los comandos del usuario sobre sus reservas (RF-06).
+"""Módulo `gestion-manual` (vista N2): los comandos del usuario sobre sus reservas y viajes.
 
 Alta, edición, baja, confirmación o descarte de una reserva de banda media y resolución de un
-conflicto. Todo pasa por las reglas de `fusion` (regla I2): la edición del usuario es una
+conflicto (RF-06); mover una reserva a otro viaje, archivar y eliminar un viaje (RF-07, RF-08).
+Los comandos de reservas y los de viajes nunca se mezclan en una transacción (ADR-0010). Todo pasa por las reglas de `fusion` (regla I2): la edición del usuario es una
 observación más, de fuente manual, y **fija** los campos que toca (ADR-0013).
 
 Cada comando trabaja dentro de la transacción de quien lo llama (a través del puerto
@@ -17,7 +18,7 @@ from typing import Any, Callable, Mapping
 from uuid import UUID, uuid4
 
 from trotamundos.comun.contratos import ErrorDeContrato
-from trotamundos.comun.eventos import Evento
+from trotamundos.comun.eventos import Causa, Evento
 from trotamundos.comun.modelo import (
     Fuente,
     Identificador,
@@ -27,7 +28,7 @@ from trotamundos.comun.modelo import (
 )
 from trotamundos.comun.tipos_de_segmento import RegistroDeTipos, TipoNoRegistrado
 from trotamundos.servicios.itinerary.fusion.consolidacion import hojas, reconsolidar
-from trotamundos.servicios.itinerary.fusion.eventos import Causa, eventos_del_cambio
+from trotamundos.servicios.itinerary.fusion.eventos import eventos_del_cambio
 from trotamundos.servicios.itinerary.fusion.identidad import (
     MOTIVO_IDENTIFICADOR,
     PosibleDuplicado,
@@ -42,6 +43,8 @@ from trotamundos.servicios.itinerary.reservas import (
     Reserva,
     TransicionInvalida,
 )
+from trotamundos.servicios.itinerary.viajes import ViajeNoModificable
+from trotamundos.servicios.itinerary.viajes import operaciones as viajes
 
 # Lo que una edición no toca: lo calcula la consolidación o es la estructura del tramo.
 _NO_EDITABLES = ("id", "orden", "fijados", "tipo", "versionTipo", "estado")
@@ -201,6 +204,36 @@ def resolver_conflicto(ctx: Contexto, reserva_id: UUID, conflicto_id: UUID,
             raise SolicitudInvalida(f"La fuente {aceptar} no participa del conflicto")
     reserva.resolver_conflicto(conflicto.id, aceptar=aceptar, ahora=ctx.ahora)
     return _cerrar(ctx, reserva)
+
+
+# --- comandos sobre viajes (solo tocan el agregado Viaje) ------------------------------------
+
+def mover_reserva(sesion: viajes.Sesion, reserva_id: UUID, viaje_id: UUID) -> list[Evento]:
+    """`PUT /viajes/{vid}/reservas/{rid}`: la asignación queda fijada (RF-07, regla 3)."""
+    try:
+        viajes.mover(sesion, reserva_id, viaje_id)
+    except (viajes.ReservaSinViaje, viajes.ViajeInexistente) as error:
+        raise NoEncontrada() from error
+    return sesion.cerrar()
+
+
+def archivar_viaje(sesion: viajes.Sesion, viaje_id: UUID) -> list[Evento]:
+    try:
+        viajes.archivar(sesion, viaje_id)
+    except viajes.ViajeInexistente as error:
+        raise NoEncontrada() from error
+    except ViajeNoModificable as error:
+        raise ConflictoDeComando(str(error)) from error
+    return sesion.cerrar()
+
+
+def eliminar_viaje(sesion: viajes.Sesion, viaje_id: UUID) -> list[Evento]:
+    """El viaje sale de toda vista; sus reservas quedan ocultas con él (RF-08)."""
+    try:
+        viajes.eliminar(sesion, viaje_id)
+    except viajes.ViajeInexistente as error:
+        raise NoEncontrada() from error
+    return sesion.cerrar()
 
 
 # --- auxiliares ------------------------------------------------------------------------------

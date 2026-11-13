@@ -37,6 +37,23 @@ def ahora_utc() -> str:
 
 
 @dataclass(frozen=True)
+class Causa:
+    """Lo que el sobre de un evento copia del origen del cambio (iteración 3 §5.8, ADR-0025)."""
+
+    region: str | None = None
+    traceparent: str | None = None
+    id_de_correlacion: str | None = None
+    id_de_causa: str | None = None  # p. ej., la disrupción que provocó el cambio
+
+    @classmethod
+    def de_evento(cls, evento: "Evento", region: str | None = None) -> "Causa":
+        """La causa de lo que se produce al procesar `evento`: hereda su traza y correlación."""
+        return cls(region=region, traceparent=evento.sobre.get("traceparent"),
+                   id_de_correlacion=evento.sobre.get("idDeCorrelacion"),
+                   id_de_causa=evento.sobre.get("idDeCausa"))
+
+
+@dataclass(frozen=True)
 class Evento:
     tipo: str
     sobre: dict[str, Any]

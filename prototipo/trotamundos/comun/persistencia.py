@@ -194,6 +194,14 @@ def guardar_respuesta(conexion: psycopg.Connection, usuario_id: UUID | str, clav
     )
 
 
+def reemplazar_respuesta(conexion: psycopg.Connection, usuario_id: UUID | str, clave: UUID | str,
+                         cuerpo: Any) -> None:
+    """Completa la respuesta guardada de un comando que termina en una segunda transacción (por
+    ejemplo, un alta que después se agrupa en un viaje)."""
+    conexion.execute("UPDATE comando_idempotente SET respuesta = %s WHERE usuario_id = %s AND clave = %s",
+                     (Jsonb(cuerpo), str(usuario_id), str(clave)))
+
+
 # --- retención -------------------------------------------------------------------------------
 
 def purgar(conexion: psycopg.Connection, ahora: datetime, retencion: timedelta = RETENCION) -> int:

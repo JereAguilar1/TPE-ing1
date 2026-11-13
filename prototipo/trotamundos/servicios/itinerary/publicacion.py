@@ -15,9 +15,9 @@ from trotamundos.comun.contratos import Contratos
 from trotamundos.comun.eventos import Evento
 from trotamundos.comun.persistencia import escribir_en_outbox
 
-# Lo que publica itinerary (operaciones con `x-productor: itinerary` del contrato AsyncAPI). Los
-# eventos de viajes llegan con el paso 5.
-PUBLICA = frozenset({"ReservaActualizada", "ReservaCancelada", "ConflictoDeFuentesDetectado"})
+# Lo que publica itinerary (operaciones con `x-productor: itinerary` del contrato AsyncAPI).
+PUBLICA = frozenset({"ReservaActualizada", "ReservaCancelada", "ConflictoDeFuentesDetectado",
+                     "ViajeArmado", "ViajeCompletado", "ViajeArchivado"})
 
 
 def registrar(conexion: psycopg.Connection, eventos: Iterable[Evento], contratos: Contratos) -> None:

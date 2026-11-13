@@ -5,6 +5,8 @@ Cada comando y cada evento consumido es una transacción: el cambio, la outbox, 
 """
 
 import copy
+import dataclasses
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 import pytest
@@ -16,16 +18,18 @@ from trotamundos.comun.contratos import ErrorDeContrato
 from trotamundos.comun.eventos import Evento
 from trotamundos.comun.persistencia import conectar
 from trotamundos.servicios.itinerary import gestion_manual, publicacion
+from trotamundos.servicios.itinerary.viajes import operaciones as viajes
 from trotamundos.servicios.itinerary.servicio import Itinerary
 
 
 @pytest.fixture
 def itinerary(dsn, esquema, contratos):
-    configuracion = Configuracion.desde_entorno()
+    configuracion = dataclasses.replace(Configuracion.desde_entorno(), intervalo_tareas_s=0)
+    reloj = {"ahora": instante(20)}
     servicio = Itinerary(configuracion, esquema=esquema, contratos=contratos,
-                         reloj=lambda: instante(20))
+                         reloj=lambda: reloj["ahora"])
     servicio.crear_esquema()
-    servicio.bd = (configuracion.dsn_postgres, esquema)
+    servicio.bd, servicio.reloj = (configuracion.dsn_postgres, esquema), reloj
     return servicio
 
 
@@ -54,12 +58,16 @@ def _observada(observacion: dict, **sobre) -> Evento:
 def test_un_evento_consumido_deja_la_reserva_la_outbox_y_la_lectura(itinerary, observacion, contratos):
     eventos = itinerary.consumir(_extraida(observacion, traceparent="00-t-s-01"))
 
-    [actualizada] = eventos
+    # La reserva en una transacción y su viaje en otra (ADR-0010), los dos en la outbox.
+    actualizada, armado = eventos
+    assert (actualizada.tipo, armado.tipo) == ("ReservaActualizada", "ViajeArmado")
     reserva_id = actualizada.carga["reserva"]["id"]
-    [salida] = _filas(itinerary, "SELECT * FROM bandeja_salida")
-    assert (salida["tipo"], salida["sobre"]["traceparent"]) == ("ReservaActualizada", "00-t-s-01")
-    assert itinerary.leer_reserva(USUARIO, reserva_id) == actualizada.carga["reserva"]
-    assert _filas(itinerary, "SELECT version FROM usuario_version") == [{"version": 1}]
+    salidas = _filas(itinerary, "SELECT tipo, sobre FROM bandeja_salida ORDER BY creado_en")
+    assert [s["tipo"] for s in salidas] == ["ReservaActualizada", "ViajeArmado"]
+    assert {s["sobre"]["traceparent"] for s in salidas} == {"00-t-s-01"}
+    assert itinerary.leer_reserva(USUARIO, reserva_id) == {
+        **actualizada.carga["reserva"], "viajeId": armado.carga["viajeId"]}
+    assert _filas(itinerary, "SELECT version FROM usuario_version") == [{"version": 2}]
 
 
 def test_un_evento_repetido_no_produce_un_segundo_efecto(itinerary, observacion):
@@ -67,8 +75,8 @@ def test_un_evento_repetido_no_produce_un_segundo_efecto(itinerary, observacion)
     itinerary.consumir(evento)
 
     assert itinerary.consumir(evento) == []
-    assert len(_filas(itinerary, "SELECT * FROM bandeja_salida")) == 1
-    assert _filas(itinerary, "SELECT version FROM usuario_version") == [{"version": 1}]
+    assert len(_filas(itinerary, "SELECT * FROM bandeja_salida")) == 2  # la reserva y su viaje
+    assert _filas(itinerary, "SELECT version FROM usuario_version") == [{"version": 2}]
 
 
 def test_la_cancelacion_del_proveedor_se_publica_con_su_causa(itinerary, observacion):
@@ -78,9 +86,10 @@ def test_la_cancelacion_del_proveedor_se_publica_con_su_causa(itinerary, observa
 
     eventos = itinerary.consumir(cancelacion)
 
-    assert [e.tipo for e in eventos] == ["ReservaActualizada", "ReservaCancelada"]
-    assert {e.sobre["idDeCausa"] for e in eventos} == {"disrupcion-7"}
+    assert [e.tipo for e in eventos] == ["ReservaActualizada", "ReservaCancelada", "ViajeArmado"]
+    assert {e.sobre["idDeCausa"] for e in eventos} == {"disrupcion-7"}  # también el del viaje
     assert eventos[1].carga["fuente"] == "proveedor"
+    assert eventos[2].carga["estado"] == "Cancelado"  # todas sus reservas están canceladas
 
 
 @pytest.mark.parametrize("estropear", [
@@ -112,8 +121,9 @@ def test_el_alta_es_idempotente_por_clave(itinerary, alta):
     segunda = itinerary.crear_reserva(USUARIO, clave, copy.deepcopy(alta))
 
     assert primera == segunda and primera[0] == 201
+    assert "viajeId" in primera[1]  # la respuesta guardada incluye el viaje
     assert len(_filas(itinerary, "SELECT * FROM reserva")) == 1
-    assert len(_filas(itinerary, "SELECT * FROM bandeja_salida")) == 1
+    assert len(_filas(itinerary, "SELECT * FROM bandeja_salida")) == 2
 
     alta["segmentos"][0]["operador"] = "Otra"
     with pytest.raises(gestion_manual.SolicitudInvalida):
@@ -130,7 +140,7 @@ def test_version_usuario_crece_con_cada_cambio(itinerary, alta):
     editada = itinerary.editar_reserva(USUARIO, UUID(reserva["id"]),
                                        {"version": reserva["version"], "segmentos": [segmento]})
 
-    assert (creada["versionUsuario"], editada["versionUsuario"]) == (1, 2)
+    assert 0 < creada["versionUsuario"] < editada["versionUsuario"]
     assert itinerary.leer_reserva(USUARIO, reserva["id"]) == editada["reserva"]
 
 
@@ -188,3 +198,151 @@ def test_recorrido_http_de_una_reserva(itinerary, alta, contratos):
         assert cliente.delete(ruta, headers=cabeceras).status_code == 204
         assert cliente.get(ruta, headers=cabeceras).status_code == 404
         assert cliente.delete(ruta, headers=cabeceras).status_code == 404
+
+
+# --- viajes: la reserva y su viaje en dos transacciones (ADR-0010) -------------------------
+
+COMUN = "openapi/comun.yaml#/components/schemas/"
+
+
+def _alta_el(alta: dict, dia: int, codigo: str) -> dict:
+    """El mismo vuelo, otro día y con otro localizador (otra reserva)."""
+    alta = copy.deepcopy(alta)
+    alta["identificadores"] = [{"emisor": "aerolinea:AR", "codigo": codigo}]
+    for extremo, hora in (("inicio", 13), ("fin", 15)):
+        alta["segmentos"][0][extremo]["instante"] = f"2026-12-{dia:02d}T{hora}:00:00Z"
+    return alta
+
+
+def test_el_alta_queda_en_un_viaje_y_en_el_panel(itinerary, alta, contratos):
+    _, respuesta = itinerary.crear_reserva(USUARIO, uuid4(), alta)
+    viaje_id = respuesta["viajeId"]
+
+    assert respuesta["reserva"]["viajeId"] == viaje_id
+    viaje = itinerary.leer_viaje(USUARIO, viaje_id)
+    contratos.validar(COMUN + "Viaje", viaje)
+    assert [r["id"] for r in viaje["reservas"]] == [respuesta["reserva"]["id"]]
+    panel = itinerary.leer_panel(USUARIO)
+    contratos.validar(COMUN + "Panel", panel)
+    assert [v["id"] for v in panel["viajesActivos"]] == [viaje_id]
+    assert panel["versionUsuario"] == respuesta["versionUsuario"]
+
+
+def test_el_alta_con_viaje_queda_fijada_en_ese_viaje(itinerary, alta):
+    _, primera = itinerary.crear_reserva(USUARIO, uuid4(), alta)
+    lejana = _alta_el(alta, 20, "LEJOS1")  # sola iría a otro viaje
+
+    _, segunda = itinerary.crear_reserva(USUARIO, uuid4(), {**lejana, "viajeId": primera["viajeId"]})
+
+    assert segunda["viajeId"] == primera["viajeId"]
+    assert _filas(itinerary, "SELECT fijada FROM viaje_reserva ORDER BY fijada") == [
+        {"fijada": False}, {"fijada": True}]
+    with pytest.raises(gestion_manual.SolicitudInvalida):
+        itinerary.crear_reserva(USUARIO, uuid4(), {**_alta_el(alta, 25, "OTRO1"), "viajeId": str(uuid4())})
+
+
+def test_mover_archivar_y_eliminar_viajes(itinerary, alta):
+    _, una = itinerary.crear_reserva(USUARIO, uuid4(), alta)
+    _, otra = itinerary.crear_reserva(USUARIO, uuid4(), _alta_el(alta, 20, "LEJOS1"))
+    assert una["viajeId"] != otra["viajeId"]
+
+    itinerary.mover_reserva(USUARIO, UUID(una["viajeId"]), UUID(otra["reserva"]["id"]))
+    assert itinerary.leer_viaje(USUARIO, otra["viajeId"]) is None  # quedó vacío: eliminado
+    assert len(itinerary.leer_viaje(USUARIO, una["viajeId"])["reservas"]) == 2
+
+    itinerary.archivar_viaje(USUARIO, UUID(una["viajeId"]))
+    assert itinerary.leer_panel(USUARIO)["viajesActivos"] == []
+    archivados = itinerary.leer_viajes(USUARIO, estado="Archivado")["viajes"]
+    assert [v["id"] for v in archivados] == [una["viajeId"]]
+    with pytest.raises(gestion_manual.ConflictoDeComando):
+        itinerary.archivar_viaje(USUARIO, UUID(una["viajeId"]))
+
+    itinerary.eliminar_viaje(USUARIO, UUID(una["viajeId"]))
+    assert itinerary.leer_viaje(USUARIO, una["viajeId"]) is None
+    with pytest.raises(gestion_manual.NoEncontrada):
+        itinerary.eliminar_viaje(USUARIO, UUID(una["viajeId"]))
+
+
+def test_si_falla_la_transaccion_del_viaje_la_reserva_queda_y_se_recupera(itinerary, alta, monkeypatch):
+    original = viajes.aplicar_reserva
+
+    def falla(*args, **kwargs):
+        raise RuntimeError("falla en viajes")
+
+    monkeypatch.setattr(viajes, "aplicar_reserva", falla)
+    with pytest.raises(RuntimeError):
+        itinerary.crear_reserva(USUARIO, uuid4(), alta)
+
+    # Ninguna transacción escribe en reserva y viaje a la vez: la reserva quedó, el viaje no.
+    assert len(_filas(itinerary, "SELECT * FROM reserva")) == 1
+    assert _filas(itinerary, "SELECT * FROM viaje") == []
+    assert len(_filas(itinerary, "SELECT * FROM evento_interno")) == 1
+
+    monkeypatch.setattr(viajes, "aplicar_reserva", original)
+    itinerary.tareas_periodicas()
+
+    assert len(_filas(itinerary, "SELECT * FROM viaje")) == 1
+    assert _filas(itinerary, "SELECT * FROM evento_interno") == []
+
+
+def test_el_trabajo_periodico_avanza_el_ciclo_de_vida(itinerary, alta):
+    _, creada = itinerary.crear_reserva(USUARIO, uuid4(), alta)  # vuela el 1/12 de 13 a 15 h
+    viaje_id = creada["viajeId"]
+
+    def estado_el(momento):
+        itinerary.reloj["ahora"] = momento
+        itinerary.tareas_periodicas()
+        return itinerary.leer_viajes(USUARIO)["viajes"][0]["estado"]
+
+    assert estado_el(datetime(2026, 12, 1, 14, tzinfo=timezone.utc)) == "EnCurso"
+    assert estado_el(datetime(2026, 12, 2, 15, tzinfo=timezone.utc)) == "Completado"
+    assert itinerary.leer_panel(USUARIO)["viajesActivos"] == []  # sale de la vista principal
+    assert estado_el(datetime(2026, 12, 5, 15, tzinfo=timezone.utc)) == "Archivado"
+    tipos = [f["tipo"] for f in _filas(itinerary, "SELECT tipo FROM bandeja_salida ORDER BY creado_en")]
+    assert tipos[-2:] == ["ViajeArmado", "ViajeArchivado"] and "ViajeCompletado" in tipos
+    assert itinerary.leer_viaje(USUARIO, viaje_id)["estado"] == "Archivado"
+
+
+def test_la_lista_de_viajes_se_pagina_con_un_cursor(itinerary, alta, contratos):
+    for dia, codigo in ((1, "A1"), (10, "B2"), (20, "C3")):
+        itinerary.crear_reserva(USUARIO, uuid4(), _alta_el(alta, dia, codigo))
+
+    primera = itinerary.leer_viajes(USUARIO, limite=2)
+    segunda = itinerary.leer_viajes(USUARIO, limite=2, cursor=primera["siguienteCursor"])
+
+    for pagina in (primera, segunda):
+        for resumen in pagina["viajes"]:
+            contratos.validar(COMUN + "ViajeResumen", resumen)
+    desdes = [v["desde"] for v in primera["viajes"] + segunda["viajes"]]
+    assert desdes == sorted(desdes, reverse=True) and len(desdes) == 3
+    assert segunda["siguienteCursor"] is None
+    assert primera["viajes"][0]["proximoSegmento"]["inicio"]["instante"] == "2026-12-20T13:00:00Z"
+    with pytest.raises(ValueError):
+        itinerary.leer_viajes(USUARIO, cursor="no-es-un-cursor")
+
+
+def test_recorrido_http_de_viajes_y_panel(itinerary, alta, contratos):
+    itinerario = "openapi/itinerary.yaml#/paths/"
+    cabeceras = {"X-Usuario-Id": str(USUARIO)}
+    with TestClient(itinerary.app()) as cliente:
+        creada = cliente.post("/reservas", json=alta,
+                              headers={**cabeceras, "Idempotency-Key": str(uuid4())}).json()
+        viaje = f"/viajes/{creada['viajeId']}"
+
+        panel = cliente.get("/panel", headers={**cabeceras, "X-Min-Version": "1"})
+        contratos.validar(COMUN + "Panel", panel.json())
+        lista = cliente.get("/viajes", params={"limite": 5}, headers=cabeceras)
+        contratos.validar(itinerario + "~1viajes/get/responses/200/content/application~1json/schema",
+                          lista.json())
+        contratos.validar(COMUN + "Viaje", cliente.get(viaje, headers=cabeceras).json())
+        foto = cliente.get(f"{viaje}/instantanea", headers=cabeceras)
+        assert foto.json()["tomadaEn"] and foto.json()["viaje"]["id"] == creada["viajeId"]
+
+        mover = cliente.put(f"{viaje}/reservas/{creada['reserva']['id']}", headers=cabeceras)
+        assert mover.status_code == 204
+        assert cliente.post(f"{viaje}/archivo", headers=cabeceras).status_code == 204
+        assert cliente.post(f"{viaje}/archivo", headers=cabeceras).status_code == 409
+        assert cliente.delete(viaje, headers=cabeceras).status_code == 204
+        assert cliente.get(viaje, headers=cabeceras).status_code == 404
+        assert cliente.get("/viajes", params={"estado": "Inventado"}, headers=cabeceras).status_code == 400
+        assert cliente.get("/viajes", params={"cursor": "x"}, headers=cabeceras).status_code == 400

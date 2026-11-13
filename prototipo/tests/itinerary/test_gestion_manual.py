@@ -8,10 +8,11 @@ import pytest
 
 from ayudas import USUARIO, instante
 from repositorio_en_memoria import RepositorioEnMemoria
+from trotamundos.comun.eventos import Causa
 from trotamundos.comun.modelo import Fuente
 from trotamundos.comun.tipos_de_segmento import registro_por_omision
 from trotamundos.servicios.itinerary import gestion_manual as gm
-from trotamundos.servicios.itinerary.fusion.eventos import Causa, eventos_del_cambio
+from trotamundos.servicios.itinerary.fusion.eventos import eventos_del_cambio
 from trotamundos.servicios.itinerary.fusion.identidad import ingerir, persistir
 from trotamundos.servicios.itinerary.reservas import EstadoReserva
 

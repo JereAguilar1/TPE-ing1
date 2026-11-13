@@ -5,9 +5,9 @@ y las lecturas a `proyeccion_panel`, a través del puerto `Itinerario`, que impl
 del elemento (`servicio`). Los cuerpos se validan contra los esquemas del contrato, sin
 redefinirlos (ADR-0036), y todo error sale como `Problema` (`comun.errores`).
 
-En este paso expone las operaciones de reservas y de tipos de segmento. Las de viajes y panel
-llegan con el paso 5; el vale interno (ADR-0028) y `X-Deadline-Ms` (ADR-0020), con los pasos que
-implementan esas decisiones (ver el plan en el README del prototipo).
+Expone todas las operaciones del contrato: panel, viajes, reservas y tipos de segmento. El vale
+interno (ADR-0028) y `X-Deadline-Ms` (ADR-0020) llegan con los pasos que implementan esas
+decisiones (ver el plan en el README del prototipo).
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from contextlib import AbstractAsyncContextManager
 from typing import Any, Callable, Mapping, Protocol, TypeVar
 from uuid import UUID
 
-from fastapi import Body, FastAPI, Header
+from fastapi import Body, FastAPI, Header, Query
 from fastapi.responses import JSONResponse, Response
 
 from trotamundos.comun.contratos import Contratos
@@ -50,6 +50,24 @@ class Itinerario(Protocol):
                            cuerpo: Mapping[str, Any], *,
                            traceparent: str | None = None) -> dict[str, Any]: ...
 
+    def mover_reserva(self, usuario_id: UUID, viaje_id: UUID, reserva_id: UUID, *,
+                      traceparent: str | None = None) -> None: ...
+
+    def archivar_viaje(self, usuario_id: UUID, viaje_id: UUID, *,
+                       traceparent: str | None = None) -> None: ...
+
+    def eliminar_viaje(self, usuario_id: UUID, viaje_id: UUID, *,
+                       traceparent: str | None = None) -> None: ...
+
+    def leer_panel(self, usuario_id: UUID) -> dict[str, Any]: ...
+
+    def leer_viajes(self, usuario_id: UUID, *, estado: str | None = None,
+                    cursor: str | None = None, limite: int = 20) -> dict[str, Any]: ...
+
+    def leer_viaje(self, usuario_id: UUID, viaje_id: UUID) -> dict[str, Any] | None: ...
+
+    def leer_instantanea(self, usuario_id: UUID, viaje_id: UUID) -> dict[str, Any] | None: ...
+
     def leer_reserva(self, usuario_id: UUID, reserva_id: UUID) -> dict[str, Any] | None: ...
 
     def tipos_de_segmento(self) -> list[dict[str, Any]]: ...
@@ -82,10 +100,7 @@ def crear_app(itinerario: Itinerario, contratos: Contratos,
 
     @app.get("/reservas/{id}")
     def leer_reserva(id: UUID, usuario_id: UUID = Header(alias="X-Usuario-Id")) -> JSONResponse:
-        reserva = itinerario.leer_reserva(usuario_id, id)
-        if reserva is None:
-            raise no_encontrado()
-        return JSONResponse(reserva)
+        return JSONResponse(_o_404(itinerario.leer_reserva(usuario_id, id)))
 
     @app.put("/reservas/{id}")
     def editar_reserva(id: UUID, cuerpo: dict[str, Any] = Body(...),
@@ -117,11 +132,68 @@ def crear_app(itinerario: Itinerario, contratos: Contratos,
         return JSONResponse(_ejecutar(lambda: itinerario.resolver_conflicto(
             usuario_id, id, cid, cuerpo, traceparent=traceparent)))
 
+    # --- panel y viajes -----------------------------------------------------------------
+
+    @app.get("/panel")
+    def leer_panel(usuario_id: UUID = Header(alias="X-Usuario-Id"),
+                   min_version: int | None = Header(default=None, alias="X-Min-Version", ge=0)
+                   ) -> JSONResponse:
+        # La proyección se actualiza en la misma transacción que cada cambio, así que nunca
+        # está detrás de una versión que el usuario ya vio: `X-Min-Version` siempre se cumple
+        # en una sola región (ADR-0018).
+        return JSONResponse(itinerario.leer_panel(usuario_id))
+
+    @app.get("/viajes")
+    def leer_viajes(usuario_id: UUID = Header(alias="X-Usuario-Id"),
+                    estado: str | None = Query(default=None),
+                    cursor: str | None = Query(default=None),
+                    limite: int = Query(default=20, ge=1, le=100)) -> JSONResponse:
+        if estado is not None:
+            validar(_COMUN + "EstadoViaje", estado)
+        try:
+            return JSONResponse(itinerario.leer_viajes(usuario_id, estado=estado, cursor=cursor,
+                                                       limite=limite))
+        except ValueError as error:  # cursor que no emitimos nosotros
+            raise Problema(400, "Solicitud inválida", errores=[
+                {"campo": "cursor", "mensaje": str(error)}]) from error
+
+    @app.get("/viajes/{id}")
+    def leer_viaje(id: UUID, usuario_id: UUID = Header(alias="X-Usuario-Id")) -> JSONResponse:
+        return JSONResponse(_o_404(itinerario.leer_viaje(usuario_id, id)))
+
+    @app.delete("/viajes/{id}", status_code=204)
+    def eliminar_viaje(id: UUID, usuario_id: UUID = Header(alias="X-Usuario-Id"),
+                       traceparent: str | None = Header(default=None)) -> Response:
+        _ejecutar(lambda: itinerario.eliminar_viaje(usuario_id, id, traceparent=traceparent))
+        return Response(status_code=204)
+
+    @app.get("/viajes/{id}/instantanea")
+    def leer_instantanea(id: UUID, usuario_id: UUID = Header(alias="X-Usuario-Id")) -> JSONResponse:
+        return JSONResponse(_o_404(itinerario.leer_instantanea(usuario_id, id)))
+
+    @app.post("/viajes/{id}/archivo", status_code=204)
+    def archivar_viaje(id: UUID, usuario_id: UUID = Header(alias="X-Usuario-Id"),
+                       traceparent: str | None = Header(default=None)) -> Response:
+        _ejecutar(lambda: itinerario.archivar_viaje(usuario_id, id, traceparent=traceparent))
+        return Response(status_code=204)
+
+    @app.put("/viajes/{vid}/reservas/{rid}", status_code=204)
+    def mover_reserva(vid: UUID, rid: UUID, usuario_id: UUID = Header(alias="X-Usuario-Id"),
+                      traceparent: str | None = Header(default=None)) -> Response:
+        _ejecutar(lambda: itinerario.mover_reserva(usuario_id, vid, rid, traceparent=traceparent))
+        return Response(status_code=204)
+
     @app.get("/tipos-de-segmento")
     def leer_tipos_de_segmento() -> JSONResponse:
         return JSONResponse(itinerario.tipos_de_segmento())
 
     return app
+
+
+def _o_404(recurso: T | None) -> T:
+    if recurso is None:
+        raise no_encontrado()
+    return recurso
 
 
 def _ejecutar(comando: Callable[[], T]) -> T:

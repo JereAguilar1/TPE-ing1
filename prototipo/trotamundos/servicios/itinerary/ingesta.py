@@ -19,10 +19,10 @@ from uuid import UUID
 import psycopg
 
 from trotamundos.comun.contratos import Contratos, ErrorDeContrato
-from trotamundos.comun.eventos import Evento
+from trotamundos.comun.eventos import Causa, Evento
 from trotamundos.comun.modelo import Fuente, ObservacionCanonica
 from trotamundos.comun.persistencia import registrar_en_bandeja_de_entrada
-from trotamundos.servicios.itinerary.fusion.eventos import Causa, eventos_del_cambio
+from trotamundos.servicios.itinerary.fusion.eventos import eventos_del_cambio
 from trotamundos.servicios.itinerary.fusion.identidad import (
     RepositorioDeReservas,
     ingerir_observacion,
@@ -56,9 +56,7 @@ def procesar(conexion: psycopg.Connection, evento: Evento, repositorio: Reposito
                                     ahora, banda=banda, confianza=confianza)
     persistir(repositorio, resultado)
 
-    causa = Causa(region=region, traceparent=evento.sobre.get("traceparent"),
-                  id_de_correlacion=evento.sobre.get("idDeCorrelacion"),
-                  id_de_causa=evento.sobre.get("idDeCausa"))
+    causa = Causa.de_evento(evento, region)
     return eventos_del_cambio(
         resultado.reserva, resultado.consolidacion, observacion.fuente, causa, ahora,
         hubo_cambio=resultado.creada or resultado.aplicada or bool(resultado.unificadas),
