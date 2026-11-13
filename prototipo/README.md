@@ -82,7 +82,7 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | El registro de tipos de segmento vive en `comun/tipos_de_segmento.py`, no dentro de `itinerary` | Lo usan `itinerary` y también los extractores y adaptadores para validar su salida (QA-10, QA-11); como un servicio no puede importar a otro (ADR-0036), tiene que estar en lo compartido | La vista de módulos de adaptadores muestra los descriptores como «artefacto común transversal» usado por `booking-extraction`. La vista N2 lo ubica en `itinerary`: en el prototipo ese módulo es la exposición de `GET /tipos-de-segmento` |
 | `CuentaSuprimida` se particiona por `seudonimoAnalitico` | El contrato prohíbe `usuarioId` en ese evento (ADR-0030); el seudónimo es el único identificador que trae, y mantiene en orden los eventos de supresión de una misma cuenta | Contrato AsyncAPI, `SobreSinUsuario` y carga de `CuentaSuprimida` |
 | Los adaptadores y extractores van en carpetas `complementos/`, y son lo único que puede nombrar un tipo de segmento concreto | Traducen un formato externo a un tipo, así que necesitan conocerlo; el resto del código razona por descriptor (regla I4) | Vista de módulos N2 (regla I4) y vista de adaptadores (complementos aislados, reglas R2 y R3) |
-| Los eventos y las respuestas se validan en el mismo proceso contra los archivos de `contratos/`, sin un registro de esquemas | Da la misma garantía (nada sale del servicio sin cumplir el contrato) sin agregar otro servidor a la infraestructura local. La compatibilidad entre versiones se comprueba con pruebas (paso 16) | La iteración 4 prevé un registro de esquemas AsyncAPI con compatibilidad `BACKWARD_TRANSITIVE` (ADR-0027); el prototipo lo reemplaza, no lo contradice |
+| Los eventos y las respuestas se validan en el mismo proceso contra los archivos de `contratos/`, sin un registro de esquemas | Da la misma garantía (nada sale del servicio sin cumplir el contrato) sin agregar otro servidor a la infraestructura local. La compatibilidad entre versiones se comprueba con pruebas (paso 17) | La iteración 4 prevé un registro de esquemas AsyncAPI con compatibilidad `BACKWARD_TRANSITIVE` (ADR-0027); el prototipo lo reemplaza, no lo contradice |
 | El campo `type` de los errores es `https://errores.trotamundos.app/{status}` | RFC 9457 pide una URI que identifique el tipo de problema; una por código de estado alcanza para el prototipo | `comun.yaml`, esquema `Problema` (`type` con `format: uri`) |
 | Por cada clave `(fuente, idDeFuente)` la reserva guarda una sola observación: la de mayor `versionDeFuente` (ante un empate, decide el contenido). Repetirla o recibir una versión vieja no cambia nada | ADR-0014 identifica la observación por esa clave y la ordena por la versión de la fuente; así se cubren el duplicado de entrega y la reversión de estado | Iteración 2 §5.8: `observacion` única por `(reserva_id, fuente, id_de_fuente)` |
 | De cada fuente cuenta solo su observación vigente (la de mayor `versionDeFuente`). Entre fuentes, la fusión es campo a campo: proveedor, correo y manual. El alta manual no fija campos: solo la edición los fija | Es la tabla de ADR-0013: gana la mayor versión de la fuente, el proveedor gana en los hechos operativos, el correo completa lo que el proveedor no informa y el usuario es la autoridad si la reserva es solo manual o si fijó el campo. Como la compactación conserva solo la vigente por fuente, compactar no cambia la vista (lo comprueba una prueba de propiedades) | ADR-0012 y ADR-0023 (compactación); `EdicionReserva` dice «cada campo tocado queda fijado» y `ReservaNueva` no |
@@ -113,7 +113,7 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | Un viaje que se queda sin reservas pasa a `Eliminado`. Eliminar un viaje no toca sus reservas: quedan ocultas con él | Un viaje vacío no tiene qué mostrar, y ADR-0010 separa los dos agregados. Lo de las reservas se decidió al implementar el paso 5 | ADR-0010; iteración 2 §5.1 (RF-08) |
 | El archivo manual se admite en cualquier estado salvo `Archivado` y `Eliminado` (si no, 409). Un viaje `Cancelado` no se completa solo: queda visible hasta que el usuario lo archiva o lo elimina | Es la fila `Cancelado` de la tabla del ciclo de vida | Iteración 2 §5.1 (RF-08) |
 | `ViajeArmado` se publica al crearse el viaje y en cada cambio de miembros, período, título o estado, con su `version` | Así `event-pipeline` y la proyección del panel se enteran de cada cambio, en orden. Se decidió al implementar el paso 5; agregar `version` es un cambio compatible del contrato (AsyncAPI 1.3.0) | ADR-0027; contrato AsyncAPI |
-| La gracia entre `Completado` y `Archivado` es de 3 días para todos | Es el valor por omisión de `diasDeGraciaArchivado`. El del usuario llegaría con `PreferenciasActualizadas`, pero `preferences` no está en el plan del prototipo | Iteración 2 §5.11; `preferences.yaml` |
+| La gracia entre `Completado` y `Archivado` es de 3 días para todos, por ahora | Es el valor por omisión de `diasDeGraciaArchivado`. La de cada usuario llega con `PreferenciasActualizadas`, cuando exista `preferences` (paso 12) | Iteración 2 §5.11; `preferences.yaml` |
 | Un trabajo periódico (cada `TROTAMUNDOS_INTERVALO_TAREAS` segundos, 60 por omisión) procesa los eventos internos pendientes, avanza los viajes cuya `proxima_transicion` venció y purga la bandeja de entrada y las claves de idempotencia. Las transiciones se calculan en UTC a partir del fin local de cada tramo | §5.1 habla de trabajos «por zona horaria»: con un solo proceso no hace falta repartirlos, alcanza con que el instante de cada transición respete la zona del lugar | Iteración 2 §5.1; ADR-0014 |
 | `panel_usuario` es una fila por usuario con el `Panel` completo, que se rearma con cada evento del usuario. Como se actualiza en la misma transacción que el cambio, `X-Min-Version` siempre se cumple en una sola región | UC-3 pide el panel en una sola ida y vuelta, y QA-02, un acceso | ADR-0018; ADR-0019; QA-02 |
 | Cada carril es un tópico propio: el `address` del canal del contrato más el carril (`dominio.reserva-observada.p1`). El canal lógico sigue siendo el del contrato | Kafka no prioriza mensajes dentro de un tópico: con tópicos separados, P1 no espera detrás de una avalancha de P2. Que dos eventos del mismo usuario lleguen en otro orden por ir en carriles distintos es seguro, porque la fusión no depende del orden. Se decidió al implementar el paso 6 | ADR-0020; iteración 3 §5.3; ADR-0014 (N3) |
@@ -121,6 +121,7 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | La *outbox* guarda el carril y un número de orden. Un único publicador por esquema (bloqueo consultivo) envía en ese orden, con clave `usuarioId`, y después marca. Si falla entre enviar y marcar, reenvía: es «al menos una vez» | Un solo publicador conserva el orden por usuario; el duplicado posible lo frena la bandeja de entrada del consumidor | ADR-0012; ADR-0014 |
 | El consumidor lee de a un carril por vuelta y siempre el más urgente con mensajes; P3 se puede pausar. Un mensaje que no cumple el contrato se guarda en `evento_rechazado` y se sigue; cualquier otro error se reintenta sin avanzar el desplazamiento | Nada se descarta en silencio y un error transitorio no pierde el evento. Qué hacer con los inválidos se decidió al implementar el paso 6: los documentos no prevén una cola de fallidos | ADR-0020; ADR-0014; QA-11 |
 | Los tópicos se crean al arrancar, con 6 particiones, y la creación falla si el broker rechaza alguno | La vista de despliegue N2 prevé 96 particiones por región; en una notebook alcanzan 6. El cliente no avisa si un tópico no se creó: se revisa la respuesta | Vista de despliegue N2 |
+| `itinerary` se despliega en dos modos del mismo código: `itinerary-lectura` registra solo las rutas con etiqueta `lectura` del contrato e `itinerary-escritura`, solo las de `comando`, más el trabajo periódico y el *broker*. Al armar la API se verifica que toda ruta esté en el contrato | Es la separación de ADR-0021: la lectura escala y se despliega sin arrastrar la fusión. La etiqueta del contrato decide el modo de cada ruta, así el código no puede divergir. La Opción B lee de `itinerary-lectura` (ADR-0034) | ADR-0021; iteración 3 §5.4; ADR-0009 |
 | Las pruebas que necesitan PostgreSQL se saltean, con el motivo, si no está levantado | Las del dominio corren en cualquier máquina; las de persistencia piden `make infra-arriba` | ADR-0017 |
 | Todos los servicios usan la misma imagen, construida desde la raíz del repositorio para incluir `contratos/`; cada uno es un proceso con su comando | Un solo paquete y un proceso por servicio | ADR-0036 |
 
@@ -137,16 +138,75 @@ make servicios-arriba # además construye la imagen y levanta los servicios
 make infra-abajo
 ```
 
+**Integración continua.** En cada cambio de `prototipo/` o `contratos/`,
+[`.github/workflows/pruebas.yml`](../.github/workflows/pruebas.yml) levanta PostgreSQL y Redpanda
+con el mismo `docker-compose.yml` y corre todas las pruebas. Ahí se define
+`TROTAMUNDOS_EXIGIR_INFRA=1`: sin base o sin broker, las pruebas fallan en lugar de saltearse.
+
 Servicios que levanta `make servicios-arriba`:
 
 | Servicio | Puerto local | Contrato |
 |---|---|---|
-| `itinerary` | 18101 | [`openapi/itinerary.yaml`](../contratos/openapi/itinerary.yaml): panel, viajes, reservas y tipos de segmento. Además publica su *outbox* y consume `ReservaExtraida` y `ReservaObservada` del broker |
+| `itinerary-escritura` | 18101 | Los comandos de [`openapi/itinerary.yaml`](../contratos/openapi/itinerary.yaml) (etiqueta `comando`). Además corre el trabajo periódico, publica su *outbox* y consume `ReservaExtraida` y `ReservaObservada` del broker |
+| `itinerary-lectura` | 18102 | Las lecturas del mismo contrato (etiqueta `lectura`): panel, viajes, reservas y tipos de segmento |
 
 Variables de entorno opcionales: `TROTAMUNDOS_CONTRATOS`, `TROTAMUNDOS_DSN`, `TROTAMUNDOS_BROKER`,
 `TROTAMUNDOS_REGION`, `TROTAMUNDOS_INTERVALO_TAREAS` (segundos entre corridas del trabajo
 periódico; 0 lo apaga) y `TROTAMUNDOS_PREFIJO_TOPICOS` (antepuesto a los tópicos; las pruebas lo
 usan para no mezclarse). Con `TROTAMUNDOS_BROKER` vacío, un servicio no publica ni consume.
+`TROTAMUNDOS_MODO` elige el modo de despliegue de `itinerary`: `completo` (por omisión), `lectura` o
+`escritura`.
+
+## Estado de las decisiones de arquitectura
+
+Qué ADR implementa el prototipo hasta ahora, cuál se implementa en un paso posterior y cuál queda
+fuera del alcance que fija [ADR-0034](../docs/03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md)
+(una tajada vertical por los 5 ASR, no el sistema completo). Se actualiza al cerrar cada paso.
+
+✅ implementado · 🟨 parcial · ⏳ en un paso posterior · ➖ fuera de alcance
+
+| ADR | Estado | Dónde está o cuándo llega |
+|---|---|---|
+| [0001](../docs/03-adr/ADR-0001-estilo-arquitectonico.md) Microservicios orientados a eventos | 🟨 | `itinerary` y lo compartido en `comun`; ningún servicio importa a otro (prueba de arquitectura). Los demás servicios, pasos 7 a 14 |
+| [0002](../docs/03-adr/ADR-0002-despliegue-multirregion.md) Activo-activo en tres regiones | ⏳ | Paso 16, como multirregión simulada: dos regiones con región primaria por usuario (ver ADR-0018). Las tres regiones reales ➖ |
+| [0003](../docs/03-adr/ADR-0003-separacion-planos.md) Plano operacional y analítico separados | ⏳ | Paso 14 |
+| [0004](../docs/03-adr/ADR-0004-obtencion-de-correo.md) Correo por *push* con reconciliación | ⏳ | Paso 8 |
+| [0005](../docs/03-adr/ADR-0005-capa-de-clientes-bff.md) Un BFF por tipo de cliente | ⏳ | Paso 11 |
+| [0006](../docs/03-adr/ADR-0006-capa-de-anticorrupcion.md) Capa de anticorrupción con complementos | ⏳ | Pasos 9 y 10 (la prueba ya reserva las carpetas `complementos/`) |
+| [0007](../docs/03-adr/ADR-0007-identidad-y-comparticion.md) OIDC, delegación OAuth y designados | ⏳ | Pasos 7 y 13 |
+| [0008](../docs/03-adr/ADR-0008-alcance-disponibilidad.md) Alcance y medición de la disponibilidad | ➖ | Medir disponibilidad real no tiene sentido en una notebook; lo crítico se ejercita con QA-05 |
+| [0009](../docs/03-adr/ADR-0009-contratos-spec-driven.md) Contratos como artefactos de primera clase | 🟨 | Todo cuerpo, respuesta y evento se valida contra `contratos/` en ejecución, y la integración continua corre todas las pruebas en cada cambio. La detección de cambios incompatibles entre versiones, paso 17 |
+| [0010](../docs/03-adr/ADR-0010-modelo-canonico-reserva-segmento-viaje.md) Agregados `Reserva` y `Viaje` | ✅ | Pasos 3 a 5: ninguna transacción escribe los dos (probado) y se coordinan por eventos internos |
+| [0011](../docs/03-adr/ADR-0011-extensibilidad-del-tipo-de-segmento.md) Registro de tipos de segmento | ✅ | Pasos 2 a 5 (regla I4 probada). El tipo `tren` sin tocar código (QA-15), paso 15 |
+| [0012](../docs/03-adr/ADR-0012-persistencia-del-plano-operacional.md) Persistencia relacional por `usuario_id` | ✅ | Las diez tablas de §5.8, con las unicidades impuestas por la base y la *outbox*. La compactación, ver ADR-0023 |
+| [0013](../docs/03-adr/ADR-0013-deduplicacion-y-conflictos.md) Identidad, precedencia y conflictos | ✅ | Paso 3: una prueba por regla, más pruebas de propiedades. La métrica «conflictos abiertos por usuario y por semana», paso 14 (desde `ConflictoDeFuentesDetectado`) |
+| [0014](../docs/03-adr/ADR-0014-idempotencia-de-la-ingesta.md) Bandeja de entrada y fusión determinista | ✅ | Pasos 3 a 6: bandeja de entrada, `Idempotency-Key`, entrega repetida sin doble efecto y reversión 10:00 → 10:30 → 10:00 (probados). La de `mail-ingest`, paso 8 |
+| [0015](../docs/03-adr/ADR-0015-politica-de-confianza-de-extraccion.md) Tres bandas de confianza | 🟨 | Del lado de `itinerary` está (`PorConfirmar`, la banda media no cambia lo confirmado). Los extractores y el corpus, paso 9 |
+| [0016](../docs/03-adr/ADR-0016-modelo-dimensional-analitico.md) Esquema en estrella desde eventos | ⏳ | Paso 14 |
+| [0017](../docs/03-adr/ADR-0017-estrategia-de-pruebas-y-contratos.md) Pruebas derivadas de la especificación | 🟨 | Propiedades de la fusión y validación contra contratos, en la integración continua (`.github/workflows/pruebas.yml`). Conformidad de complementos y corpus, pasos 9 y 10; Schemathesis y compatibilidad, paso 17 |
+| [0018](../docs/03-adr/ADR-0018-consistencia-datos-multirregion.md) Región primaria, testigo y lectura causal | 🟨 | `versionUsuario` y escrituras serializadas por usuario. Región primaria, testigo transregional síncrono para los comandos manuales y conmutación, paso 16 (QA-05) |
+| [0019](../docs/03-adr/ADR-0019-cache-camino-lectura-arranque-movil.md) Caché multinivel y arranque móvil | ⏳ | Paso 11 (el panel ya se lee en un acceso) |
+| [0020](../docs/03-adr/ADR-0020-contrapresion-y-sobrecarga.md) Contrapresión, carriles y degradación | 🟨 | Carriles P1/P2/P3 (paso 6). Plazo propagado, colas acotadas y modos de degradación, pasos 11 y 17 |
+| [0021](../docs/03-adr/ADR-0021-estrategia-autoescalado.md) Autoescalado y lectura/escritura separadas | 🟨 | `itinerary-lectura` e `itinerary-escritura` como modos del mismo código (`TROTAMUNDOS_MODO`). El autoescalado es de la plataforma de producción ➖ |
+| [0022](../docs/03-adr/ADR-0022-despliegue-progresivo-y-reversion.md) Entrega canaria y *expand/contract* | ➖ | Requiere varias regiones y tráfico real |
+| [0023](../docs/03-adr/ADR-0023-particionamiento-y-crecimiento.md) Particionamiento, compactación y archivo frío | 🟨 | La clave de partición `usuario_id` está en toda tabla y en el *broker*. Los 64 *buckets*, la compactación y el archivo frío ➖ (volumen de producción); la consolidación ya es indiferente a la compactación (probado) |
+| [0024](../docs/03-adr/ADR-0024-cortacircuitos-reintentos-y-cuotas.md) Cortacircuitos, cola persistente y cuotas | ⏳ | Paso 10 |
+| [0025](../docs/03-adr/ADR-0025-observabilidad-sli-slo-presupuesto-error.md) Observabilidad y presupuesto de error | 🟨 | `traceparent` e `idDeCorrelacion` se propagan en HTTP y eventos. OpenTelemetry y SLO ➖: no están en el plan |
+| [0026](../docs/03-adr/ADR-0026-modelo-costo-y-camino-escalonado.md) Modelo de costo | ➖ | Es una decisión de operación, no de código |
+| [0027](../docs/03-adr/ADR-0027-versionado-y-evolucion-de-contratos.md) Evolución compatible de contratos | 🟨 | Los contratos evolucionan con SemVer y cambios compatibles (`itinerary.yaml` 1.1.0, AsyncAPI 1.3.0). El tipo de medio versionado de la API pública, paso 11 |
+| [0028](../docs/03-adr/ADR-0028-autorizacion-comparticion-y-publicacion.md) ABAC, vales firmados y designados | 🟨 | El mismo 404 para «no existe» y «no es tuyo». El vale interno, desde el paso 7; designados y publicación, paso 13 |
+| [0029](../docs/03-adr/ADR-0029-cifrado-custodia-y-rotacion-de-claves.md) Cifrado por sobres y custodia | ⏳ | Paso 7 (QA-13) |
+| [0030](../docs/03-adr/ADR-0030-auditoria-y-supresion-datos-personales.md) Auditoría y supresión de datos | 🟨 | Los errores no filtran datos internos. Auditoría, paso 7; supresión en el plano analítico, paso 14 |
+| [0031](../docs/03-adr/ADR-0031-residencia-de-datos-por-region.md) Residencia de datos por región | ➖ | La multirregión del paso 16 se simula en una sola jurisdicción; las clases de residencia no aplican |
+| [0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md) Internacionalización | 🟨 | Instantes en UTC con zona IANA aparte, en todo el modelo. Idioma y formateo, en los BFF (paso 11) |
+| [0033](../docs/03-adr/ADR-0033-capacidades-nativas-gps-y-degradacion.md) GPS en el móvil | ➖ | No hay cliente móvil nativo en el prototipo |
+| [0034](../docs/03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) Módulo avanzado y recorte del prototipo | 🟨 | El recorte guía este plan. La Opción B, pasos 18 y 19 |
+| [0035](../docs/03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) Buzones sin OAuth y formatos desconocidos | ⏳ | Pasos 8 y 9 |
+| [0036](../docs/03-adr/ADR-0036-tecnologia-del-prototipo.md) Tecnología del prototipo | ✅ | Python 3.12, FastAPI, PostgreSQL, Redpanda y Docker Compose. Schemathesis, paso 17 |
+
+Además de los ADR: `preferences` se construye como servicio mínimo en el paso 12, porque su evento
+`PreferenciasActualizadas` lo consumen `itinerary` (la gracia de archivado de cada usuario) y la
+Opción B (ADR-0034).
 
 ## Plan de construcción
 
@@ -166,12 +226,13 @@ implementa.
 | 9 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | ⬜ |
 | 10 | `provider-sync`: adaptador simulado, cortacircuitos, disrupciones | QA-10, ADR-0024 | ⬜ |
 | 11 | BFF y `api-gateway`: panel, límite de tasa, plazos | QA-02, ADR-0020 | ⬜ |
-| 12 | `notification` y `support-liaison` | UC-5, UC-7 | ⬜ |
+| 12 | `notification`, `support-liaison` y `preferences` mínimo | UC-5, UC-7, ADR-0034 | ⬜ |
 | 13 | `sharing`: compartición y `ResumenPublicable` | QA-12, ADR-0028 | ⬜ |
 | 14 | `event-pipeline` y plano analítico | QA-09, ADR-0016 | ⬜ |
 | 15 | Tipo `tren` sin tocar código de dominio | QA-15 | ⬜ |
-| 16 | Pruebas de contrato y de escenarios (QA-01, QA-04, QA-05) | ADR-0017 | ⬜ |
-| 17 | Iteración 5 de ADD: diseño de la Opción B (ADRs y contrato) | CON-06 | ⬜ |
-| 18 | `virtual-assistant`: intenciones y derivación a la agencia | RF-B1, RF-B2 | ⬜ |
-| 19 | Interfaz web mínima de demostración | RF-09 | ⬜ |
-| 20 | Matriz código ↔ ADR, guion de demostración y README final | QA-16 | ⬜ |
+| 16 | Multirregión simulada: región primaria por usuario, testigo transregional y conmutación | QA-05, ADR-0018 | ⬜ |
+| 17 | Pruebas de contrato y de escenarios (QA-01, QA-04, QA-05) | ADR-0017 | ⬜ |
+| 18 | Iteración 5 de ADD: diseño de la Opción B (ADRs y contrato) | CON-06 | ⬜ |
+| 19 | `virtual-assistant`: intenciones y derivación a la agencia | RF-B1, RF-B2 | ⬜ |
+| 20 | Interfaz web mínima de demostración | RF-09 | ⬜ |
+| 21 | Matriz código ↔ ADR, guion de demostración y README final | QA-16 | ⬜ |
