@@ -264,16 +264,21 @@ class Itinerary:
     # --- API -----------------------------------------------------------------------------
 
     def app(self) -> FastAPI:
-        """La API interna sobre este elemento. Al arrancar crea el esquema y lanza el trabajo
-        periódico (cada `intervalo_tareas_s`; 0 lo apaga) y, con un broker configurado, el
-        publicador de la outbox y el consumidor."""
+        """La API interna sobre este elemento, en el modo configurado (ADR-0021).
+
+        `itinerary-lectura` solo atiende las lecturas, servidas por `proyeccion_panel`.
+        `itinerary-escritura` atiende los comandos y además corre el trabajo periódico (cada
+        `intervalo_tareas_s`; 0 lo apaga) y, con un broker configurado, el publicador de la outbox
+        y el consumidor. `completo` hace las dos cosas. Al arrancar, todos crean el esquema si
+        no existe."""
         intervalo = self._configuracion.intervalo_tareas_s
+        escribe = "comando" in api.MODOS[self._configuracion.modo]
 
         @asynccontextmanager
         async def ciclo_de_vida(_: FastAPI) -> AsyncIterator[None]:
             self.crear_esquema()
-            tareas = [asyncio.create_task(self._bucle(intervalo))] if intervalo > 0 else []
-            async with self.con_broker() as en_marcha:
+            tareas = [asyncio.create_task(self._bucle(intervalo))] if escribe and intervalo > 0 else []
+            async with self.con_broker(escribe) as en_marcha:
                 tareas += en_marcha
                 yield
                 for tarea in tareas:
@@ -282,7 +287,8 @@ class Itinerary:
                     with contextlib.suppress(asyncio.CancelledError):
                         await tarea
 
-        return api.crear_app(self, self._contratos, lifespan=ciclo_de_vida)
+        return api.crear_app(self, self._contratos, lifespan=ciclo_de_vida,
+                             modo=self._configuracion.modo)
 
     # --- broker (ADR-0012, ADR-0014, ADR-0020) -------------------------------------------
 
@@ -310,10 +316,11 @@ class Itinerary:
                                             c.dsn_postgres, self._esquema)
 
     @contextlib.asynccontextmanager
-    async def con_broker(self) -> AsyncIterator[list[asyncio.Task]]:
-        """Arranca el publicador y el consumidor (si hay broker) y los detiene al salir."""
+    async def con_broker(self, escribe: bool = True) -> AsyncIterator[list[asyncio.Task]]:
+        """Arranca el publicador y el consumidor (si hay broker y el modo escribe) y los detiene
+        al salir."""
         servidores = self._configuracion.broker
-        if not servidores:
+        if not servidores or not escribe:
             yield []
             return
         publica, consume = self.topicos()

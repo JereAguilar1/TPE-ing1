@@ -5,7 +5,9 @@ y las lecturas a `proyeccion_panel`, a través del puerto `Itinerario`, que impl
 del elemento (`servicio`). Los cuerpos se validan contra los esquemas del contrato, sin
 redefinirlos (ADR-0036), y todo error sale como `Problema` (`comun.errores`).
 
-Expone todas las operaciones del contrato: panel, viajes, reservas y tipos de segmento. El vale
+Expone las operaciones del contrato: panel, viajes, reservas y tipos de segmento. Según el modo
+de despliegue (ADR-0021) registra solo las de lectura (`itinerary-lectura`), solo los comandos
+(`itinerary-escritura`) o todas; cada ruta se clasifica por su etiqueta en el contrato. El vale
 interno (ADR-0028) y `X-Deadline-Ms` (ADR-0020) llegan con los pasos que implementan esas
 decisiones (ver el plan en el README del prototipo).
 """
@@ -17,13 +19,18 @@ from typing import Any, Callable, Mapping, Protocol, TypeVar
 from uuid import UUID
 
 from fastapi import Body, FastAPI, Header, Query
+from fastapi.routing import APIRoute
 from fastapi.responses import JSONResponse, Response
 
 from trotamundos.comun.contratos import Contratos
 from trotamundos.comun.errores import Problema, instalar_manejadores, no_encontrado
 from trotamundos.servicios.itinerary.gestion_manual import ErrorDeComando, NoEncontrada
 
+_CONTRATO = "openapi/itinerary.yaml"
 _COMUN = "openapi/comun.yaml#/components/schemas/"
+# Modos de despliegue (ADR-0021, iteración 3 §5.4): qué etiquetas del contrato atiende cada uno.
+MODOS = {"completo": frozenset({"lectura", "comando"}), "lectura": frozenset({"lectura"}),
+         "escritura": frozenset({"comando"})}
 _CUERPO = "openapi/itinerary.yaml#/paths/{ruta}/post/requestBody/content/application~1json/schema"
 CUERPO_CONFIRMACION = _CUERPO.format(ruta="~1reservas~1{id}~1confirmacion")
 CUERPO_RESOLUCION = _CUERPO.format(ruta="~1reservas~1{id}~1conflictos~1{cid}~1resolucion")
@@ -74,7 +81,11 @@ class Itinerario(Protocol):
 
 
 def crear_app(itinerario: Itinerario, contratos: Contratos,
-              lifespan: Callable[[FastAPI], AbstractAsyncContextManager] | None = None) -> FastAPI:
+              lifespan: Callable[[FastAPI], AbstractAsyncContextManager] | None = None,
+              modo: str = "completo") -> FastAPI:
+    """La API con las rutas del modo indicado (`completo`, `lectura` o `escritura`)."""
+    if modo not in MODOS:
+        raise ValueError(f"Modo de despliegue desconocido: {modo!r}")
     # El contrato es `contratos/openapi/itinerary.yaml`: no se publica otro generado.
     app = FastAPI(title="itinerary", openapi_url=None, docs_url=None, redoc_url=None,
                   lifespan=lifespan)
@@ -187,7 +198,27 @@ def crear_app(itinerario: Itinerario, contratos: Contratos,
     def leer_tipos_de_segmento() -> JSONResponse:
         return JSONResponse(itinerario.tipos_de_segmento())
 
+    _quedarse_con(app, _etiquetas(contratos), MODOS[modo])
     return app
+
+
+def _etiquetas(contratos: Contratos) -> dict[tuple[str, str], str]:
+    """(método, ruta) → etiqueta (`lectura` o `comando`) de cada operación del contrato."""
+    return {(metodo.upper(), ruta): operacion["tags"][0]
+            for ruta, operaciones in contratos.documento(_CONTRATO)["paths"].items()
+            for metodo, operacion in operaciones.items()
+            if isinstance(operacion, dict) and "tags" in operacion}
+
+
+def _quedarse_con(app: FastAPI, etiquetas: dict[tuple[str, str], str], activas: frozenset) -> None:
+    """Deja solo las rutas del modo. Una ruta que no está en el contrato es un error: el código
+    no puede exponer nada que el contrato no declare (ADR-0009)."""
+    propias = [r for r in app.router.routes if isinstance(r, APIRoute)]
+    ajenas = sorted(f"{m} {r.path}" for r in propias for m in r.methods if (m, r.path) not in etiquetas)
+    if ajenas:
+        raise RuntimeError(f"Rutas que no están en {_CONTRATO}: {', '.join(ajenas)}")
+    app.router.routes = [r for r in app.router.routes if not isinstance(r, APIRoute)
+                         or any(etiquetas[(m, r.path)] in activas for m in r.methods)]
 
 
 def _o_404(recurso: T | None) -> T:

@@ -36,25 +36,47 @@ services:
       timeout: 3s
       retries: 20
 
-  itinerary:
-    # Núcleo del dominio: API interna, publicación de su outbox y consumo de ReservaExtraida y
-    # ReservaObservada por carriles (pasos 4 a 6).
+  # itinerary en sus dos modos de despliegue (ADR-0021, iteración 3 §5.4): el mismo código, con
+  # réplicas y conexiones propias para la lectura y para la escritura.
+  itinerary-escritura:
+    # Comandos, trabajo periódico, publicación de la outbox y consumo por carriles (pasos 4 a 6).
     build:
       context: ..
       dockerfile: prototipo/Dockerfile
     image: trotamundos-prototipo:local
     command: ["uvicorn", "--factory", "trotamundos.servicios.itinerary.servicio:crear_app",
               "--host", "0.0.0.0", "--port", "8000"]
-    environment:
+    environment: &entorno_itinerary
       TROTAMUNDOS_DSN: postgresql://trotamundos:trotamundos@postgres:5432/trotamundos
       TROTAMUNDOS_BROKER: broker:9092
       TROTAMUNDOS_REGION: AM
+      TROTAMUNDOS_MODO: escritura
     ports:
       - "18101:8000"
     depends_on:
       postgres:
         condition: service_healthy
       broker:
+        condition: service_healthy
+    healthcheck:
+      # Sin rutas de lectura: alcanza con que el puerto atienda.
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  itinerary-lectura:
+    # Panel, viajes, reservas y tipos de segmento, servidos por proyeccion_panel.
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.itinerary.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *entorno_itinerary
+      TROTAMUNDOS_MODO: lectura
+    ports:
+      - "18102:8000"
+    depends_on:
+      itinerary-escritura:  # que el esquema lo cree uno solo
         condition: service_healthy
     healthcheck:
       # GET /tipos-de-segmento no necesita usuario (contrato de itinerary).

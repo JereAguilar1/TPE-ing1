@@ -190,3 +190,48 @@ def test_tipos_de_segmento_sin_usuario(cliente, contratos):
 def test_no_publica_un_openapi_propio(cliente, contratos):
     # El contrato es contratos/openapi/itinerary.yaml; una ruta inexistente es un Problema.
     _problema(contratos, cliente.get("/openapi.json"), 404)
+
+
+# --- modos de despliegue (ADR-0021) --------------------------------------------------------
+
+def _rutas(app) -> set[tuple[str, str]]:
+    from fastapi.routing import APIRoute
+    return {(m, r.path) for r in app.router.routes if isinstance(r, APIRoute) for m in r.methods}
+
+
+def test_cada_modo_expone_solo_sus_rutas_segun_el_contrato(falso, contratos):
+    completo = _rutas(crear_app(falso, contratos))
+    lectura = _rutas(crear_app(falso, contratos, modo="lectura"))
+    escritura = _rutas(crear_app(falso, contratos, modo="escritura"))
+
+    assert lectura | escritura == completo and not lectura & escritura
+    assert ("GET", "/panel") in lectura and ("POST", "/reservas") in escritura
+    assert {m for m, _ in lectura} == {"GET"}  # en este contrato, leer es GET
+
+
+def test_itinerary_lectura_no_atiende_comandos(falso, contratos, alta):
+    cliente = TestClient(crear_app(falso, contratos, modo="lectura"))
+    respuesta = cliente.post("/reservas", json=alta,
+                             headers=_cabeceras(**{"Idempotency-Key": str(uuid4())}))
+
+    _problema(contratos, respuesta, 404)  # `/reservas` solo tiene POST: en lectura no existe
+    assert falso.llamadas == []
+    assert cliente.get(f"/reservas/{RESERVA}", headers=_cabeceras()).status_code == 200
+
+
+def test_itinerary_escritura_no_atiende_lecturas(falso, contratos):
+    cliente = TestClient(crear_app(falso, contratos, modo="escritura"))
+    assert cliente.get("/panel", headers=_cabeceras()).status_code == 404
+    assert cliente.delete(f"/reservas/{RESERVA}", headers=_cabeceras()).status_code == 204
+
+
+def test_un_modo_desconocido_o_una_ruta_fuera_del_contrato_no_arrancan(falso, contratos, monkeypatch):
+    with pytest.raises(ValueError):
+        crear_app(falso, contratos, modo="mixto")
+
+    from trotamundos.servicios.itinerary import api
+    original = api._etiquetas
+    monkeypatch.setattr(api, "_etiquetas", lambda c: {k: v for k, v in original(c).items()
+                                                      if k != ("GET", "/panel")})
+    with pytest.raises(RuntimeError, match="GET /panel"):
+        crear_app(falso, contratos)

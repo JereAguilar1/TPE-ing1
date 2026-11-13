@@ -23,6 +23,9 @@ class Configuracion:
     intervalo_tareas_s: float = 60.0
     # Antepuesto a los tópicos del broker: aísla entornos (por ejemplo, las pruebas).
     prefijo_topicos: str = ""
+    # Modo de despliegue de un servicio con lectura y escritura separadas (ADR-0021):
+    # `completo`, `lectura` o `escritura`.
+    modo: str = "completo"
 
     @classmethod
     def desde_entorno(cls) -> "Configuracion":
@@ -40,4 +43,5 @@ class Configuracion:
             region=os.environ.get("TROTAMUNDOS_REGION", "AM"),
             intervalo_tareas_s=float(os.environ.get("TROTAMUNDOS_INTERVALO_TAREAS", "60")),
             prefijo_topicos=os.environ.get("TROTAMUNDOS_PREFIJO_TOPICOS", ""),
+            modo=os.environ.get("TROTAMUNDOS_MODO", "completo"),
         )
