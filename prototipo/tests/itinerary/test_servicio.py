@@ -347,3 +347,25 @@ def test_recorrido_http_de_viajes_y_panel(itinerary, alta, contratos):
         assert cliente.get(viaje, headers=cabeceras).status_code == 404
         assert cliente.get("/viajes", params={"estado": "Inventado"}, headers=cabeceras).status_code == 400
         assert cliente.get("/viajes", params={"cursor": "x"}, headers=cabeceras).status_code == 400
+
+
+def test_la_reversion_de_un_horario_no_se_toma_por_duplicado(itinerary, observacion):
+    # ADR-0014, «Confirmación»: 10:00 → 10:30 → 10:00 deja la reserva a las 10:00 y emite dos
+    # cambios. Una huella de contenido (alternativa N2) habría descartado la tercera.
+    def horario(version: str, hora: str):
+        datos = copy.deepcopy(observacion)
+        datos["versionDeFuente"] = version
+        datos["segmentos"][0]["inicio"]["instante"] = f"2026-12-01T{hora}:00Z"
+        return _observada(datos)
+
+    itinerary.consumir(horario("2026-11-10T00:00:00Z", "10:00"))
+    eventos = [*itinerary.consumir(horario("2026-11-11T00:00:00Z", "10:30")),
+               *itinerary.consumir(horario("2026-11-12T00:00:00Z", "10:00"))]
+
+    cambios = [c for e in eventos if e.tipo == "ReservaActualizada" for c in e.carga["cambios"]
+               if c["campo"] == "segmentos[0].inicio.instante"]
+    assert [(c["anterior"], c["nuevo"]) for c in cambios] == [
+        ("2026-12-01T10:00:00Z", "2026-12-01T10:30:00Z"), ("2026-12-01T10:30:00Z", "2026-12-01T10:00:00Z")]
+    reserva_id = next(e for e in eventos if e.tipo == "ReservaActualizada").carga["reserva"]["id"]
+    assert itinerary.leer_reserva(USUARIO, reserva_id)["segmentos"][0]["inicio"]["instante"] == \
+        "2026-12-01T10:00:00Z"

@@ -1,6 +1,7 @@
 """Datos de prueba compartidos."""
 
 import asyncio
+import os
 import shutil
 import uuid
 from pathlib import Path
@@ -28,6 +29,14 @@ def copia_de_contratos(tmp_path) -> Path:
     return destino
 
 
+def _sin_infraestructura(motivo: str) -> None:
+    """En una máquina, la prueba se saltea; en la integración continua
+    (`TROTAMUNDOS_EXIGIR_INFRA=1`), falla: un CI en verde sin base ni broker no probó nada."""
+    if os.environ.get("TROTAMUNDOS_EXIGIR_INFRA") == "1":
+        pytest.fail(motivo, pytrace=False)
+    pytest.skip(motivo)
+
+
 @pytest.fixture(scope="session")
 def dsn() -> str:
     """PostgreSQL de `docker-compose.yml`. Sin él, las pruebas que lo usan se saltean."""
@@ -35,7 +44,7 @@ def dsn() -> str:
     try:
         psycopg.connect(dsn, connect_timeout=2).close()
     except psycopg.OperationalError:
-        pytest.skip("PostgreSQL no disponible: correr `make infra-arriba`")
+        _sin_infraestructura("PostgreSQL no disponible: correr `make infra-arriba`")
     return dsn
 
 
@@ -61,7 +70,7 @@ def servidores() -> str:
     try:
         asyncio.run(alcanzable())
     except Exception:
-        pytest.skip("Broker no disponible: correr `make infra-arriba`")
+        _sin_infraestructura("Broker no disponible: correr `make infra-arriba`")
     return servidores
 
 
