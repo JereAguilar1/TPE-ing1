@@ -329,9 +329,11 @@ class Itinerary:
         await publicador.iniciar()
         await consumidor.iniciar()
         detener = asyncio.Event()
+        # Referencias propias: el bucle de eventos solo guarda referencias débiles a las tareas.
+        publicando = asyncio.create_task(self._publicar_siempre(publicador, detener))
+        consumiendo = asyncio.create_task(consumidor.correr(detener))
         try:
-            yield [asyncio.create_task(self._publicar_siempre(publicador, detener)),
-                   asyncio.create_task(consumidor.correr(detener))]
+            yield [publicando, consumiendo]
         finally:
             detener.set()
             await consumidor.detener()

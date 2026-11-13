@@ -35,7 +35,8 @@ class Configuracion:
             ).resolve(),
             dsn_postgres=os.environ.get(
                 "TROTAMUNDOS_DSN",
-                "postgresql://trotamundos:trotamundos@localhost:55432/trotamundos",
+                # La base local de docker-compose.yml, sin contraseña (ver allí).
+                "postgresql://trotamundos@localhost:55432/trotamundos",
             ),
             # Vacío: el servicio no publica ni consume (la outbox queda pendiente).
             broker=os.environ.get("TROTAMUNDOS_BROKER", "localhost:19092"),

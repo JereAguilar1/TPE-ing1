@@ -24,6 +24,8 @@ Punto de entrada: **[docs/Home.md](docs/Home.md)**.
 | [Vistas](docs/04-vistas/) | Vistas de contexto, módulos (N1/N2), C&C, secuencias de los casos de uso, despliegue (N1/N2) y seguridad/datos |
 | [Prototipo](prototipo/README.md) | Implementación de la 2da entrega: alcance, cómo correrlo y plan de construcción |
 | [Contratos](contratos/README.md) | OpenAPI, AsyncAPI, contratos de complementos, descriptores de tipo de segmento y modelo dimensional (Spec-driven) |
+| [Integración continua](.github/workflows/pruebas.yml) | Corre todas las pruebas del prototipo, con PostgreSQL y Redpanda, en cada cambio del código o de los contratos (ADR-0009, ADR-0017) |
+| [Análisis estático](.sonarcloud.properties) | Configuración de SonarCloud, que analiza el código en cada cambio |
 | [Trazabilidad](docs/05-trazabilidad/) | Matriz completa (100 %) driver → decisión → vista → ADR |
 
 ## Estado

@@ -6,12 +6,15 @@ FROM python:3.12.7-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/prototipo \
     TROTAMUNDOS_CONTRATOS=/app/contratos
 
 WORKDIR /app
-COPY prototipo/pyproject.toml prototipo/pyproject.toml
+# Dependencias con versión exacta (archivo de bloqueo) y solo como binarios ya compilados: la
+# instalación no ejecuta scripts de terceros. El código propio corre desde el fuente.
+COPY prototipo/requirements.txt prototipo/requirements.txt
+RUN pip install --no-cache-dir --only-binary :all: --no-deps -r prototipo/requirements.txt
 COPY prototipo/trotamundos prototipo/trotamundos
-RUN pip install --no-cache-dir ./prototipo
 COPY contratos contratos
 
 RUN useradd --system --no-create-home trotamundos
