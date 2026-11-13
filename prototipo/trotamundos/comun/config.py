@@ -8,9 +8,30 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import quote
 
 # prototipo/trotamundos/comun/config.py -> raíz del repositorio
 _RAIZ_REPOSITORIO = Path(__file__).resolve().parents[3]
+# Lo que genera `make infra-arriba` para la base local (ignorado por git).
+_ARCHIVO_ENV = _RAIZ_REPOSITORIO / "prototipo" / ".env"
+
+
+def _variable(nombre: str) -> str:
+    """Del entorno o, si no está, de `prototipo/.env`."""
+    if nombre in os.environ:
+        return os.environ[nombre]
+    if _ARCHIVO_ENV.is_file():
+        for linea in _ARCHIVO_ENV.read_text().splitlines():
+            clave, _, valor = linea.partition("=")
+            if clave.strip() == nombre:
+                return valor.strip()
+    return ""
+
+
+def _dsn_local() -> str:
+    """La base local de docker-compose.yml. Su contraseña no está en el código: está en `.env`."""
+    contrasena = quote(_variable("POSTGRES_PASSWORD"), safe="")
+    return f"postgresql://trotamundos:{contrasena}@localhost:55432/trotamundos"
 
 
 @dataclass(frozen=True)
@@ -33,11 +54,7 @@ class Configuracion:
             ruta_contratos=Path(
                 os.environ.get("TROTAMUNDOS_CONTRATOS", _RAIZ_REPOSITORIO / "contratos")
             ).resolve(),
-            dsn_postgres=os.environ.get(
-                "TROTAMUNDOS_DSN",
-                # La base local de docker-compose.yml, sin contraseña (ver allí).
-                "postgresql://trotamundos@localhost:55432/trotamundos",
-            ),
+            dsn_postgres=os.environ.get("TROTAMUNDOS_DSN") or _dsn_local(),
             # Vacío: el servicio no publica ni consume (la outbox queda pendiente).
             broker=os.environ.get("TROTAMUNDOS_BROKER", "localhost:19092"),
             # Región primaria de esta instancia (AM, EU o AP; ADR-0002, ADR-0018).

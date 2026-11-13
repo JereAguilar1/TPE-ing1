@@ -18,11 +18,13 @@ def _nombre(texto: str) -> str:
 
 
 def _bloqueo() -> dict[str, str]:
-    lineas = [l.strip() for l in (RAIZ / "requirements.txt").read_text().splitlines()]
-    fijadas = [l for l in lineas if l and not l.startswith("#")]
-    for linea in fijadas:
-        assert re.fullmatch(r"[A-Za-z0-9_.\-]+==[A-Za-z0-9_.+\-]+", linea), f"No está fijada: {linea}"
-    return {_nombre(l.split("==")[0]): l.split("==")[1] for l in fijadas}
+    """{paquete: versión} del archivo de bloqueo. Cada paquete va fijado y con al menos un hash."""
+    texto = (RAIZ / "requirements.txt").read_text()
+    paquetes = re.findall(r"^([A-Za-z0-9_.\-]+)==([A-Za-z0-9_.+\-]+) \\\n((?:\s+--hash=sha256:[0-9a-f]{64}(?: \\)?\n)+)",
+                          texto, flags=re.MULTILINE)
+    declaradas = re.findall(r"^[A-Za-z0-9]", texto, flags=re.MULTILINE)
+    assert len(paquetes) == len(declaradas), "Hay paquetes sin versión exacta o sin hash"
+    return {_nombre(nombre): version for nombre, version, _ in paquetes}
 
 
 def test_cada_dependencia_directa_esta_bloqueada_con_su_version():

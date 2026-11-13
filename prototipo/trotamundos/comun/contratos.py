@@ -50,15 +50,20 @@ class Contratos:
         self.ruta = ruta.resolve()
         if not self.ruta.is_dir():
             raise FileNotFoundError(f"No existe la carpeta de contratos: {self.ruta}")
+        # Cachés propias de la instancia: se liberan con ella (un `lru_cache` sobre un método
+        # es global de la clase y retiene cada instancia para siempre).
+        self._documentos: dict[str, dict[str, Any]] = {}
+        self._validadores: dict[str, Draft202012Validator] = {}
 
     # --- carga de documentos -------------------------------------------------------------
 
-    @lru_cache(maxsize=None)
     def _documento(self, relativa: str) -> dict[str, Any]:
         """Documento parseado y compartido por los validadores. No debe modificarse."""
-        archivo = self._dentro_de_contratos(self.ruta / relativa)
-        with open(archivo, encoding="utf-8") as fuente:
-            return yaml.safe_load(fuente)
+        if relativa not in self._documentos:
+            archivo = self._dentro_de_contratos(self.ruta / relativa)
+            with open(archivo, encoding="utf-8") as fuente:
+                self._documentos[relativa] = yaml.safe_load(fuente)
+        return self._documentos[relativa]
 
     def documento(self, relativa: str) -> dict[str, Any]:
         """Copia de un archivo de contratos ya parseado.
@@ -94,16 +99,17 @@ class Contratos:
 
     # --- validación ----------------------------------------------------------------------
 
-    @lru_cache(maxsize=None)
     def validador(self, referencia: str) -> Draft202012Validator:
         """Validador para `archivo#/puntero` (relativo a la carpeta de contratos)."""
-        archivo, _, puntero = referencia.partition("#")
-        esquema = {"$ref": f"{self._uri(archivo)}#{puntero}"}
-        return Draft202012Validator(
-            esquema,
-            registry=self._registro,
-            format_checker=Draft202012Validator.FORMAT_CHECKER,
-        )
+        if referencia not in self._validadores:
+            archivo, _, puntero = referencia.partition("#")
+            esquema = {"$ref": f"{self._uri(archivo)}#{puntero}"}
+            self._validadores[referencia] = Draft202012Validator(
+                esquema,
+                registry=self._registro,
+                format_checker=Draft202012Validator.FORMAT_CHECKER,
+            )
+        return self._validadores[referencia]
 
     def errores(self, referencia: str, instancia: Any) -> list[str]:
         """Lista de errores (vacía si la instancia cumple el contrato)."""

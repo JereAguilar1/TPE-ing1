@@ -100,7 +100,7 @@ def test_modificar_un_documento_no_altera_las_validaciones(contratos):
     ref = "openapi/comun.yaml#/components/schemas/Identificador"
     documento = contratos.documento("openapi/comun.yaml")
     documento["components"]["schemas"]["Identificador"]["required"].append("inventado")
-    contratos.validador.cache_clear()
+    contratos._validadores.clear()  # que el validador se arme de nuevo desde el documento
     assert not contratos.errores(ref, {"emisor": "aerolinea:AR", "codigo": "ABC123"})
 
 

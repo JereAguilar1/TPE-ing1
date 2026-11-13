@@ -9,10 +9,10 @@ services:
     environment:
       POSTGRES_USER: trotamundos
       POSTGRES_DB: trotamundos
-      # Base local y descartable: sin contraseña, para no tener credenciales en el código. Solo
-      # se puede entrar desde esta máquina (el puerto escucha en 127.0.0.1) y desde la red
-      # interna del compose. Un entorno real usaría credenciales de un gestor de secretos.
-      POSTGRES_HOST_AUTH_METHOD: trust
+      # La contraseña no está en el código: la genera `make infra-arriba` en .env (ignorado por
+      # git). Un entorno real la tomaría de un gestor de secretos (ADR-0029). Además, el puerto
+      # solo escucha en 127.0.0.1.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta .env, correr make infra-arriba}
     ports:
       - "127.0.0.1:55432:5432"  # 55432 para no chocar con un PostgreSQL local
     healthcheck:
@@ -50,7 +50,7 @@ services:
     command: ["uvicorn", "--factory", "trotamundos.servicios.itinerary.servicio:crear_app",
               "--host", "0.0.0.0", "--port", "8000"]
     environment: &entorno_itinerary
-      TROTAMUNDOS_DSN: postgresql://trotamundos@postgres:5432/trotamundos
+      TROTAMUNDOS_DSN: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres:5432/trotamundos
       TROTAMUNDOS_BROKER: broker:9092
       TROTAMUNDOS_REGION: AM
       TROTAMUNDOS_MODO: escritura

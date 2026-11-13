@@ -10,10 +10,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TROTAMUNDOS_CONTRATOS=/app/contratos
 
 WORKDIR /app
-# Dependencias con versión exacta (archivo de bloqueo) y solo como binarios ya compilados: la
-# instalación no ejecuta scripts de terceros. El código propio corre desde el fuente.
+# Dependencias del archivo de bloqueo: versión exacta y hash verificado de cada archivo (un paquete
+# alterado no se instala), y solo binarios ya compilados (la instalación no ejecuta scripts de
+# terceros). El código propio corre desde el fuente.
 COPY prototipo/requirements.txt prototipo/requirements.txt
-RUN pip install --no-cache-dir --only-binary :all: --no-deps -r prototipo/requirements.txt
+RUN pip install --no-cache-dir --require-hashes --only-binary :all: --no-deps \
+        -r prototipo/requirements.txt
 COPY prototipo/trotamundos prototipo/trotamundos
 COPY contratos contratos
 

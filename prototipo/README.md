@@ -122,8 +122,8 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | El consumidor lee de a un carril por vuelta y siempre el más urgente con mensajes; P3 se puede pausar. Un mensaje que no cumple el contrato se guarda en `evento_rechazado` y se sigue; cualquier otro error se reintenta sin avanzar el desplazamiento | Nada se descarta en silencio y un error transitorio no pierde el evento. Qué hacer con los inválidos se decidió al implementar el paso 6: los documentos no prevén una cola de fallidos | ADR-0020; ADR-0014; QA-11 |
 | Los tópicos se crean al arrancar, con 6 particiones, y la creación falla si el broker rechaza alguno | La vista de despliegue N2 prevé 96 particiones por región; en una notebook alcanzan 6. El cliente no avisa si un tópico no se creó: se revisa la respuesta | Vista de despliegue N2 |
 | `itinerary` se despliega en dos modos del mismo código: `itinerary-lectura` registra solo las rutas con etiqueta `lectura` del contrato e `itinerary-escritura`, solo las de `comando`, más el trabajo periódico y el *broker*. Al armar la API se verifica que toda ruta esté en el contrato | Es la separación de ADR-0021: la lectura escala y se despliega sin arrastrar la fusión. La etiqueta del contrato decide el modo de cada ruta, así el código no puede divergir. La Opción B lee de `itinerary-lectura` (ADR-0034) | ADR-0021; iteración 3 §5.4; ADR-0009 |
-| El PostgreSQL local no tiene contraseña (`trust`) y su puerto solo escucha en `127.0.0.1` | Así no hay credenciales en el código, que SonarCloud marca como vulnerabilidad aunque sean de una base descartable. Un entorno real tomaría las credenciales de un gestor de secretos | ADR-0029 (custodia de secretos); análisis de SonarCloud |
-| La imagen instala las dependencias desde un archivo de bloqueo (`requirements.txt`, todas con versión exacta) y solo como binarios; el código propio corre desde el fuente | Instalaciones reproducibles y sin ejecutar *scripts* de terceros al construir la imagen. Una prueba mantiene el bloqueo alineado con `pyproject.toml` | ADR-0036; análisis de SonarCloud |
+| La contraseña del PostgreSQL local se genera al azar en `prototipo/.env` (ignorado por git) y su puerto solo escucha en `127.0.0.1` | Ni credenciales en el código ni una base sin contraseña: las dos cosas las marca SonarCloud. Un entorno real tomaría la contraseña de un gestor de secretos | ADR-0029 (custodia de secretos); análisis de SonarCloud |
+| La imagen instala las dependencias desde un archivo de bloqueo (`requirements.txt`: versión exacta y *hash* de cada archivo, verificados con `--require-hashes`) y solo como binarios; el código propio corre desde el fuente | Instalaciones reproducibles, un paquete alterado no se instala y no se ejecutan *scripts* de terceros al construir la imagen. Una prueba mantiene el bloqueo alineado con `pyproject.toml` | ADR-0036; análisis de SonarCloud |
 | SonarCloud no analiza `contratos/analitica/*.sql` (`.sonarcloud.properties`) | Lo lee como PL/SQL de Oracle y marca como error el `CHAR` de SQL ANSI, que es el dialecto del contrato. Es un falso positivo | ADR-0016; `contratos/README.md` |
 | Las pruebas que necesitan PostgreSQL se saltean, con el motivo, si no está levantado | Las del dominio corren en cualquier máquina; las de persistencia piden `make infra-arriba` | ADR-0017 |
 | Todos los servicios usan la misma imagen, construida desde la raíz del repositorio para incluir `contratos/`; cada uno es un proceso con su comando | Un solo paquete y un proceso por servicio | ADR-0036 |
@@ -146,17 +146,21 @@ make infra-abajo
 con el mismo `docker-compose.yml` y corre todas las pruebas. Ahí se define
 `TROTAMUNDOS_EXIGIR_INFRA=1`: sin base o sin broker, las pruebas fallan en lugar de saltearse.
 
-**Base local sin contraseña.** El PostgreSQL de `docker-compose.yml` no tiene contraseña y solo
-acepta conexiones desde esta máquina (`127.0.0.1:55432`) y desde la red interna del compose.
+**Contraseña de la base local.** No está en el código: `make infra-arriba` la genera al azar la
+primera vez y la guarda en `prototipo/.env`, que git ignora. Docker Compose y las pruebas la leen
+de ahí. El puerto de PostgreSQL solo escucha en `127.0.0.1`. Si tenías la base creada con una
+versión anterior del compose, recreala una vez: `docker compose down -v && make infra-arriba`.
 
 **Dependencias.** `pyproject.toml` declara las directas; `requirements.txt` es el archivo de bloqueo
-con todas, incluidas las transitivas, y es lo que instala la imagen. Si cambia una versión en
-`pyproject.toml`, hay que regenerarlo (`tests/test_dependencias.py` avisa si no coinciden):
+con todas, incluidas las transitivas, con versión exacta y los *hashes* de sus archivos. Es lo que
+instala la imagen (`--require-hashes`). Si cambia una versión en `pyproject.toml`, hay que
+regenerarlo; `tests/test_dependencias.py` avisa si no coinciden:
 
 ```bash
-python3.12 -m venv /tmp/bloqueo && /tmp/bloqueo/bin/pip install --only-binary :all: \
-  $(.venv/bin/python -c "import tomllib; print(' '.join(tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']))")
-/tmp/bloqueo/bin/pip freeze --exclude pip   # reemplaza las líneas de requirements.txt (sin el encabezado)
+python3.12 -m venv /tmp/bloqueo && /tmp/bloqueo/bin/pip install pip-tools==7.4.1
+.venv/bin/python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']))" > /tmp/requirements.in
+/tmp/bloqueo/bin/pip-compile --generate-hashes --strip-extras --no-header -o /tmp/requirements.txt /tmp/requirements.in
+# reemplazar todo menos el encabezado de requirements.txt por /tmp/requirements.txt
 ```
 
 Servicios que levanta `make servicios-arriba`:
