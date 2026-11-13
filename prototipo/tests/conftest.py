@@ -1,13 +1,16 @@
 """Datos de prueba compartidos."""
 
+import asyncio
 import shutil
 import uuid
 from pathlib import Path
 
 import psycopg
 import pytest
+from aiokafka.admin import AIOKafkaAdminClient
 from psycopg import sql
 
+from trotamundos.comun.carriles import borrar_topicos
 from trotamundos.comun.config import Configuracion
 from trotamundos.comun.contratos import Contratos, contratos_por_omision
 
@@ -43,6 +46,32 @@ def esquema(dsn) -> str:
     yield nombre
     with psycopg.connect(dsn, autocommit=True) as conexion:
         conexion.execute(sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(nombre)))
+
+
+@pytest.fixture(scope="session")
+def servidores() -> str:
+    """Broker de `docker-compose.yml`. Sin él, las pruebas que lo usan se saltean."""
+    servidores = Configuracion.desde_entorno().broker
+
+    async def alcanzable():
+        administrador = AIOKafkaAdminClient(bootstrap_servers=servidores, request_timeout_ms=3000)
+        await asyncio.wait_for(administrador.start(), 5)
+        await administrador.close()
+
+    try:
+        asyncio.run(alcanzable())
+    except Exception:
+        pytest.skip("Broker no disponible: correr `make infra-arriba`")
+    return servidores
+
+
+@pytest.fixture
+def prefijo(servidores) -> str:
+    """Tópicos propios de la prueba; se borran al terminar (el broker local tiene un límite de
+    particiones)."""
+    prefijo = f"prueba-{uuid.uuid4().hex[:8]}."
+    yield prefijo
+    asyncio.run(borrar_topicos(servidores, prefijo))
 
 
 def _extremo(instante: str, lugar: str, zona: str, precision: str = "instante") -> dict:

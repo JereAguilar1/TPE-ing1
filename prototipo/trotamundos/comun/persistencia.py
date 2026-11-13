@@ -26,7 +26,7 @@ import re
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Iterable, Iterator
+from typing import Any, Callable, Iterable, Iterator
 from uuid import UUID
 
 import psycopg
@@ -56,8 +56,12 @@ DDL = (
         creado_en          timestamptz NOT NULL DEFAULT now(),
         publicado_en       timestamptz
     );
-    CREATE INDEX IF NOT EXISTS bandeja_salida_pendientes
-        ON bandeja_salida (creado_en) WHERE publicado_en IS NULL;
+    -- El carril (ADR-0020) y el orden de escritura, que el publicador respeta (paso 6).
+    ALTER TABLE bandeja_salida ADD COLUMN IF NOT EXISTS carril text NOT NULL DEFAULT 'P2';
+    ALTER TABLE bandeja_salida ADD COLUMN IF NOT EXISTS seq bigserial;
+    DROP INDEX IF EXISTS bandeja_salida_pendientes;
+    CREATE INDEX IF NOT EXISTS bandeja_salida_por_publicar
+        ON bandeja_salida (seq) WHERE publicado_en IS NULL;
     """,
     """
     CREATE TABLE IF NOT EXISTS bandeja_entrada (
@@ -128,17 +132,27 @@ def bloquear_usuario(conexion: psycopg.Connection, usuario_id: UUID | str) -> No
 # --- outbox ----------------------------------------------------------------------------------
 
 def escribir_en_outbox(conexion: psycopg.Connection, eventos: Iterable[Evento],
-                       contratos: Contratos) -> None:
+                       contratos: Contratos,
+                       carril_de: Callable[[Evento], str] | None = None) -> None:
     """Agrega los eventos a la *outbox* de la transacción en curso. Cada uno se valida antes
-    contra el contrato AsyncAPI: nada sale del servicio sin cumplirlo (ADR-0009)."""
+    contra el contrato AsyncAPI: nada sale del servicio sin cumplirlo (ADR-0009).
+
+    El carril (ADR-0020) es el que fija el contrato (`x-carril`) o, si el contrato da una regla,
+    el que decide `carril_de`, que aporta el productor.
+    """
     for evento in eventos:
         evento.validar(contratos)
+        carril = contratos.carril_de_evento(evento.tipo).strip()
+        if carril not in ("P1", "P2", "P3"):
+            if carril_de is None:
+                raise ValueError(f"El carril de {evento.tipo} depende del productor: {carril}")
+            carril = carril_de(evento)
         conexion.execute(
             """INSERT INTO bandeja_salida
-                   (evento_id, usuario_id, tipo, topico, clave_de_particion, sobre, carga)
-               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                   (evento_id, usuario_id, tipo, topico, carril, clave_de_particion, sobre, carga)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
             (evento.id, evento.sobre.get("usuarioId"), evento.tipo,
-             contratos.canal_de_evento(evento.tipo), evento.clave_de_particion,
+             contratos.canal_de_evento(evento.tipo), carril, evento.clave_de_particion,
              Jsonb(evento.sobre), Jsonb(evento.carga)),
         )
 

@@ -129,6 +129,11 @@ class Contratos:
                 return canal["address"]
         raise KeyError(f"Evento sin canal en el contrato AsyncAPI: {tipo}")
 
+    def carril_de_evento(self, tipo: str) -> str:
+        """`x-carril` del mensaje: `P1`, `P2`, `P3` o una regla que aplica el productor (ADR-0020)."""
+        self._exigir_evento(tipo)
+        return str(self._documento(_ASYNCAPI)["components"]["messages"][tipo]["x-carril"])
+
     def referencia_sobre(self, tipo: str) -> str:
         self._exigir_evento(tipo)
         return f"{_ASYNCAPI}#/components/messages/{tipo}/headers"
