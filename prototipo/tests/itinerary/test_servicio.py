@@ -24,7 +24,8 @@ from trotamundos.servicios.itinerary.servicio import Itinerary
 
 @pytest.fixture
 def itinerary(dsn, esquema, contratos):
-    configuracion = dataclasses.replace(Configuracion.desde_entorno(), intervalo_tareas_s=0)
+    # Sin broker ni trabajo periódico: estas pruebas los llaman directamente.
+    configuracion = dataclasses.replace(Configuracion.desde_entorno(), intervalo_tareas_s=0, broker="")
     reloj = {"ahora": instante(20)}
     servicio = Itinerary(configuracion, esquema=esquema, contratos=contratos,
                          reloj=lambda: reloj["ahora"])

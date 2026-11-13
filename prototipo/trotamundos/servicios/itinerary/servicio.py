@@ -9,6 +9,10 @@ de arquitectura lo declara así). Toda transacción (ADR-0012):
 4. escribe los eventos en la *outbox* (`publicacion`) y actualiza las lecturas
    (`proyeccion_panel`). O se confirma todo o no queda nada.
 
+Con un *broker* configurado, el elemento también publica su *outbox* y consume `ReservaExtraida`
+y `ReservaObservada` por carriles de prioridad (`comun.publicador`, `comun.consumidor`; ADR-0012,
+ADR-0014, ADR-0020).
+
 `Reserva` y `Viaje` se coordinan por eventos internos (ADR-0010): cada `ReservaActualizada` queda
 también en `evento_interno`, en la misma transacción que el cambio, y `viajes` la procesa en una
 segunda transacción. Un comando espera a las dos para responder con el viaje (la mitigación que
@@ -30,7 +34,9 @@ import psycopg
 from fastapi import FastAPI
 from psycopg.types.json import Jsonb
 
+from trotamundos.comun.carriles import Carril, asegurar_topicos, carriles_posibles, topico
 from trotamundos.comun.config import Configuracion
+from trotamundos.comun.consumidor import DDL_RECHAZADOS, ConsumidorConCarriles
 from trotamundos.comun.contratos import Contratos, contratos_por_omision
 from trotamundos.comun.eventos import Causa, Evento
 from trotamundos.comun.modelo import instante_a_texto
@@ -45,6 +51,7 @@ from trotamundos.comun.persistencia import (
     respuesta_guardada,
     transaccion,
 )
+from trotamundos.comun.publicador import PublicadorDeOutbox
 from trotamundos.comun.tipos_de_segmento import RegistroDeTipos, registro_por_omision
 from trotamundos.servicios.itinerary import (
     api,
@@ -62,6 +69,7 @@ DDL = (
     *reservas.DDL,
     *repositorio_de_viajes.DDL,
     *proyeccion_panel.DDL,
+    *DDL_RECHAZADOS,
     """
     CREATE TABLE IF NOT EXISTS usuario_version (
         usuario_id uuid   PRIMARY KEY,
@@ -84,6 +92,8 @@ DDL = (
 )
 # Lo que `viajes` necesita saber de `reservas` (ADR-0010: se coordinan por eventos internos).
 PARA_VIAJES = frozenset({"ReservaActualizada"})
+GRUPO = "itinerary"  # grupo de consumidores en el broker
+PAUSA_DEL_PUBLICADOR_S = 0.5
 
 _registro_de_errores = logging.getLogger(__name__)
 
@@ -255,20 +265,80 @@ class Itinerary:
 
     def app(self) -> FastAPI:
         """La API interna sobre este elemento. Al arrancar crea el esquema y lanza el trabajo
-        periódico (cada `intervalo_tareas_s`; 0 lo apaga)."""
+        periódico (cada `intervalo_tareas_s`; 0 lo apaga) y, con un broker configurado, el
+        publicador de la outbox y el consumidor."""
         intervalo = self._configuracion.intervalo_tareas_s
 
         @asynccontextmanager
         async def ciclo_de_vida(_: FastAPI) -> AsyncIterator[None]:
             self.crear_esquema()
-            tarea = asyncio.create_task(self._bucle(intervalo)) if intervalo > 0 else None
-            yield
-            if tarea is not None:
-                tarea.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await tarea
+            tareas = [asyncio.create_task(self._bucle(intervalo))] if intervalo > 0 else []
+            async with self.con_broker() as en_marcha:
+                tareas += en_marcha
+                yield
+                for tarea in tareas:
+                    tarea.cancel()
+                for tarea in tareas:
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await tarea
 
         return api.crear_app(self, self._contratos, lifespan=ciclo_de_vida)
+
+    # --- broker (ADR-0012, ADR-0014, ADR-0020) -------------------------------------------
+
+    def topicos(self) -> tuple[list[str], dict[Carril, list[str]]]:
+        """Los tópicos que publica y, por carril, los que consume."""
+        prefijo = self._configuracion.prefijo_topicos
+        publica = [topico(self._contratos, tipo, carril, prefijo)
+                   for tipo in sorted(publicacion.PUBLICA)
+                   for carril in carriles_posibles(self._contratos, tipo)]
+        consume: dict[Carril, list[str]] = {}
+        for tipo in sorted(ingesta.FUENTE_POR_EVENTO):
+            for carril in carriles_posibles(self._contratos, tipo):
+                consume.setdefault(carril, []).append(
+                    topico(self._contratos, tipo, carril, prefijo))
+        return publica, consume
+
+    def publicador(self) -> PublicadorDeOutbox:
+        c = self._configuracion
+        return PublicadorDeOutbox(c.dsn_postgres, self._esquema, c.broker, self._contratos,
+                                         c.prefijo_topicos)
+
+    def consumidor(self) -> ConsumidorConCarriles:
+        c = self._configuracion
+        return ConsumidorConCarriles(c.broker, GRUPO, self.topicos()[1], self.consumir,
+                                            c.dsn_postgres, self._esquema)
+
+    @contextlib.asynccontextmanager
+    async def con_broker(self) -> AsyncIterator[list[asyncio.Task]]:
+        """Arranca el publicador y el consumidor (si hay broker) y los detiene al salir."""
+        servidores = self._configuracion.broker
+        if not servidores:
+            yield []
+            return
+        publica, consume = self.topicos()
+        await asegurar_topicos(servidores, publica + [t for ts in consume.values() for t in ts])
+        publicador, consumidor = self.publicador(), self.consumidor()
+        await publicador.iniciar()
+        await consumidor.iniciar()
+        detener = asyncio.Event()
+        try:
+            yield [asyncio.create_task(self._publicar_siempre(publicador, detener)),
+                   asyncio.create_task(consumidor.correr(detener))]
+        finally:
+            detener.set()
+            await consumidor.detener()
+            await publicador.detener()
+
+    async def _publicar_siempre(self, publicador: PublicadorDeOutbox,
+                                detener: asyncio.Event) -> None:
+        while not detener.is_set():
+            try:
+                if await publicador.publicar_pendientes() == 0:
+                    await asyncio.sleep(PAUSA_DEL_PUBLICADOR_S)
+            except Exception:  # el broker o la base no responden: se reintenta
+                _registro_de_errores.exception("Falló la publicación de la outbox de itinerary")
+                await asyncio.sleep(PAUSA_DEL_PUBLICADOR_S)
 
     async def _bucle(self, intervalo: float) -> None:
         while True:
@@ -353,7 +423,7 @@ class Itinerary:
     def _publicar(self, conexion: psycopg.Connection, usuario_id: UUID | str,
                   eventos: list[Evento] | tuple[Evento, ...]) -> int:
         """Outbox, cola interna y lecturas en la misma transacción; devuelve `versionUsuario`."""
-        publicacion.registrar(conexion, eventos, self._contratos)
+        publicacion.registrar(conexion, eventos, self._contratos, self._reloj())
         for evento in eventos:
             if evento.tipo in PARA_VIAJES:
                 conexion.execute(

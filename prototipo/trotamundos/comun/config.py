@@ -21,6 +21,8 @@ class Configuracion:
     region: str
     # Cada cuántos segundos corre el trabajo periódico de un servicio; 0 lo apaga.
     intervalo_tareas_s: float = 60.0
+    # Antepuesto a los tópicos del broker: aísla entornos (por ejemplo, las pruebas).
+    prefijo_topicos: str = ""
 
     @classmethod
     def desde_entorno(cls) -> "Configuracion":
@@ -32,8 +34,10 @@ class Configuracion:
                 "TROTAMUNDOS_DSN",
                 "postgresql://trotamundos:trotamundos@localhost:55432/trotamundos",
             ),
+            # Vacío: el servicio no publica ni consume (la outbox queda pendiente).
             broker=os.environ.get("TROTAMUNDOS_BROKER", "localhost:19092"),
             # Región primaria de esta instancia (AM, EU o AP; ADR-0002, ADR-0018).
             region=os.environ.get("TROTAMUNDOS_REGION", "AM"),
             intervalo_tareas_s=float(os.environ.get("TROTAMUNDOS_INTERVALO_TAREAS", "60")),
+            prefijo_topicos=os.environ.get("TROTAMUNDOS_PREFIJO_TOPICOS", ""),
         )

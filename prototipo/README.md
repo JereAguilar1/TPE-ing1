@@ -31,12 +31,15 @@ PostgreSQL 16, Redpanda (API de Kafka) y Docker Compose.
 prototipo/
 ├── trotamundos/
 │   ├── comun/                  # lo único compartido (equivale a modelo-canonico + contratos)
+│   │   ├── carriles.py         # carriles P1/P2/P3 y tópicos del broker      (ADR-0020)
 │   │   ├── config.py           # configuración por entorno
+│   │   ├── consumidor.py       # consumo por carriles, con eventos rechazados (ADR-0014, ADR-0020)
 │   │   ├── contratos.py        # validación en ejecución contra contratos/   (ADR-0009, ADR-0017)
 │   │   ├── eventos.py          # sobre, carga y representación en el broker  (AsyncAPI, ADR-0014)
 │   │   ├── errores.py          # application/problem+json                    (comun.yaml)
 │   │   ├── modelo.py           # modelo-canonico: ObservacionCanonica, Lugar, Extremo (ADR-0010)
 │   │   ├── persistencia.py     # PostgreSQL: outbox, bandeja de entrada, Idempotency-Key (ADR-0012, ADR-0014)
+│   │   ├── publicador.py       # de la outbox al broker, al menos una vez     (ADR-0012)
 │   │   └── tipos_de_segmento.py # registro de descriptores de tipo           (ADR-0011, ADR-0027)
 │   └── servicios/              # un subpaquete por servicio; ninguno importa a otro (ADR-0036)
 │       └── itinerary/          # un módulo por cada módulo de la vista N2, más servicio.py
@@ -113,6 +116,11 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | La gracia entre `Completado` y `Archivado` es de 3 días para todos | Es el valor por omisión de `diasDeGraciaArchivado`. El del usuario llegaría con `PreferenciasActualizadas`, pero `preferences` no está en el plan del prototipo | Iteración 2 §5.11; `preferences.yaml` |
 | Un trabajo periódico (cada `TROTAMUNDOS_INTERVALO_TAREAS` segundos, 60 por omisión) procesa los eventos internos pendientes, avanza los viajes cuya `proxima_transicion` venció y purga la bandeja de entrada y las claves de idempotencia. Las transiciones se calculan en UTC a partir del fin local de cada tramo | §5.1 habla de trabajos «por zona horaria»: con un solo proceso no hace falta repartirlos, alcanza con que el instante de cada transición respete la zona del lugar | Iteración 2 §5.1; ADR-0014 |
 | `panel_usuario` es una fila por usuario con el `Panel` completo, que se rearma con cada evento del usuario. Como se actualiza en la misma transacción que el cambio, `X-Min-Version` siempre se cumple en una sola región | UC-3 pide el panel en una sola ida y vuelta, y QA-02, un acceso | ADR-0018; ADR-0019; QA-02 |
+| Cada carril es un tópico propio: el `address` del canal del contrato más el carril (`dominio.reserva-observada.p1`). El canal lógico sigue siendo el del contrato | Kafka no prioriza mensajes dentro de un tópico: con tópicos separados, P1 no espera detrás de una avalancha de P2. Que dos eventos del mismo usuario lleguen en otro orden por ir en carriles distintos es seguro, porque la fusión no depende del orden. Se decidió al implementar el paso 6 | ADR-0020; iteración 3 §5.3; ADR-0014 (N3) |
+| El carril sale de `x-carril`. Si es una regla, la aplica el productor: `itinerary` manda `ReservaActualizada` por P1 si la reserva está en curso o sale en menos de 48 h, y por P2 si no. Se crean los tópicos de todos los carriles que el contrato nombra (los tres si no nombra ninguno) | Es la tabla de carriles de la iteración 3 («cambios sobre viajes EnCurso o con salida < 48 h») | Contrato AsyncAPI (`x-carril`); iteración 3 §5.3 |
+| La *outbox* guarda el carril y un número de orden. Un único publicador por esquema (bloqueo consultivo) envía en ese orden, con clave `usuarioId`, y después marca. Si falla entre enviar y marcar, reenvía: es «al menos una vez» | Un solo publicador conserva el orden por usuario; el duplicado posible lo frena la bandeja de entrada del consumidor | ADR-0012; ADR-0014 |
+| El consumidor lee de a un carril por vuelta y siempre el más urgente con mensajes; P3 se puede pausar. Un mensaje que no cumple el contrato se guarda en `evento_rechazado` y se sigue; cualquier otro error se reintenta sin avanzar el desplazamiento | Nada se descarta en silencio y un error transitorio no pierde el evento. Qué hacer con los inválidos se decidió al implementar el paso 6: los documentos no prevén una cola de fallidos | ADR-0020; ADR-0014; QA-11 |
+| Los tópicos se crean al arrancar, con 6 particiones, y la creación falla si el broker rechaza alguno | La vista de despliegue N2 prevé 96 particiones por región; en una notebook alcanzan 6. El cliente no avisa si un tópico no se creó: se revisa la respuesta | Vista de despliegue N2 |
 | Las pruebas que necesitan PostgreSQL se saltean, con el motivo, si no está levantado | Las del dominio corren en cualquier máquina; las de persistencia piden `make infra-arriba` | ADR-0017 |
 | Todos los servicios usan la misma imagen, construida desde la raíz del repositorio para incluir `contratos/`; cada uno es un proceso con su comando | Un solo paquete y un proceso por servicio | ADR-0036 |
 
@@ -133,11 +141,12 @@ Servicios que levanta `make servicios-arriba`:
 
 | Servicio | Puerto local | Contrato |
 |---|---|---|
-| `itinerary` | 18101 | [`openapi/itinerary.yaml`](../contratos/openapi/itinerary.yaml): panel, viajes, reservas y tipos de segmento |
+| `itinerary` | 18101 | [`openapi/itinerary.yaml`](../contratos/openapi/itinerary.yaml): panel, viajes, reservas y tipos de segmento. Además publica su *outbox* y consume `ReservaExtraida` y `ReservaObservada` del broker |
 
 Variables de entorno opcionales: `TROTAMUNDOS_CONTRATOS`, `TROTAMUNDOS_DSN`, `TROTAMUNDOS_BROKER`,
-`TROTAMUNDOS_REGION` y `TROTAMUNDOS_INTERVALO_TAREAS` (segundos entre corridas del trabajo
-periódico; 0 lo apaga).
+`TROTAMUNDOS_REGION`, `TROTAMUNDOS_INTERVALO_TAREAS` (segundos entre corridas del trabajo
+periódico; 0 lo apaga) y `TROTAMUNDOS_PREFIJO_TOPICOS` (antepuesto a los tópicos; las pruebas lo
+usan para no mezclarse). Con `TROTAMUNDOS_BROKER` vacío, un servicio no publica ni consume.
 
 ## Plan de construcción
 
@@ -151,7 +160,7 @@ implementa.
 | 3 | `itinerary`: agregado `Reserva` y fusión determinista | ADR-0010, ADR-0013 | ✅ |
 | 4 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | ✅ |
 | 5 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | ✅ |
-| 6 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | ⬜ |
+| 6 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | ✅ |
 | 7 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | ⬜ |
 | 8 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | ⬜ |
 | 9 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | ⬜ |

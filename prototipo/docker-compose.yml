@@ -37,8 +37,8 @@ services:
       retries: 20
 
   itinerary:
-    # Núcleo del dominio (paso 4): API interna de reservas. Consumir del broker y publicar la
-    # outbox llegan con el paso 6.
+    # Núcleo del dominio: API interna, publicación de su outbox y consumo de ReservaExtraida y
+    # ReservaObservada por carriles (pasos 4 a 6).
     build:
       context: ..
       dockerfile: prototipo/Dockerfile
@@ -53,6 +53,8 @@ services:
       - "18101:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      broker:
         condition: service_healthy
     healthcheck:
       # GET /tipos-de-segmento no necesita usuario (contrato de itinerary).
