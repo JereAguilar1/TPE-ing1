@@ -189,3 +189,43 @@ def test_la_regla_interna_detecta_dependencias_no_permitidas(tmp_path):
         "reservas.py importa trotamundos.servicios.itinerary.fusion.consolidacion",
         "suelto.py: el módulo suelto no está en la vista de módulos",
     ]
+
+
+# --- R5-estricto y dependencias de `identity_access` (vista de adaptadores §2-4, ADR-0029) ---
+
+DEPENDENCIAS_DE_IDENTITY_ACCESS = {
+    "auditoria_y_revocacion": set(),
+    "custodia_boveda": {"auditoria_y_revocacion"},
+    "autenticacion_oidc": {"auditoria_y_revocacion"},
+    "consentimiento_buzones": {"custodia_boveda", "auditoria_y_revocacion"},
+    "motor_autorizacion_abac": {"auditoria_y_revocacion"},
+    "publicacion": set(),
+    "api": set(),
+    "servicio": {
+        "auditoria_y_revocacion",
+        "custodia_boveda",
+        "autenticacion_oidc",
+        "consentimiento_buzones",
+        "motor_autorizacion_abac",
+        "publicacion",
+        "api",
+    },
+}
+
+
+def test_los_modulos_de_identity_access_respetan_la_vista_de_adaptadores():
+    assert violaciones_internas(PAQUETE, "identity_access", DEPENDENCIAS_DE_IDENTITY_ACCESS) == []
+
+
+def test_regla_r5_solo_custodia_boveda_usa_cifrado_de_boveda():
+    """Regla R5-estricto (QA-13, ADR-0029): ningún módulo fuera de `custodia_boveda` importa AEAD/KMS."""
+    permitido = Path("servicios/identity_access/custodia_boveda.py")
+    violaciones_r5 = []
+    for archivo in PAQUETE.rglob("*.py"):
+        relativa = archivo.relative_to(PAQUETE)
+        if relativa == permitido:
+            continue
+        for nombre in _importaciones(PAQUETE, archivo):
+            if nombre.startswith("cryptography"):
+                violaciones_r5.append(f"{relativa} importa {nombre}")
+    assert violaciones_r5 == []

@@ -88,3 +88,25 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  identity-access:
+    # Sesiones OIDC/OTP, buzones, bóveda con cifrado por sobres, ABAC y auditoría (paso 7).
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.identity_access.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TROTAMUNDOS_DSN: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres:5432/trotamundos
+      TROTAMUNDOS_BROKER: broker:9092
+      TROTAMUNDOS_REGION: AM
+    ports:
+      - "18103:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
