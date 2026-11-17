@@ -18,6 +18,10 @@ estructuras del sistema»).
 | [Despliegue — nivel 1](vista-despliegue-nivel-1.md) | **De asignación**: software sobre hardware | ¿Dónde corre cada cosa a escala global? |
 | [Despliegue — nivel 2](vista-despliegue-nivel-2.md) | **De asignación refinada**: interior regional, plano de datos y elasticidad | ¿Cómo se despliega en 3 AZs, cómo cierra `R-1`/`R-4`, cuántas réplicas corren y cómo escala? |
 | [Seguridad, privacidad y residencia de datos](vista-seguridad-y-datos.md) | **Transversal híbrida** (C&C + asignación de datos y claves) | ¿Dónde están las fronteras de confianza, cómo se protegen 9 M de buzones (`QA-13`), cómo cierra `R-6` y cómo se suprime PII en ambos planos (`QA-14`)? |
+| [Módulos — nivel 2 (asistente virtual)](vista-modulos-asistente.md) *(2da entrega)* | **Estática refinada**: interior del elemento nº 14 (Opción B) | ¿Cómo está armado el asistente por dentro y dónde queda la comprensión del lenguaje para poder cambiarla? |
+| [Componentes y conectores — asistente virtual](vista-cyc-asistente.md) *(2da entrega)* | **Dinámica**: el elemento nº 14 en ejecución | ¿Con qué componentes habla el asistente, por qué conector y con qué contrato? |
+| [Despliegue — asistente virtual](vista-despliegue-asistente.md) *(2da entrega)* | **De asignación**: el elemento nº 14 en la región | ¿Dónde corre el asistente, dónde viven sus datos y cómo se degrada? |
+| [Secuencias del asistente virtual](secuencias-asistente.md) *(2da entrega)* | **Dinámica refinada**: comportamiento de `RF-B1` y `RF-B2` | ¿Qué recorrido sigue una consulta, una corrección confirmada y una derivación a la agencia? |
 
 Las estructuras son distintas y no se pueden mezclar arbitrariamente en un dibujo. Un módulo no es
 un componente: `provider-sync` es **un** módulo con varios adaptadores dentro, y en ejecución es

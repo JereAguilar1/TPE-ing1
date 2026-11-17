@@ -104,6 +104,10 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 | [Despliegue — nivel 1](04-vistas/vista-despliegue-nivel-1.md) | Asignación a infraestructura multirregión |
 | [Despliegue — nivel 2](04-vistas/vista-despliegue-nivel-2.md) | Interior regional en 3 AZs, topología de datos sin `R-1`/`R-4`, dimensionamiento y autoescalado |
 | [Seguridad, privacidad y residencia de datos](04-vistas/vista-seguridad-y-datos.md) | Fronteras de confianza, cifrado por sobres, cierre gráfico de `R-6`, catálogo de PII y supresión en ambos planos |
+| [Módulos — nivel 2 (asistente virtual)](04-vistas/vista-modulos-asistente.md) *(2da entrega)* | Interior del elemento nº 14 (Opción B): módulos, catálogos por idioma y complemento previsto |
+| [Componentes y conectores — asistente virtual](04-vistas/vista-cyc-asistente.md) *(2da entrega)* | Con qué componentes habla el asistente, por qué conector y con qué contrato |
+| [Despliegue — asistente virtual](04-vistas/vista-despliegue-asistente.md) *(2da entrega)* | Dónde corre el asistente, dónde viven sus datos y cómo se degrada |
+| [Secuencias del asistente virtual](04-vistas/secuencias-asistente.md) *(2da entrega)* | Consulta, corrección confirmada y derivación a la agencia |
 
 ## 5. Contratos (Spec-driven)
 

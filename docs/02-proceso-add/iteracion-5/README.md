@@ -23,7 +23,8 @@ la 2da entrega, esta iteración diseña ese interior.
 | 2. El asistente tiene contrato antes de tener código (`CON-04`) | `contratos/openapi/virtual-assistant.yaml`, validado con `openapi-spec-validator` |
 | 3. Cero interfaces nuevas en servicios existentes (`CON-06`) | El asistente solo usa operaciones que ya estaban en `itinerary.yaml` y `support-liaison.yaml` |
 | 4. `RF-B1` y `RF-B2` quedan trazados a decisiones | Kanban del [paso 7](paso-7-analisis.md) |
-| 5. El paso 19 del plan del prototipo puede empezar sin inventar decisiones | Vista de módulos y secuencias de esta página |
+| 5. El paso 19 del plan del prototipo puede empezar sin inventar decisiones | Vistas, intenciones y secuencias de esta página, y la guía de entrada del [paso 7](paso-7-analisis.md#guía-de-entrada-para-el-paso-19) |
+| 6. El elemento nº 14 respeta las reglas de consistencia entre vistas y de dependencia de la 1ra entrega | Verificación del [paso 7](paso-7-analisis.md#verificación-de-consistencia-entre-vistas) |
 
 ---
 
@@ -109,70 +110,9 @@ de un evento que ya existía.
 
 ### 5.1 Vista de módulos de `virtual-assistant`
 
-```mermaid
-flowchart LR
-    BFF(["bff-web<br/>(sesión del viajero)"]) --> API["api<br/><i>virtual-assistant.yaml</i>"]
-    BRK(["DisrupcionDetectada<br/>(broker, P1)"]) --> CTX
-
-    subgraph VA["virtual-assistant (elemento nº 14)"]
-        direction LR
-        API --> DIA["dialogo<br/><i>un turno: entender,<br/>decidir, responder</i>"]
-        DIA --> INT["interprete<br/><i>puerto + reglas</i>"]
-        DIA --> ACC["acciones<br/><i>proponer · confirmar · corregir ·<br/>problemas menores</i>"]
-        DIA --> DER["derivacion<br/><i>disparadores · caso</i>"]
-        DIA --> SES["sesiones<br/><i>turnos · acción pendiente ·<br/>retención</i>"]
-        DIA --> CTX["contexto<br/><i>panel y viajes del viajero ·<br/>disrupciones conocidas</i>"]
-        DIA --> CAT[("catálogos por idioma<br/><i>patrones y mensajes</i>")]
-        INT --> CAT
-        INT -. "enchufable" .-> LLM["complementos/<br/>modelo de lenguaje<br/><i>(diseñado, no construido)</i>"]
-    end
-
-    CTX -->|"GET /panel · GET /viajes · GET /viajes/{id}"| ITR["itinerary-lectura"]
-    ACC -->|"PUT /reservas/{id} · confirmacion · resolucion"| ITW["itinerary-escritura"]
-    DER -->|"POST /casos"| SUP["support-liaison"]
-
-    subgraph LEYENDA["Leyenda — tipos de elemento"]
-        direction LR
-        LEY_MOD["módulo interno"]
-        LEY_REC[("recurso estático")]
-        LEY_EXT(["elemento o evento externo"])
-        LEY_FUT["previsto, no construido"]
-        LEY_MOD ~~~ LEY_REC ~~~ LEY_EXT ~~~ LEY_FUT
-    end
-    style LLM stroke-dasharray: 5 5
-    style LEY_FUT stroke-dasharray: 5 5
-    style LEYENDA fill:#ffffff,stroke:#888,stroke-dasharray: 3 3
-```
-
-**Leyenda**
-
-| Notación | Significado en esta vista |
-|---|---|
-| Rectángulo | **Módulo interno** de `virtual-assistant` |
-| Cilindro | **Recurso estático**: catálogos de patrones y de mensajes por idioma, sin lógica (ADR-0032, ADR-0037) |
-| Rectángulo punteado | Complemento **previsto y no construido** (el adaptador de modelo de lenguaje, ADR-0037) |
-| Óvalo | Elemento o evento externo al asistente |
-| `-->` flecha | Dependencia «usa a» (o llamada HTTP, si está rotulada con la operación) |
-| `-.->` flecha punteada | Realización: el complemento implementa el puerto del intérprete |
-
-| Módulo | Responsabilidad única | Drivers | ADR |
-|---|---|---|---|
-| `api` | Expone `virtual-assistant.yaml`, valida cuerpos y verifica la sesión del viajero | CON-04, QA-12 | ADR-0028, ADR-0034 |
-| `dialogo` | Atiende un turno: interpreta, consulta el contexto, decide si responde, propone o deriva, y registra el turno. Sus textos salen del catálogo de mensajes | RF-B1, RF-B2, QA-18 | ADR-0037, ADR-0038, ADR-0039 |
-| `interprete` | Puerto `InterpreteDeIntenciones` y su implementación por reglas: intención, entidades y confianza | RF-B1, QA-14 | ADR-0037 |
-| `acciones` | Arma la corrección de una reserva o la resolución de un problema menor (confirmar o descartar una reserva por confirmar, resolver un conflicto), la propone con vencimiento y la ejecuta solo con confirmación | RF-B1, RF-06, QA-11 | ADR-0038 |
-| `derivacion` | Evalúa los cuatro disparadores, arma la síntesis y abre el caso idempotente | RF-B2, RF-12 | ADR-0039 |
-| `contexto` | Lee el panel del viajero (viajes, reservas por confirmar y conflictos abiertos) y sus viajes en `itinerary`, y mantiene la proyección de disrupciones (consume `DisrupcionDetectada`) | RF-B1, RF-B2 | ADR-0038, ADR-0040 |
-| `sesiones` | Sesiones y turnos particionados por `usuario_id`, acción pendiente y retención de 30 días | QA-14, CON-10 | ADR-0040 |
-| `catalogos/` (recurso) | Patrones de cada intención y mensajes `ICU MessageFormat` por idioma; el prototipo trae solo español | QA-18, CRN-10 | ADR-0032, ADR-0037 |
-| `complementos/` | Adaptador de modelo de lenguaje con redacción de datos personales (previsto) | RF-B1, QA-14 | ADR-0037 |
-
-**Reglas de dependencia del asistente.** Ningún módulo salvo `interprete` sabe cómo se interpreta un
-texto, y ningún texto para el viajero está fuera de los catálogos. Solo `contexto`, `acciones` y
-`derivacion` hablan con otros servicios, y cada uno con uno solo: `contexto` lee de
-`itinerary-lectura`, `acciones` escribe en `itinerary-escritura` y `derivacion` abre casos en
-`support-liaison`. El asistente no importa código de ningún otro servicio (regla de `ADR-0001`,
-verificada por `tests/test_arquitectura.py`).
+→ [Vista de módulos — nivel 2 (asistente virtual)](../../04-vistas/vista-modulos-asistente.md): los siete módulos
+internos, los catálogos por idioma y el complemento previsto, con su leyenda, la responsabilidad de
+cada módulo y sus reglas de dependencia.
 
 ### 5.2 Intenciones que entiende
 
@@ -191,68 +131,9 @@ verificada por `tests/test_arquitectura.py`).
 
 ### 5.3 Secuencias
 
-**Consulta de estado (RF-B1).** El viajero pregunta y el asistente responde con lo que lee en
-`itinerary`; si la reserva tiene una disrupción conocida, la menciona.
-
-```mermaid
-sequenceDiagram
-    actor V as Viajero
-    participant B as bff-web
-    participant A as virtual-assistant
-    participant I as itinerary-lectura
-    V->>B: «¿a qué hora sale mi vuelo?»
-    B->>A: POST /asistente/sesiones/{sid}/mensajes (sesión del viajero)
-    A->>A: interprete → proximoTramo (confianza ≥ 0,6)
-    A->>I: GET /viajes/{id}
-    I-->>A: viaje con sus reservas
-    A->>A: contexto: ¿disrupción conocida sobre ese tramo?
-    A-->>B: Respuesta (intencion, mensajes)
-    B-->>V: «Tu vuelo AR1402 sale el jueves 3/12 a las 10:00 (hora de Buenos Aires)»
-```
-
-**Corrección confirmada del itinerario (RF-B1).** Nada cambia hasta que el viajero confirma; si la
-reserva cambió en el medio, se vuelve a proponer.
-
-```mermaid
-sequenceDiagram
-    actor V as Viajero
-    participant A as virtual-assistant
-    participant IR as itinerary-lectura
-    participant IW as itinerary-escritura
-    V->>A: «me pasaron el vuelo AR1402 al sábado a las 18:30»
-    A->>IR: GET /viajes/{id}
-    A->>A: arma la edición (inicio y fin corridos igual)
-    A-->>V: accionPropuesta (corregirReserva, vence en 10 min): «¿Confirmás?»
-    V->>A: confirmacion { accionId, confirmar }
-    A->>IW: PUT /reservas/{id} (version leída)
-    alt la reserva cambió en el medio
-        IW-->>A: 409
-        A->>IR: GET /viajes/{id}
-        A-->>V: nueva accionPropuesta con la versión actual
-    else
-        IW-->>A: 200 (el cambio queda fijado, ADR-0013)
-        A-->>V: accionRealizada (corregirReserva)
-    end
-```
-
-**Derivación por disrupción (RF-B2).** Una cancelación del proveedor no se arregla corrigiendo el
-itinerario: el asistente propone derivar, con el `disrupcionId` como causa.
-
-```mermaid
-sequenceDiagram
-    participant P as provider-sync
-    participant A as virtual-assistant
-    actor V as Viajero
-    participant S as support-liaison
-    P-)A: DisrupcionDetectada (severidad alta, reservas afectadas)
-    A->>A: contexto: guarda la disrupción del viajero (bandeja de entrada)
-    V->>A: «¿qué pasa con mi vuelo?»
-    A-->>V: «Tu vuelo fue cancelado por el proveedor.» + accionPropuesta (derivarALaAgencia)
-    V->>A: confirmacion { accionId, confirmar }
-    A->>S: POST /casos (Idempotency-Key de la acción, motivo otro, descripción e idDeCausa)
-    S-->>A: 201 Caso (agencia, estado Derivado)
-    A-->>V: accionRealizada (derivarALaAgencia, casoId, agencia)
-```
+→ [Secuencias del asistente virtual](../../04-vistas/secuencias-asistente.md): consulta de estado, corrección
+confirmada del itinerario y derivación por disrupción, con su leyenda y las decisiones que ejercita
+cada una.
 
 ### 5.4 Interfaces
 
@@ -266,7 +147,27 @@ sequenceDiagram
 Las rutas públicas del asistente las expone `bff-web` ([ADR-0005](../../03-adr/ADR-0005-capa-de-clientes-bff.md)),
 que reenvía la sesión del viajero: el asistente actúa siempre en su nombre.
 
-### 5.5 Parámetros iniciales (supuestos a calibrar)
+### 5.5 Vista de componentes y conectores, y despliegue del elemento nº 14
+
+→ [Componentes y conectores — asistente virtual](../../04-vistas/vista-cyc-asistente.md): con qué componentes habla,
+por qué conector, con qué contrato y con qué garantía.
+
+→ [Despliegue — asistente virtual](../../04-vistas/vista-despliegue-asistente.md): dónde corre, dónde viven sus
+datos, qué pasa si cae la región y cómo se degrada. Aplica reglas existentes y registra una decisión
+menor: las conversaciones no se copian al testigo de la región de respaldo.
+
+### 5.6 Datos personales del asistente
+
+Completa el [catálogo de datos personales](../../04-vistas/vista-seguridad-y-datos.md#4-catálogo-de-datos-personales-con-10--qa-14)
+de la 1ra entrega con los almacenes del elemento nº 14, con las mismas columnas:
+
+| Categoría de dato | Elementos concretos | Almacén donde vive | Clase residencia | Base legal (GDPR / Ley 25.326) | Retención activa | Mecanismo de supresión (`≤ 30 días`) |
+|---|---|---|---|---|---|---|
+| **Conversaciones con el asistente** | Texto de cada turno, intención interpretada, viaje en foco, acción pendiente y su vencimiento, contador de malentendidos | `virtual-assistant` (`OLTP`, esquema propio) | **Clase R2** (solo región primaria, sin testigo) | Ejecución de contrato a pedido del usuario (Art. 6.1.b), como los casos de soporte | `30 días` desde el último turno | Borrado físico por `usuario_id` en la fase 1 de [ADR-0030](../../03-adr/ADR-0030-auditoria-y-supresion-datos-personales.md) (`< 24 h`) y purga automática a los `30 días` |
+| **Disrupciones conocidas del viajero** | `disrupcionId`, reservas afectadas, severidad | `virtual-assistant` (`OLTP`, esquema propio) | **Clase R2** | Ejecución de contrato | La ventana de la bandeja de entrada (`14 días`) | Purga con la bandeja de entrada y borrado físico por `usuario_id` en la fase 1 |
+| **Datos EXCLUIDOS por diseño *(no almacenados jamás)*** | Copias del itinerario, de los casos o de las preferencias del viajero; texto enviado a terceros | **Ninguno** | — | Minimización (GDPR Art. 5.1.c) | `0 s`: el itinerario se lee cuando hace falta, y con reglas ningún texto sale del sistema | No requiere borrado. Si se enchufa un modelo de lenguaje ([ADR-0037](../../03-adr/ADR-0037-interpretacion-de-intenciones-del-asistente.md)), el texto sale redactado y se registra como un nuevo destinatario de datos |
+
+### 5.7 Parámetros iniciales (supuestos a calibrar)
 
 | Parámetro | Valor inicial | Se calibra con |
 |---|---|---|
@@ -282,13 +183,16 @@ que reenvía la sesión del viajero: el asistente actúa siempre en su nombre.
 
 ### Vistas producidas en esta iteración
 
-Las vistas de la 1ra entrega (`docs/04-vistas`) no se modifican. Las de esta iteración están en esta
-página:
+Como en las iteraciones anteriores, las vistas están en [`docs/04-vistas`](../../04-vistas/README.md). Son archivos
+nuevos: las vistas de la 1ra entrega no se modifican.
 
-| Vista | Dónde |
-|---|---|
-| Módulos de `virtual-assistant` (nivel 2 del elemento nº 14) | [§5.1](#51-vista-de-módulos-de-virtual-assistant) |
-| Secuencias: consulta, corrección confirmada y derivación por disrupción | [§5.3](#53-secuencias) |
+| Vista | Tipo | Dónde |
+|---|---|---|
+| Módulos — nivel 2 (asistente virtual) | Estática refinada | [vista-modulos-asistente](../../04-vistas/vista-modulos-asistente.md) |
+| Componentes y conectores — asistente virtual | Dinámica | [vista-cyc-asistente](../../04-vistas/vista-cyc-asistente.md) |
+| Despliegue — asistente virtual | De asignación | [vista-despliegue-asistente](../../04-vistas/vista-despliegue-asistente.md) |
+| Secuencias del asistente virtual | Dinámica refinada | [secuencias-asistente](../../04-vistas/secuencias-asistente.md) |
+| Catálogo de datos personales del asistente (completa el de la vista de seguridad) | Transversal | [§5.6](#56-datos-personales-del-asistente) |
 
 ### Decisiones registradas
 

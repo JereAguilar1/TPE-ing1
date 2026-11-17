@@ -39,6 +39,10 @@
 - [Despliegue N1](04-vistas/vista-despliegue-nivel-1.md)
 - [Despliegue N2](04-vistas/vista-despliegue-nivel-2.md)
 - [Seguridad y Datos](04-vistas/vista-seguridad-y-datos.md)
+- [Módulos Asistente N2](04-vistas/vista-modulos-asistente.md)
+- [C&C Asistente](04-vistas/vista-cyc-asistente.md)
+- [Despliegue Asistente](04-vistas/vista-despliegue-asistente.md)
+- [Secuencias Asistente](04-vistas/secuencias-asistente.md)
 
 **Contratos**
 - [Índice de contratos](../contratos/README.md)
