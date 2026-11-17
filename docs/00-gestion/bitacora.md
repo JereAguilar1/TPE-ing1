@@ -16,6 +16,7 @@ enunciado.
 | 2026-11-10 | **Consolidación de artefactos de la iteración 2** que estaban enlazados y no existían | [ADR-0010](../03-adr/ADR-0010-modelo-canonico-reserva-segmento-viaje.md) a [ADR-0017](../03-adr/ADR-0017-estrategia-de-pruebas-y-contratos.md) en formato MADR (derivados de D10–D17 sin cambiar las decisiones), [vista de módulos N2](../04-vistas/vista-modulos-nivel-2.md), [secuencias UC-1…UC-7](../04-vistas/secuencias-casos-primarios.md), glosario ampliado, nota de actualización en ADR-0006; se retira el borrador `iteracion-2/verificar-y-borrar.md` | Francisco Lozano |
 | 2026-11-10 | **Contratos de interfaz (Spec-driven)** que la iteración 2 declaraba y no estaban en el repositorio | [`contratos/`](../../contratos/README.md): 12 documentos OpenAPI 3.1, AsyncAPI 3.0 con los 16 eventos, contratos de complementos `Extractor` y `AdaptadorDeProveedor`, metaesquema y descriptores de los 5 tipos de segmento, y modelo dimensional SQL. Todos validados con herramientas de la especificación | Francisco Lozano |
 | 2026-11-11 | **Inicio de la 2da entrega.** El grupo elige la **Opción B (asistente virtual)** y la tecnología del prototipo | [ADR-0036](../03-adr/ADR-0036-tecnologia-del-prototipo.md), base del [prototipo](../../prototipo/README.md): infraestructura (PostgreSQL + broker), validación en ejecución contra `contratos/` y plan de construcción en 20 pasos | Francisco Lozano |
+| 2026-11-16 | **El profesor aprueba ADRs nuevos y una iteración 5 de ADD para la Opción B.** La iteración 5 va en `docs/02-proceso-add/iteracion-5/` (paso 18 del plan); las iteraciones 1 a 4 no se modifican | [Instrucciones del repositorio](../../AGENTS.md) (excepción para `iteracion-5/`), [plan de construcción](../../prototipo/README.md#plan-de-construcción) | Francisco Lozano (con el ok del grupo) |
 
 ## Próximos hitos
 
@@ -25,6 +26,7 @@ enunciado.
 | Iteración 3 — refinamiento para rendimiento, disponibilidad y escalabilidad | Vista de despliegue N2, análisis de presupuestos, modelo de costo, ADRs 0018–0026 y especificación ejecutable de pruebas de carga y SLOs | ✅ Completa |
 | Iteración 4 — refinamiento para interoperabilidad, seguridad y evolucionabilidad | Vista de módulos de adaptadores, vista de seguridad y datos, guías de extensión (`tren` / proveedor / región), contratos versionados y ADRs 0027–0035 | ✅ Completa |
 | Cierre de 1ra entrega | Revisión de consistencia entre vistas, verificación en papel de Opción A y B (`CON-06`) y matriz de trazabilidad al 100 % (`0` drivers en `⬜`) | ✅ Completa |
+| Iteración 5 — diseño de la Opción B (asistente virtual) | ADRs nuevos y contrato del asistente en `iteracion-5/` | Pendiente *(paso 18 del [plan](../../prototipo/README.md#plan-de-construcción))* |
 | 2da entrega | Módulo avanzado (Opción B: asistente virtual) + prototipo ejecutable trazable | En curso *(ver [plan de construcción](../../prototipo/README.md#plan-de-construcción))* |
 
 ## Cambios a drivers después de fijados

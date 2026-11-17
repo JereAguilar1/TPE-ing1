@@ -8,7 +8,9 @@ Proyecto: TPE de Ingeniería de Software I (UNICEN), grupo 15, **Trotamundos**. 
 
 - **No modificar nada** en `docs/01-analisis-inicial`, `docs/02-proceso-add`, `docs/04-vistas` ni
   `docs/05-trazabilidad`: es la 1ra entrega, ya presentada. Si encontrás una inconsistencia ahí,
-  informala; no la corrijas.
+  informala; no la corrijas. La única excepción es agregar `docs/02-proceso-add/iteracion-5/`, la
+  iteración de ADD de la Opción B (paso 18), que aprobó el profesor; las iteraciones 1 a 4 no se
+  tocan.
 - **`docs/00-gestion`** (equipo, bitácora, plan): consultar al grupo antes de cambiar cualquier cosa.
 - **`docs/03-adr`**: se pueden agregar ADR nuevos, pero un ADR aceptado no se edita; se escribe otro
   que lo reemplace.
