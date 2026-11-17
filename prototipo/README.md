@@ -40,9 +40,10 @@ prototipo/
 │   │   ├── modelo.py           # modelo-canonico: ObservacionCanonica, Lugar, Extremo (ADR-0010)
 │   │   ├── persistencia.py     # PostgreSQL: outbox, bandeja de entrada, Idempotency-Key (ADR-0012, ADR-0014)
 │   │   ├── publicador.py       # de la outbox al broker, al menos una vez     (ADR-0012)
+│   │   ├── sesion.py           # sesión OIDC de las operaciones públicas      (ADR-0007)
 │   │   └── tipos_de_segmento.py # registro de descriptores de tipo           (ADR-0011, ADR-0027)
 │   └── servicios/              # un subpaquete por servicio; ninguno importa a otro (ADR-0036)
-│       └── itinerary/          # un módulo por cada módulo de la vista N2, más servicio.py
+│       ├── itinerary/          # un módulo por cada módulo de la vista N2, más servicio.py
 │           ├── reservas/       # agregado Reserva (ADR-0010) y su repositorio PostgreSQL (ADR-0012)
 │           ├── viajes/         # agregado Viaje: agrupación y ciclo de vida (RF-07, RF-08) y su repositorio
 │           ├── fusion/
@@ -55,7 +56,7 @@ prototipo/
 │           ├── proyeccion_panel.py  # lecturas de reserva, viaje y panel, mantenidas por eventos internos
 │           ├── api.py               # API interna (openapi/itinerary.yaml)
 │           └── servicio.py          # arma los módulos y define las transacciones
-│       └── identity_access/         # identidad, buzones, bóveda, ABAC y auditoría (paso 7)
+│       ├── identity_access/         # identidad, buzones, bóveda, ABAC y auditoría (paso 7)
 │           ├── auditoria_y_revocacion.py # bitácora SHA-256 y detector de anomalías (ADR-0029, ADR-0030)
 │           ├── autenticacion_oidc.py     # OIDC simulado y OTP para invitados (ADR-0007, ADR-0028)
 │           ├── consentimiento_buzones.py # ciclo de vida de buzones y revocación en bloque (RF-01, ADR-0035)
@@ -64,6 +65,21 @@ prototipo/
 │           ├── publicacion.py            # outbox: EstadoDeBuzonCambiado y CuentaSuprimida
 │           ├── api.py                    # API (openapi/identity-access.yaml)
 │           └── servicio.py               # arma los módulos y define las transacciones
+│       └── mail_ingest/             # obtención del correo (paso 8, vista N2 §3)
+│           ├── suscripciones.py      # buzones a atender y suscripciones de avisos (ADR-0004)
+│           ├── receptor.py           # aviso del proveedor: firma y a la cola (ADR-0020)
+│           ├── reconciliador.py      # sondeo escalonado por buzón (ADR-0004, ADR-0024)
+│           ├── cola.py               # «buzones con cambios»: donde convergen los dos caminos
+│           ├── descargador.py        # token efímero de identity-access (ADR-0029)
+│           ├── filtros.py            # permitidos, bloqueados y catálogo (RF-04)
+│           ├── normalizador.py       # RFC 5322 → MensajeNormalizado
+│           ├── deduplicador.py       # bandeja (buzón, idDeMensaje) (ADR-0014)
+│           ├── receptor_reenvio.py   # alias de reenvío: DKIM/SPF/ARC y titular (ADR-0035)
+│           ├── publicacion.py        # outbox: MensajeDeViajeRecibido
+│           ├── interfaz_de_correo.py # lo que implementa cada complemento de proveedor (ADR-0006)
+│           ├── complementos/         # proveedor de correo simulado (con push e IMAP)
+│           ├── api.py                # webhooks y filtros (mail-ingest-*.yaml)
+│           └── servicio.py           # arma los módulos y define las transacciones
 ├── tests/
 ├── Dockerfile              # una imagen para todos los servicios (se construye desde la raíz)
 ├── docker-compose.yml      # PostgreSQL, broker y servicios
@@ -142,6 +158,17 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | `KmsLocal` en `custodia_boveda.py` simula el HSM/KMS regional con `KEK_region` en memoria (derivada de `TROTAMUNDOS_KMS_SECRETO`, que `make infra-arriba` genera en `.env` junto con `TROTAMUNDOS_JWT_SECRETO` y `TROTAMUNDOS_VALE_SECRETO`; al azar si no se fija) y `DEK_u` por usuario (`AES-256-GCM` + AAD). La tabla `kek_version` guarda solo qué versión está vigente y cuáles se inhabilitaron, y el servicio la carga al arrancar, como haría un KMS gestionado. `test_arquitectura.py` verifica que ningún otro módulo importe `cryptography` (`R5-estricto`) | Reemplaza el KMS gestionado de nube sin guardar claves maestras en PostgreSQL ni credenciales en código | ADR-0029; vista de adaptadores §4 (`R5-estricto`); ADR-0036 |
 | La revocación regional en bloque inhabilita la versión de `KEK_region`, pasa a `v{N+1}` si era la vigente y descarta las `DEK_u` envueltas con ella y los secretos que protegían | Quedan ilegibles para siempre; sin una versión nueva, la reautorización y los buzones nuevos de la región fallarían | ADR-0029 (revocación en dos fases) |
 | La revocación regional pasa a `RequiereReautorizacion` solo los buzones que guardan algo en la bóveda (`oauth`, `imapDelegado`); los de `reenvio` siguen `Activo`. Un `oauth` se reautoriza con `POST /buzones/{id}/autorizacion`; un `imapDelegado`, dándolo de baja y conectándolo con una credencial nueva | ADR-0029 revoca los *grants* y los tokens custodiados: el alias de reenvío no es un secreto. El contrato no tiene una operación para renovar la credencial IMAP | ADR-0029; ADR-0035 |
+| Los proveedores de correo (OAuth con *push* e IMAP) se simulan con un complemento en `mail_ingest/complementos/`, en memoria. La demostración de punta a punta usa el reenvío, que recibe el mensaje crudo por HTTP | No hay proveedores reales en el prototipo. Acordado con el grupo, igual que `ProveedorOidcSimulado` en el paso 7 | ADR-0006; ADR-0036 |
+| La firma `X-Firma` de los avisos es un HMAC-SHA256 del cuerpo con `TROTAMUNDOS_SECRETO_WEBHOOK_CORREO` (de `.env`). Un aviso de una suscripción que no es de un buzón activo responde `202` y no hace nada | `comun.yaml` admite HMAC o JWS. Responder igual no revela qué suscripciones existen | ADR-0020; `mail-ingest-webhooks.yaml` |
+| Reconciliación con los intervalos «en reposo» de ADR-0024 (24 h con *push*, 6 h IMAP), escalonada por `buzon_id`; `MensajeDeViajeRecibido` va siempre por P2 | El ajuste por viaje en curso y el P1 del contrato necesitan saber de viajes, y `mail-ingest` no los consume. Acordado con el grupo | ADR-0004; ADR-0020; ADR-0024 |
+| El catálogo de remitentes reconocidos está vacío hasta el paso 9: pasan los remitentes permitidos por el usuario, y los bloqueados tienen prioridad | El catálogo sale de los manifiestos de los extractores, que llegan con `booking-extraction`. Acordado con el grupo; cómo llegan a `mail-ingest` se decide en el paso 9 | Iteración 2 §5.4; RF-04 |
+| El receptor de reenvío acepta un mensaje si su `Authentication-Results` del servidor propio (`ingesta.trotamundos.app`) dice `dkim=pass` y además `spf=pass` o `arc=pass`, y si quien reenvía (`Return-Path`, o `From` si no está) es el titular del buzón. Lo rechazado responde `403` y queda en `reenvio_rechazado` sin el contenido. El servidor de correo propio se identifica con `X-Servicio-Cliente: mta-entrante`, como el mTLS del paso 7 | Las cabeceras de autenticación que escribió otro servidor las puede poner cualquiera. El ARC es lo que sobrevive a un reenvío automático | ADR-0035; `mail-ingest-webhooks.yaml` |
+| En el reenvío solo cuentan los remitentes bloqueados: no hace falta que el remitente esté permitido ni en el catálogo | Reenviar ya es una elección explícita del usuario, y en un reenvío manual el remitente es él mismo. Acordado con el grupo | ADR-0035; RF-04 |
+| Los filtros se evalúan sobre los metadatos y solo se baja lo que pasa. Lo que no se publica (filtrado, bloqueado, ilegible o que no cumple el contrato) queda en `mensaje_recibido` con el motivo, y no frena a los mensajes que vienen detrás. Del mensaje pasan solo las cabeceras que lo identifican y fechan; los adjuntos no viajan | Nada se descarta en silencio. Los adjuntos piden una referencia a un almacenamiento cifrado que no está en el plan | Iteración 2 §5.4; vista de seguridad y datos |
+| Para leer un buzón, `mail-ingest` primero lo saca de la cola (lo «reclama») en una transacción corta y recién después lo lee. Si la lectura falla, vuelve a la cola con una espera de `5 s × 2^n`, con tope de 15 min | Un aviso que llega mientras se lee el buzón lo vuelve a encolar en lugar de perderse, la cola no queda bloqueada mientras se habla con el proveedor, y un proveedor caído no recibe un reintento por vuelta. La espera es la de ADR-0024, sin la variación aleatoria | ADR-0004; ADR-0024 |
+| El p99 de tokens por minuto de una réplica de `mail-ingest`, sobre el que `identity-access` bloquea a la réplica (3 veces ese valor), se configura con `TROTAMUNDOS_P99_TOKENS_POR_MINUTO` (20 por omisión) | `mail-ingest` pide un token por cada lectura de buzón: con muchos buzones (o en las pruebas de carga del paso 17) hay que calibrarlo para no bloquear una réplica sana, y el bloqueo no se levanta solo | ADR-0029 |
+| La sesión OIDC de las operaciones públicas se verifica en `comun/sesion.py` (`HS256` con `TROTAMUNDOS_JWT_SECRETO`, compartido por `.env`); la usan `identity-access` y la API de filtros de `mail-ingest` | El token lo emite `identity-access`. En producción cada servicio verificaría con la clave pública de `identity-access` | ADR-0007 |
+| AsyncAPI 1.4.0: `EstadoDeBuzonCambiado` suma `via`, `proveedor`, `aliasReenvio` y `correoDelTitular`, que viajan solo cuando el buzón pasa a `Activo` | `mail-ingest` necesita saber cómo atender cada buzón y, para un reenvío, con qué correo comparar el remitente (ADR-0035). Acordado con el grupo frente a un endpoint interno en `identity-access`: un solo mecanismo y sin llamadas sincrónicas. En los demás cambios alcanza con `buzonId`, así el correo no viaja de más | ADR-0004; ADR-0027 (cambio compatible); ADR-0035 |
 | `DELETE /privacidad/cuenta` publica `EstadoDeBuzonCambiado` (`desconectadoPorUsuario`) por cada buzón que revoca, igual que `DELETE /buzones/{id}` | `mail-ingest` consume ese evento para dejar de leer los buzones | ADR-0030; `eventos-de-dominio.yaml` |
 | `ProveedorOidcSimulado` mapea `codigo` (`oidc:<correo>:<region>`) a `usuario_identidad` y firma sesiones JWT (`HS256`) y vales ABAC (`TTL 60 s`) con `TROTAMUNDOS_JWT_SECRETO` y `TROTAMUNDOS_VALE_SECRETO` (al azar si no se fijan). `ConsultorDeDesignados` y `ConsultorDeRecursos` arrancan *fail-closed* hasta conectar `sharing` | Permite probar sesiones, OTP de invitados y vales ABAC en el paso 7 sin depender de un IdP externo ni de `sharing` (paso 13) | ADR-0007; ADR-0028; ADR-0036 |
 | En `identity-access`, `POST /privacidad/exportaciones` guarda el paquete firmado (identidad, buzones y auditoría del servicio) en `exportacion_privacidad`, y `DELETE /privacidad/cuenta` ejecuta la fase 1 local (destrucción de `DEK_u`, secretos, buzones, exportaciones, identidad R1 y `mapa_seudonimo_usuario`) y publica `CuentaSuprimida` en `P3` (`SobreSinUsuario`) | La purga coordinada sobre `itinerary`/`sharing`/`preferences` y la fase 2 en `analytics-store` llegan con `event-pipeline` en el paso 14 | ADR-0030 (`QA-14`); `eventos-de-dominio.yaml` |
@@ -190,11 +217,13 @@ Servicios que levanta `make servicios-arriba`:
 | `itinerary-escritura` | 18101 | Los comandos de [`openapi/itinerary.yaml`](../contratos/openapi/itinerary.yaml) (etiqueta `comando`). Además corre el trabajo periódico, publica su *outbox* y consume `ReservaExtraida` y `ReservaObservada` del broker |
 | `itinerary-lectura` | 18102 | Las lecturas del mismo contrato (etiqueta `lectura`): panel, viajes, reservas y tipos de segmento |
 | `identity-access` | 18103 | Sesiones OIDC/OTP, buzones, bóveda (`KEK_region`/`DEK_u`), vales ABAC, auditoría encadenada y privacidad ([`openapi/identity-access.yaml`](../contratos/openapi/identity-access.yaml)). Publica `EstadoDeBuzonCambiado` y `CuentaSuprimida` |
+| `mail-ingest` | 18104 | Avisos de los proveedores (`/webhooks/correo`), reenvío verificado (`/webhooks/correo/reenvio`) y filtros del usuario ([`mail-ingest-webhooks.yaml`](../contratos/openapi/mail-ingest-webhooks.yaml), [`mail-ingest-filtros.yaml`](../contratos/openapi/mail-ingest-filtros.yaml)). Consume `EstadoDeBuzonCambiado`, pide los tokens a `identity-access` y publica `MensajeDeViajeRecibido` |
 
 Variables de entorno opcionales: `TROTAMUNDOS_CONTRATOS`, `TROTAMUNDOS_DSN`, `TROTAMUNDOS_BROKER`,
 `TROTAMUNDOS_REGION`, `TROTAMUNDOS_INTERVALO_TAREAS` (segundos entre corridas del trabajo
 periódico; 0 lo apaga) y `TROTAMUNDOS_PREFIJO_TOPICOS` (antepuesto a los tópicos; las pruebas lo
 usan para no mezclarse). Con `TROTAMUNDOS_BROKER` vacío, un servicio no publica ni consume.
+`mail-ingest` usa además `TROTAMUNDOS_URL_IDENTITY_ACCESS` (por omisión, `http://localhost:18103`).
 `TROTAMUNDOS_MODO` elige el modo de despliegue de `itinerary`: `completo` (por omisión), `lectura` o
 `escritura`.
 
@@ -211,7 +240,7 @@ fuera del alcance que fija [ADR-0034](../docs/03-adr/ADR-0034-punto-de-extension
 | [0001](../docs/03-adr/ADR-0001-estilo-arquitectonico.md) Microservicios orientados a eventos | 🟨 | `itinerary` y lo compartido en `comun`; ningún servicio importa a otro (prueba de arquitectura). Los demás servicios, pasos 7 a 14 |
 | [0002](../docs/03-adr/ADR-0002-despliegue-multirregion.md) Activo-activo en tres regiones | ⏳ | Paso 16, como multirregión simulada: dos regiones con región primaria por usuario (ver ADR-0018). Las tres regiones reales ➖ |
 | [0003](../docs/03-adr/ADR-0003-separacion-planos.md) Plano operacional y analítico separados | ⏳ | Paso 14 |
-| [0004](../docs/03-adr/ADR-0004-obtencion-de-correo.md) Correo por *push* con reconciliación | ⏳ | Paso 8 |
+| [0004](../docs/03-adr/ADR-0004-obtencion-de-correo.md) Correo por *push* con reconciliación | 🟨 | Paso 8: suscripciones con renovación y detección de caídas, aviso firmado, reconciliación escalonada por `buzon_id` y los dos caminos convergiendo en una cola, con la misma entrega publicada una sola vez (probado). Los intervalos son los «en reposo» de ADR-0024: el ajuste por viaje queda fuera (ver decisiones). Cuotas y cortacircuitos, paso 10 |
 | [0005](../docs/03-adr/ADR-0005-capa-de-clientes-bff.md) Un BFF por tipo de cliente | ⏳ | Paso 11 |
 | [0006](../docs/03-adr/ADR-0006-capa-de-anticorrupcion.md) Capa de anticorrupción con complementos | ⏳ | Pasos 9 y 10 (la prueba ya reserva las carpetas `complementos/`) |
 | [0007](../docs/03-adr/ADR-0007-identidad-y-comparticion.md) OIDC, delegación OAuth y designados | 🟨 | Sesiones OIDC y ciclo de vida de buzones en `identity-access` (paso 7). Designados y compartición, paso 13 |
@@ -234,7 +263,7 @@ fuera del alcance que fija [ADR-0034](../docs/03-adr/ADR-0034-punto-de-extension
 | [0024](../docs/03-adr/ADR-0024-cortacircuitos-reintentos-y-cuotas.md) Cortacircuitos, cola persistente y cuotas | ⏳ | Paso 10 |
 | [0025](../docs/03-adr/ADR-0025-observabilidad-sli-slo-presupuesto-error.md) Observabilidad y presupuesto de error | 🟨 | `traceparent` e `idDeCorrelacion` se propagan en HTTP y eventos. OpenTelemetry y SLO ➖: no están en el plan |
 | [0026](../docs/03-adr/ADR-0026-modelo-costo-y-camino-escalonado.md) Modelo de costo | ➖ | Es una decisión de operación, no de código |
-| [0027](../docs/03-adr/ADR-0027-versionado-y-evolucion-de-contratos.md) Evolución compatible de contratos | 🟨 | Los contratos evolucionan con SemVer y cambios compatibles (`itinerary.yaml` 1.1.0, AsyncAPI 1.3.0). El tipo de medio versionado de la API pública, paso 11 |
+| [0027](../docs/03-adr/ADR-0027-versionado-y-evolucion-de-contratos.md) Evolución compatible de contratos | 🟨 | Los contratos evolucionan con SemVer y cambios compatibles (`itinerary.yaml` 1.1.0, `identity-access.yaml` 1.1.1, AsyncAPI 1.4.0). El tipo de medio versionado de la API pública, paso 11 |
 | [0028](../docs/03-adr/ADR-0028-autorizacion-comparticion-y-publicacion.md) ABAC, vales firmados y designados | 🟨 | El mismo 404 para «no existe» y «no es tuyo»; motor ABAC, vale JWS de 60 s y OTP de invitados en `identity-access` (paso 7). Verificación en `itinerary`, `sharing` y publicación, pasos 11 y 13 |
 | [0029](../docs/03-adr/ADR-0029-cifrado-custodia-y-rotacion-de-claves.md) Cifrado por sobres y custodia | ✅ | Paso 7 (`QA-13`): `KEK_region`/`DEK_u` con `AES-256-GCM`, regla `R5-estricto` probada, rotación sin corte, tokens efímeros ≤ 15 min, detector de anomalías de 60 s y revocación regional en bloque |
 | [0030](../docs/03-adr/ADR-0030-auditoria-y-supresion-datos-personales.md) Auditoría y supresión de datos | 🟨 | Los errores no filtran datos internos; bitácora encadenada `SHA-256`, exportación y fase 1 local con `CuentaSuprimida` en `identity-access` (paso 7). Purga coordinada y plano analítico, paso 14 |
@@ -242,7 +271,7 @@ fuera del alcance que fija [ADR-0034](../docs/03-adr/ADR-0034-punto-de-extension
 | [0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md) Internacionalización | 🟨 | Instantes en UTC con zona IANA aparte, en todo el modelo. Idioma y formateo, en los BFF (paso 11) |
 | [0033](../docs/03-adr/ADR-0033-capacidades-nativas-gps-y-degradacion.md) GPS en el móvil | ➖ | No hay cliente móvil nativo en el prototipo |
 | [0034](../docs/03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) Módulo avanzado y recorte del prototipo | 🟨 | El recorte guía este plan. La Opción B, pasos 18 y 19 |
-| [0035](../docs/03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) Buzones sin OAuth y formatos desconocidos | 🟨 | Alias de reenvío e `imapDelegado` con credencial delegada cifrada en `identity-access` (paso 7). Receptor `mail-ingest` y extractores, pasos 8 y 9 |
+| [0035](../docs/03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) Buzones sin OAuth y formatos desconocidos | 🟨 | Alias de reenvío e `imapDelegado` con credencial delegada cifrada en `identity-access` (paso 7). Receptor de reenvío con DKIM/SPF/ARC y titular verificados, con rechazos auditados (paso 8). Formatos desconocidos, paso 9 |
 | [0036](../docs/03-adr/ADR-0036-tecnologia-del-prototipo.md) Tecnología del prototipo | ✅ | Python 3.12, FastAPI, PostgreSQL, Redpanda y Docker Compose. Schemathesis, paso 17 |
 
 Además de los ADR: `preferences` se construye como servicio mínimo en el paso 12, porque su evento
@@ -263,7 +292,7 @@ implementa.
 | 5 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | ✅ |
 | 6 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | ✅ |
 | 7 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | ✅ |
-| 8 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | ⬜ |
+| 8 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | ✅ |
 | 9 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | ⬜ |
 | 10 | `provider-sync`: adaptador simulado, cortacircuitos, disrupciones | QA-10, ADR-0024 | ⬜ |
 | 11 | BFF y `api-gateway`: panel, límite de tasa, plazos | QA-02, ADR-0020 | ⬜ |

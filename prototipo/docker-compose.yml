@@ -114,3 +114,30 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  mail-ingest:
+    # Suscripciones, avisos, reconciliación, filtros, reenvío verificado y MensajeDeViajeRecibido
+    # (paso 8). Pide los tokens de los buzones a identity-access.
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.mail_ingest.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TROTAMUNDOS_DSN: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres:5432/trotamundos
+      TROTAMUNDOS_BROKER: broker:9092
+      TROTAMUNDOS_REGION: AM
+      TROTAMUNDOS_URL_IDENTITY_ACCESS: http://identity-access:8000
+      # De .env (make infra-arriba): la sesión la emite identity-access con el mismo secreto.
+      TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
+      TROTAMUNDOS_SECRETO_WEBHOOK_CORREO: ${TROTAMUNDOS_SECRETO_WEBHOOK_CORREO}
+    ports:
+      - "18104:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
