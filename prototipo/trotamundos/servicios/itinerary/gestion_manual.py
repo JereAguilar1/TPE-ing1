@@ -121,7 +121,8 @@ def crear(ctx: Contexto, cuerpo: Mapping[str, Any], clave: UUID) -> Resultado:
             version = ctx.registro.obtener(nuevo["tipo"]).version  # el alta usa la vigente
         except TipoNoRegistrado as error:
             raise SolicitudInvalida(str(error), [{"campo": f"segmentos[{i}].tipo",
-                                                  "mensaje": "tipo de segmento no registrado"}])
+                                                  "mensaje": "tipo de segmento no registrado"}]
+                                    ) from error
         segmentos.append({**nuevo, "versionTipo": version})
     observacion = _observacion_manual(ctx, f"alta/{clave}", cuerpo.get("identificadores", []),
                                       segmentos)
