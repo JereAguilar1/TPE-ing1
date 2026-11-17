@@ -229,3 +229,31 @@ def test_regla_r5_solo_custodia_boveda_usa_cifrado_de_boveda():
             if nombre.startswith("cryptography"):
                 violaciones_r5.append(f"{relativa} importa {nombre}")
     assert violaciones_r5 == []
+
+
+# --- `mail_ingest` (vista de módulos N2, §3) ------------------------------------------------
+# El flujo de la vista (receptor → cola → descargador → filtros → …) lo arma `servicio`: cada
+# módulo hace una sola cosa y no conoce al siguiente. Los complementos solo conocen la interfaz.
+
+DEPENDENCIAS_DE_MAIL_INGEST = {
+    "interfaz_de_correo": set(),
+    "complementos": {"interfaz_de_correo"},
+    "cola": set(),
+    "suscripciones": {"cola", "interfaz_de_correo"},
+    "reconciliador": {"cola"},
+    "receptor": set(),
+    "receptor_reenvio": set(),
+    "descargador": set(),
+    "filtros": set(),
+    "normalizador": set(),
+    "deduplicador": set(),
+    "publicacion": set(),
+    "api": set(),
+    "servicio": {"interfaz_de_correo", "complementos", "cola", "suscripciones", "reconciliador",
+                 "receptor", "receptor_reenvio", "descargador", "filtros", "normalizador", "deduplicador",
+                 "publicacion", "api"},
+}
+
+
+def test_los_modulos_de_mail_ingest_respetan_la_vista_n2():
+    assert violaciones_internas(PAQUETE, "mail_ingest", DEPENDENCIAS_DE_MAIL_INGEST) == []

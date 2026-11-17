@@ -11,12 +11,12 @@ from contextlib import AbstractAsyncContextManager
 from typing import Any, Callable, Mapping, Protocol
 from uuid import UUID
 
-import jwt
 from fastapi import Body, FastAPI, Header, Response
 from fastapi.responses import JSONResponse
 
 from trotamundos.comun.contratos import Contratos
-from trotamundos.comun.errores import Problema, instalar_manejadores, no_encontrado
+from trotamundos.comun.errores import Problema, instalar_manejadores
+from trotamundos.comun.sesion import usuario_de_sesion
 
 _CONTRATO = "openapi/identity-access.yaml"
 _CUERPO = "openapi/identity-access.yaml#/paths/{ruta}/post/requestBody/content/application~1json/schema"
@@ -108,14 +108,7 @@ def crear_app(
             raise Problema(400, "Solicitud inválida", errores=[_error(e) for e in errores])
 
     def usuario_desde_oidc(authorization: str | None) -> UUID:
-        if not authorization or not authorization.startswith("Bearer "):
-            raise Problema(401, "No autenticado")
-        token = authorization.removeprefix("Bearer ").strip()
-        try:
-            datos = jwt.decode(token, secreto_jwt, algorithms=["HS256"])
-            return UUID(str(datos["sub"]))
-        except Exception as exc:
-            raise Problema(401, "No autenticado") from exc
+        return usuario_de_sesion(authorization, secreto_jwt)
 
     # --- Sesiones ----------------------------------------------------------------------------
 
