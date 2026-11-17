@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — identity-access
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Identidad, consentimiento de buzones, custodia de tokens delegados, autorización y derechos
     sobre datos personales.
@@ -164,6 +164,34 @@ paths:
       responses:
         '204': { description: Revocado; se publica `EstadoDeBuzonCambiado`. }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /buzones/{id}/autorizacion:
+    parameters:
+      - { name: id, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    post:
+      tags: [buzones]
+      operationId: autorizarBuzon
+      summary: Completa el consentimiento OAuth del buzón y lo pasa a `Activo`
+      security: [{ oidc: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [codigo]
+              properties:
+                codigo: { type: string }
+                direccion: { type: string, format: email }
+      responses:
+        '200':
+          description: Buzón autorizado y activo; el token queda cifrado bajo `DEK_u`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Buzon' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
 
   /buzones/{id}/token-efimero:
     parameters:

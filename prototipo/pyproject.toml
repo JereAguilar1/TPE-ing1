@@ -16,6 +16,8 @@ dependencies = [
     "referencing==0.35.1",
     "psycopg[binary]==3.2.3",
     "aiokafka==0.12.0",
+    "cryptography==44.0.3",
+    "PyJWT==2.15.1",
 ]
 
 [project.optional-dependencies]
