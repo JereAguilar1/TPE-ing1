@@ -297,3 +297,8 @@ class Viaje:
         """Lo que publica `ViajeArmado` sin la versión: si cambia, el viaje cambió."""
         datos = {k: v for k, v in self.datos_publicos().items() if k != "version"}
         return tuple(sorted((k, repr(v)) for k, v in datos.items()))
+
+    def huella_de_miembros(self) -> tuple:
+        """Lo que el viaje guarda de cada reserva (resumen y si está fijada)."""
+        return tuple(sorted((str(r), m.fijada, repr(m.resumen.a_dict()))
+                            for r, m in self.miembros.items()))

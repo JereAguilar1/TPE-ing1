@@ -369,3 +369,30 @@ def test_la_reversion_de_un_horario_no_se_toma_por_duplicado(itinerary, observac
     reserva_id = next(e for e in eventos if e.tipo == "ReservaActualizada").carga["reserva"]["id"]
     assert itinerary.leer_reserva(USUARIO, reserva_id)["segmentos"][0]["inicio"]["instante"] == \
         "2026-12-01T10:00:00Z"
+
+
+def _vuelo_el(alta: dict, dia: int, desde: str, hasta: str, codigo: str) -> dict:
+    """Un vuelo de `desde` a `hasta` el día `dia`, con su localizador (otra reserva)."""
+    vuelo = _alta_el(alta, dia, codigo)
+    segmento = vuelo["segmentos"][0]
+    segmento["inicio"]["lugar"]["nombre"], segmento["fin"]["lugar"]["nombre"] = desde, hasta
+    return vuelo
+
+
+def test_el_viaje_guarda_el_cambio_de_una_reserva_aunque_no_cambie_su_periodo(itinerary, alta):
+    """B se mueve dentro del período: el viaje no publica nada, pero guarda el tramo nuevo. Si
+    después sale C, el período se calcula con B como quedó, no como estaba."""
+    _, a = itinerary.crear_reserva(USUARIO, uuid4(), _vuelo_el(alta, 1, "Aeroparque", "Mendoza", "A1"))
+    _, b = itinerary.crear_reserva(USUARIO, uuid4(), _vuelo_el(alta, 2, "Mendoza", "Córdoba", "B1"))
+    _, c = itinerary.crear_reserva(USUARIO, uuid4(), _vuelo_el(alta, 5, "Córdoba", "Aeroparque", "C1"))
+    assert a["viajeId"] == b["viajeId"] == c["viajeId"]
+    version_del_viaje = itinerary.leer_viaje(USUARIO, a["viajeId"])["version"]
+
+    tramo = copy.deepcopy(b["reserva"]["segmentos"][0])
+    tramo["inicio"]["instante"], tramo["fin"]["instante"] = "2026-12-03T13:00:00Z", "2026-12-03T15:00:00Z"
+    itinerary.editar_reserva(USUARIO, b["reserva"]["id"],
+                             {"version": b["reserva"]["version"], "segmentos": [tramo]})
+    assert itinerary.leer_viaje(USUARIO, a["viajeId"])["version"] == version_del_viaje
+
+    itinerary.eliminar_reserva(USUARIO, c["reserva"]["id"])
+    assert itinerary.leer_viaje(USUARIO, a["viajeId"])["hasta"] == "2026-12-03T15:00:00Z"

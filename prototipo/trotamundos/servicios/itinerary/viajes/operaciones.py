@@ -59,7 +59,9 @@ class RepositorioDeViajes(Protocol):
 class Sesion:
     """Los viajes que toca una operación. Al cerrar, cada uno se refresca, sube de versión si
     cambió lo que publica y se guarda; de ahí salen los eventos (ADR-0010: una transacción, un
-    agregado; acá, solo viajes)."""
+    agregado; acá, solo viajes). Si solo cambió lo que sabe de sus reservas (un tramo que se
+    movió dentro del período, por ejemplo), se guarda sin versión nueva ni evento: el período y
+    las transiciones de después se calculan con eso."""
 
     def __init__(self, repositorio: RepositorioDeViajes, registro: RegistroDeTipos,
                  usuario_id: UUID, ahora: datetime, causa: Causa,
@@ -67,6 +69,7 @@ class Sesion:
         self.repositorio, self.registro, self.usuario_id = repositorio, registro, usuario_id
         self.ahora, self.causa, self.nuevo_id, self.gracia = ahora, causa, nuevo_id, gracia
         self._antes: dict[UUID, tuple | None] = {}
+        self._miembros_antes: dict[UUID, tuple | None] = {}
         self._tocados: dict[UUID, Viaje] = {}
         self._transiciones: list[tuple[Viaje, str]] = []
 
@@ -74,6 +77,7 @@ class Sesion:
         if viaje.id not in self._tocados:
             self._tocados[viaje.id] = viaje
             self._antes[viaje.id] = None if nuevo else viaje.huella()
+            self._miembros_antes[viaje.id] = None if nuevo else viaje.huella_de_miembros()
         return viaje
 
     def transicion(self, viaje: Viaje, nombre: str) -> None:
@@ -85,6 +89,8 @@ class Sesion:
         for viaje in self._tocados.values():
             viaje.refrescar(self.ahora, self.registro)
             if viaje.huella() == self._antes[viaje.id]:
+                if viaje.huella_de_miembros() != self._miembros_antes[viaje.id]:
+                    self.repositorio.guardar(viaje)
                 continue
             viaje.version += 1
             self.repositorio.guardar(viaje)
