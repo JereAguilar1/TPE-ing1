@@ -168,6 +168,7 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | Para leer un buzón, `mail-ingest` primero lo saca de la cola (lo «reclama») en una transacción corta y recién después lo lee. Si la lectura falla, vuelve a la cola con una espera de `5 s × 2^n`, con tope de 15 min | Un aviso que llega mientras se lee el buzón lo vuelve a encolar en lugar de perderse, la cola no queda bloqueada mientras se habla con el proveedor, y un proveedor caído no recibe un reintento por vuelta. La espera es la de ADR-0024, sin la variación aleatoria | ADR-0004; ADR-0024 |
 | El p99 de tokens por minuto de una réplica de `mail-ingest`, sobre el que `identity-access` bloquea a la réplica (3 veces ese valor), se configura con `TROTAMUNDOS_P99_TOKENS_POR_MINUTO` (20 por omisión) | `mail-ingest` pide un token por cada lectura de buzón: con muchos buzones (o en las pruebas de carga del paso 17) hay que calibrarlo para no bloquear una réplica sana, y el bloqueo no se levanta solo | ADR-0029 |
 | La sesión OIDC de las operaciones públicas se verifica en `comun/sesion.py` (`HS256` con `TROTAMUNDOS_JWT_SECRETO`, compartido por `.env`); la usan `identity-access` y la API de filtros de `mail-ingest` | El token lo emite `identity-access`. En producción cada servicio verificaría con la clave pública de `identity-access` | ADR-0007 |
+| El alias de reenvío lo genera `identity-access` al conectar el buzón y lo devuelve en `POST /buzones`; `mail-ingest` lo recibe por `EstadoDeBuzonCambiado` | ADR-0035 dice que lo asigna `mail-ingest`, pero el contrato `identity-access.yaml` lo devuelve al conectar el buzón, y el contrato manda (AGENTS.md). Registrado como inconsistencia en el [paso 7 de la iteración 5](../docs/02-proceso-add/iteracion-5/paso-7-analisis.md#inconsistencias-encontradas-en-la-1ra-entrega) | ADR-0035; `identity-access.yaml` |
 | AsyncAPI 1.4.0: `EstadoDeBuzonCambiado` suma `via`, `proveedor`, `aliasReenvio` y `correoDelTitular`, que viajan solo cuando el buzón pasa a `Activo` | `mail-ingest` necesita saber cómo atender cada buzón y, para un reenvío, con qué correo comparar el remitente (ADR-0035). Acordado con el grupo frente a un endpoint interno en `identity-access`: un solo mecanismo y sin llamadas sincrónicas. En los demás cambios alcanza con `buzonId`, así el correo no viaja de más | ADR-0004; ADR-0027 (cambio compatible); ADR-0035 |
 | `DELETE /privacidad/cuenta` publica `EstadoDeBuzonCambiado` (`desconectadoPorUsuario`) por cada buzón que revoca, igual que `DELETE /buzones/{id}` | `mail-ingest` consume ese evento para dejar de leer los buzones | ADR-0030; `eventos-de-dominio.yaml` |
 | `ProveedorOidcSimulado` mapea `codigo` (`oidc:<correo>:<region>`) a `usuario_identidad` y firma sesiones JWT (`HS256`) y vales ABAC (`TTL 60 s`) con `TROTAMUNDOS_JWT_SECRETO` y `TROTAMUNDOS_VALE_SECRETO` (al azar si no se fijan). `ConsultorDeDesignados` y `ConsultorDeRecursos` arrancan *fail-closed* hasta conectar `sharing` | Permite probar sesiones, OTP de invitados y vales ABAC en el paso 7 sin depender de un IdP externo ni de `sharing` (paso 13) | ADR-0007; ADR-0028; ADR-0036 |
@@ -271,16 +272,20 @@ construido](#diseñado-y-no-construido).
 | [0024](../docs/03-adr/ADR-0024-cortacircuitos-reintentos-y-cuotas.md) Cortacircuitos, cola persistente y cuotas | ⏳ | Paso 10 |
 | [0025](../docs/03-adr/ADR-0025-observabilidad-sli-slo-presupuesto-error.md) Observabilidad y presupuesto de error | 🟨 | `traceparent` e `idDeCorrelacion` se propagan en HTTP y eventos. OpenTelemetry y SLO ➖: no están en el plan |
 | [0026](../docs/03-adr/ADR-0026-modelo-costo-y-camino-escalonado.md) Modelo de costo | ➖ | Es una decisión de operación, no de código |
-| [0027](../docs/03-adr/ADR-0027-versionado-y-evolucion-de-contratos.md) Evolución compatible de contratos | 🟨 | Los contratos evolucionan con SemVer y cambios compatibles (`itinerary.yaml` 1.1.0, `identity-access.yaml` 1.1.1, AsyncAPI 1.4.0). El tipo de medio versionado de la API pública, paso 11 |
+| [0027](../docs/03-adr/ADR-0027-versionado-y-evolucion-de-contratos.md) Evolución compatible de contratos | 🟨 | Los contratos evolucionan con SemVer y cambios compatibles (`itinerary.yaml` 1.1.0, `identity-access.yaml` 1.1.1, `virtual-assistant.yaml` 1.0.0, AsyncAPI 1.5.0). El tipo de medio versionado de la API pública, paso 11 |
 | [0028](../docs/03-adr/ADR-0028-autorizacion-comparticion-y-publicacion.md) ABAC, vales firmados y designados | 🟨 | El mismo 404 para «no existe» y «no es tuyo»; motor ABAC, vale JWS de 60 s y OTP de invitados en `identity-access` (paso 7). Verificación en `itinerary`, `sharing` y publicación, pasos 11 y 13 |
 | [0029](../docs/03-adr/ADR-0029-cifrado-custodia-y-rotacion-de-claves.md) Cifrado por sobres y custodia | ✅ | Paso 7 (`QA-13`): `KEK_region`/`DEK_u` con `AES-256-GCM`, regla `R5-estricto` probada, rotación sin corte, tokens efímeros ≤ 15 min, detector de anomalías de 60 s y revocación regional en bloque |
 | [0030](../docs/03-adr/ADR-0030-auditoria-y-supresion-datos-personales.md) Auditoría y supresión de datos | 🟨 | Los errores no filtran datos internos; bitácora encadenada `SHA-256`, exportación y fase 1 local con `CuentaSuprimida` en `identity-access` (paso 7). Purga coordinada y plano analítico, paso 14 |
 | [0031](../docs/03-adr/ADR-0031-residencia-de-datos-por-region.md) Residencia de datos por región | ➖ | La multirregión del paso 16 se simula en una sola jurisdicción; las clases de residencia no aplican |
 | [0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md) Internacionalización | 🟨 | Instantes en UTC con zona IANA aparte, en todo el modelo. Idioma y formateo, en los BFF (paso 11) |
 | [0033](../docs/03-adr/ADR-0033-capacidades-nativas-gps-y-degradacion.md) GPS en el móvil | ➖ | No hay cliente móvil nativo en el prototipo |
-| [0034](../docs/03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) Módulo avanzado y recorte del prototipo | 🟨 | El recorte guía este plan. La Opción B, pasos 18 y 19 |
+| [0034](../docs/03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) Módulo avanzado y recorte del prototipo | 🟨 | El recorte guía este plan. La Opción B, diseñada en la [iteración 5](../docs/02-proceso-add/iteracion-5/README.md) (paso 18); ADR-0040 precisa su punto sobre `CuentaSuprimida`. El código, paso 19 |
 | [0035](../docs/03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) Buzones sin OAuth y formatos desconocidos | 🟨 | Alias de reenvío e `imapDelegado` con credencial delegada cifrada en `identity-access` (paso 7). Receptor de reenvío con DKIM/SPF/ARC y titular verificados, con rechazos auditados (paso 8). Formatos desconocidos, paso 9 |
 | [0036](../docs/03-adr/ADR-0036-tecnologia-del-prototipo.md) Tecnología del prototipo | ✅ | Python 3.12, FastAPI, PostgreSQL, Redpanda y Docker Compose. Schemathesis, paso 17 |
+| [0037](../docs/03-adr/ADR-0037-interpretacion-de-intenciones-del-asistente.md) Intérprete de intenciones intercambiable | ⏳ | Paso 19: reglas detrás del puerto. El adaptador de modelo de lenguaje queda diseñado y no construido |
+| [0038](../docs/03-adr/ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md) Consultas y corrección confirmada | ⏳ | Paso 19 |
+| [0039](../docs/03-adr/ADR-0039-politica-de-derivacion-a-la-agencia.md) Derivación a la agencia | ⏳ | Pasos 12 (`POST /casos`) y 19 |
+| [0040](../docs/03-adr/ADR-0040-sesion-conversacional-y-privacidad.md) Sesión conversacional y privacidad | ⏳ | Paso 19: sesiones, retención y `DisrupcionDetectada`. La supresión de fase 1 por `usuario_id`, con la del resto del plano operacional (paso 14) |
 
 Además de los ADR: `preferences` se construye como servicio mínimo en el paso 12, porque su evento
 `PreferenciasActualizadas` lo consumen `itinerary` (la gracia de archivado de cada usuario) y la
@@ -290,8 +295,8 @@ Opción B (ADR-0034).
 
 Cada paso se entrega en uno o más commits chicos. La columna «Trazabilidad» indica qué decisiones
 implementa. La columna «Prioridad» ordena lo que falta según el recorte acordado por el grupo
-(ver [abajo](#recorte-para-la-entrega)). Antes de empezar un paso, quien lo toma pone su nombre en
-«Responsable» y sube el cambio enseguida: un paso con responsable no lo empieza otro.
+(ver [abajo](#recorte-para-la-entrega)). El reparto se acuerda en el grupo y se anota todo junto en
+«Responsable»: un paso con responsable no lo empieza otro.
 
 | # | Paso | Trazabilidad | Prioridad | Estado | Responsable |
 |---|---|---|---|---|---|
@@ -312,7 +317,7 @@ implementa. La columna «Prioridad» ordena lo que falta según el recorte acord
 | 15 | Tipo `tren` sin tocar código de dominio | QA-15 | Debería | ⬜ |  |
 | 16 | Multirregión simulada: región primaria por usuario, testigo transregional y conmutación | QA-05, ADR-0018 | Completar al 100 % | ⬜ |  |
 | 17 | Pruebas de contrato y de escenarios (QA-01, QA-04, QA-05) | ADR-0017 | Debería (reducido) | ⬜ |  |
-| 18 | Iteración 5 de ADD: diseño de la Opción B (ADRs y contrato) | CON-06 | Sí o sí | ⬜ |  |
+| 18 | Iteración 5 de ADD: diseño de la Opción B (ADRs y contrato) | CON-06 | Sí o sí | ✅ | Francisco Lozano |
 | 19 | `virtual-assistant`: intenciones y derivación a la agencia | RF-B1, RF-B2 | Sí o sí | ⬜ |  |
 | 20 | Interfaz web mínima de demostración | RF-09 | Debería (reducido) | ⬜ |  |
 | 21 | Matriz código ↔ ADR, guion de demostración y README final | QA-16 | Sí o sí | ⬜ |  |

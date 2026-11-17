@@ -46,6 +46,7 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 | [Iteración 2 — Estructuras para la funcionalidad primaria](02-proceso-add/iteracion-2/README.md) | ✅ Completa |
 | [Iteración 3 — Refinamiento para rendimiento, disponibilidad y escalabilidad](02-proceso-add/iteracion-3/README.md) | ✅ Completa |
 | [Iteración 4 — Refinamiento para interoperabilidad, seguridad, evolucionabilidad y uso internacional](02-proceso-add/iteracion-4/README.md) | ✅ Completa |
+| [Iteración 5 — Módulo avanzado: asistente virtual (Opción B, 2da entrega)](02-proceso-add/iteracion-5/README.md) | ✅ Completa |
 
 ## 3. Decisiones arquitectónicas (ADR)
 

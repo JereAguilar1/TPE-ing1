@@ -24,6 +24,7 @@
 - [Iteración 2 ✅](02-proceso-add/iteracion-2/README.md)
 - [Iteración 3 ✅](02-proceso-add/iteracion-3/README.md)
 - [Iteración 4 ✅](02-proceso-add/iteracion-4/README.md)
+- [Iteración 5 ✅ (Opción B)](02-proceso-add/iteracion-5/README.md)
 
 **ADRs**
 - [Índice](03-adr/README.md)

@@ -93,6 +93,17 @@ El análisis comparativo de estas decisiones está en
 |---|---|---|---|
 | [ADR-0036](ADR-0036-tecnologia-del-prototipo.md) | Prototipo en Python 3.12 con FastAPI, PostgreSQL y un *broker* compatible con Kafka, validado en ejecución contra `contratos/` | `aceptado` | CON-04, CON-05, CON-09, QA-16 |
 
+### 2da entrega — Iteración 5 (Opción B: asistente virtual)
+
+Decisiones D37 a D40, con sus alternativas en [Iteración 5 — Paso 4](../02-proceso-add/iteracion-5/paso-4-alternativas.md).
+
+| ADR | Decisión | Estado | Drivers principales |
+|---|---|---|---|
+| [ADR-0037](ADR-0037-interpretacion-de-intenciones-del-asistente.md) | El asistente entiende por intenciones detrás de un intérprete intercambiable: reglas en el prototipo y un modelo de lenguaje enchufable con datos redactados | `aceptado` | RF-B1, RF-B2, QA-14, QA-16, CON-10 |
+| [ADR-0038](ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md) | Consultas directas y corrección del itinerario solo con confirmación explícita; los cambios ante el proveedor no los hace | `aceptado` | RF-B1, RF-06, CON-06, QA-12 |
+| [ADR-0039](ADR-0039-politica-de-derivacion-a-la-agencia.md) | Cuatro disparadores de derivación a la agencia, con confirmación y caso idempotente por `POST /casos` | `aceptado` | RF-B2, RF-12, CON-06, CRN-12 |
+| [ADR-0040](ADR-0040-sesion-conversacional-y-privacidad.md) | Sesión conversacional mínima de 30 días, supresión de fase 1 por `usuario_id` y disrupciones por evento (precisa a ADR-0034) | `aceptado` | RF-B1, QA-14, CON-10, QA-12 |
+
 ## Plantilla
 
 → [plantilla-madr.md](plantilla-madr.md)

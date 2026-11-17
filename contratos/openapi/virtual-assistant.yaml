@@ -1,0 +1,194 @@
+openapi: 3.1.0
+info:
+  title: Trotamundos — virtual-assistant
+  version: 1.0.0
+  description: |
+    Asistente virtual de primer nivel (Opción B de la 2da entrega, RF-B1 y RF-B2): atiende consultas
+    de estado, corrige el itinerario cuando el viajero ya cambió una reserva y deriva a la agencia
+    preferida los casos que no puede resolver.
+
+    Trazabilidad:
+    - Elemento autónomo nº 14 sobre el punto de extensión de ADR-0034: se expone solo a los BFF y
+      consume interfaces que ya existían (`GET /viajes`, `GET /viajes/{id}` y `PUT /reservas/{id}`
+      de `itinerary`, `POST /casos` de `support-liaison`).
+    - Comprensión por intenciones detrás de un intérprete intercambiable: ADR-0037.
+    - Qué resuelve solo y cómo pide confirmación antes de cambiar algo: ADR-0038.
+    - Cuándo y cómo deriva a la agencia: ADR-0039.
+    - Sesión conversacional propia, retención y supresión: ADR-0040.
+
+    La sesión OIDC es la del propio viajero, que el BFF reenvía (ADR-0007, ADR-0028): el asistente
+    actúa siempre en su nombre y nunca ve datos de otro usuario. Una sesión ajena responde `404`.
+servers:
+  - url: https://virtual-assistant.interno
+    description: Solo para los BFF (las rutas públicas las expone `bff-web`, ADR-0005)
+security:
+  - oidc: []
+tags:
+  - name: conversacion
+paths:
+  /asistente/sesiones:
+    post:
+      tags: [conversacion]
+      operationId: abrirSesion
+      summary: Abre una conversación; la respuesta trae el saludo del asistente
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                viajeId:
+                  $ref: 'comun.yaml#/components/schemas/Id'
+                  description: El viaje que el viajero está mirando, si abre el chat desde él.
+      responses:
+        '201':
+          description: Sesión abierta.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sesion' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /asistente/sesiones/{sid}:
+    parameters:
+      - { name: sid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    get:
+      tags: [conversacion]
+      operationId: verSesion
+      summary: La conversación con todos sus turnos
+      responses:
+        '200':
+          description: Sesión con su historial.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sesion' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /asistente/sesiones/{sid}/mensajes:
+    parameters:
+      - { name: sid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    post:
+      tags: [conversacion]
+      operationId: enviarMensaje
+      summary: El viajero escribe (o confirma una acción propuesta) y el asistente responde
+      description: |
+        Un mensaje lleva `texto`, `confirmacion` o los dos. Antes de cambiar el itinerario o de
+        derivar un caso, el asistente **propone** la acción y espera una `confirmacion` explícita
+        con el `accionId` de esa propuesta (ADR-0038). Una propuesta vence a los 10 minutos.
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MensajeDelViajero' }
+      responses:
+        '200':
+          description: Respuesta del asistente a ese turno.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Respuesta' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '409':
+          description: La confirmación es de una acción que no existe, ya se ejecutó o venció.
+          content:
+            application/problem+json:
+              schema: { $ref: 'comun.yaml#/components/schemas/Problema' }
+
+components:
+  securitySchemes:
+    oidc:
+      $ref: 'comun.yaml#/components/securitySchemes/oidc'
+  schemas:
+    Intencion:
+      type: string
+      description: Lo que el intérprete entendió del mensaje (ADR-0037).
+      enum:
+        - saludo
+        - ayuda
+        - estadoDelViaje
+        - proximoTramo
+        - corregirHorario
+        - cambioAnteProveedor
+        - pedirAgencia
+        - confirmacion
+        - noEntendido
+
+    MensajeDelViajero:
+      type: object
+      minProperties: 1
+      properties:
+        texto: { type: string, minLength: 1, maxLength: 1000 }
+        viajeId:
+          $ref: 'comun.yaml#/components/schemas/Id'
+          description: Cambia el viaje del que se habla (por ejemplo, si el viajero tiene varios).
+        confirmacion:
+          type: object
+          required: [accionId, decision]
+          properties:
+            accionId: { $ref: 'comun.yaml#/components/schemas/Id' }
+            decision: { type: string, enum: [confirmar, rechazar] }
+
+    AccionPropuesta:
+      type: object
+      description: Algo que el asistente hará solo si el viajero lo confirma (ADR-0038).
+      required: [id, tipo, resumen, venceEn]
+      properties:
+        id: { $ref: 'comun.yaml#/components/schemas/Id' }
+        tipo: { type: string, enum: [corregirReserva, derivarALaAgencia] }
+        resumen: { type: string, description: 'Qué va a cambiar o qué se va a pedir, en palabras del viajero.' }
+        reservaId: { $ref: 'comun.yaml#/components/schemas/Id' }
+        viajeId: { $ref: 'comun.yaml#/components/schemas/Id' }
+        venceEn: { type: string, format: date-time }
+
+    AccionRealizada:
+      type: object
+      required: [tipo]
+      properties:
+        tipo: { type: string, enum: [corregirReserva, derivarALaAgencia] }
+        reservaId: { $ref: 'comun.yaml#/components/schemas/Id' }
+        casoId: { $ref: 'comun.yaml#/components/schemas/Id' }
+        agencia: { type: string }
+
+    Turno:
+      type: object
+      required: [autor, texto, en]
+      properties:
+        autor: { type: string, enum: [viajero, asistente] }
+        texto: { type: string }
+        en: { type: string, format: date-time }
+        intencion: { $ref: '#/components/schemas/Intencion' }
+
+    Respuesta:
+      type: object
+      required: [intencion, mensajes]
+      properties:
+        intencion: { $ref: '#/components/schemas/Intencion' }
+        mensajes:
+          type: array
+          minItems: 1
+          items: { type: string }
+        viajeId:
+          $ref: 'comun.yaml#/components/schemas/Id'
+          description: El viaje del que se está hablando, si hay uno.
+        accionPropuesta: { $ref: '#/components/schemas/AccionPropuesta' }
+        accionRealizada: { $ref: '#/components/schemas/AccionRealizada' }
+
+    Sesion:
+      type: object
+      required: [id, abiertaEn, turnos]
+      properties:
+        id: { $ref: 'comun.yaml#/components/schemas/Id' }
+        abiertaEn: { type: string, format: date-time }
+        viajeId: { $ref: 'comun.yaml#/components/schemas/Id' }
+        turnos:
+          type: array
+          items: { $ref: '#/components/schemas/Turno' }
+        accionPendiente: { $ref: '#/components/schemas/AccionPropuesta' }

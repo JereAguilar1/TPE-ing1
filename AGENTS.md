@@ -47,9 +47,11 @@ Proyecto: TPE de Ingeniería de Software I (UNICEN), grupo 15, **Trotamundos**. 
     pruebas rotas en la entrega.
 - Un paso reducido se construye **solo** con lo que dice su fila del recorte; lo demás va a «Para
   completar el 100 %», no se agrega de paso.
-- **Antes de empezar un paso**, poner el nombre en la columna «Responsable» del plan
-  (`prototipo/README.md`) y subir ese cambio enseguida: así nadie más lo toma. Si la columna ya
-  tiene a otro integrante, ese paso no se empieza.
+- **Quién hace cada paso** lo acuerda el grupo por WhatsApp, y una sola persona anota todos los
+  nombres en la columna «Responsable» del plan (`prototipo/README.md`) en un único commit. No hace
+  falta un commit por integrante. Antes de empezar un paso, mirar esa columna: si tiene a otro
+  integrante, ese paso no se empieza. Si el reparto cambia, se actualiza la columna junto con el
+  próximo commit del paso.
 - **Al terminar un paso**, además de marcarlo hecho:
   - agregar sus filas a la «Matriz código ↔ ADR» de `prototipo/README.md` (qué código implementa
     qué ADR o contrato, y qué prueba lo verifica), y a «Diseñado y no construido» lo que haya

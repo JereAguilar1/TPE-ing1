@@ -21,6 +21,7 @@ Cuando un contrato y el código no coinciden, el error está en el código.
 | `mail-ingest` (filtros y whitelists) | [openapi/mail-ingest-filtros.yaml](openapi/mail-ingest-filtros.yaml) | OpenAPI 3.1 | RF-04, iteración 2 §5.4 (ver nota abajo) |
 | `provider-sync` (webhooks entrantes) | [openapi/provider-sync-webhooks.yaml](openapi/provider-sync-webhooks.yaml) | OpenAPI 3.1 | ADR-0006, ADR-0020 |
 | `support-liaison` | [openapi/support-liaison.yaml](openapi/support-liaison.yaml) | OpenAPI 3.1 | Iteración 2 §5.7 |
+| `virtual-assistant` (Opción B, solo para los BFF) | [openapi/virtual-assistant.yaml](openapi/virtual-assistant.yaml) | OpenAPI 3.1 | ADR-0034, ADR-0037 a ADR-0040, iteración 5 |
 | `preferences` | [openapi/preferences.yaml](openapi/preferences.yaml) | OpenAPI 3.1 | Iteración 2 §5.6 |
 | `sharing` | [openapi/sharing.yaml](openapi/sharing.yaml) | OpenAPI 3.1 | ADR-0028, iteración 4 §5.4 |
 | Eventos de dominio (16) | [asyncapi/eventos-de-dominio.yaml](asyncapi/eventos-de-dominio.yaml) | AsyncAPI 3.0 | Iteración 2 §5.10; `CuentaSuprimida` de ADR-0030 |

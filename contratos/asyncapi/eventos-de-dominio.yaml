@@ -1,7 +1,7 @@
 asyncapi: 3.0.0
 info:
   title: Trotamundos — eventos de dominio
-  version: 1.4.0
+  version: 1.5.0
   description: |
     Catálogo de eventos publicados en el *broker* (ADR-0001, ADR-0009).
 
@@ -144,7 +144,9 @@ operations:
     action: send
     channel: { $ref: '#/channels/viajeArmado' }
     x-productor: itinerary
-    x-consumidores: [event-pipeline, elemento-14]  # punto de extensión de la 2da entrega (ADR-0034)
+    # Reservado para el módulo avanzado (ADR-0034): con la Opción B, el asistente lee los viajes
+    # con GET /viajes/{id} y no consume este evento (ADR-0038).
+    x-consumidores: [event-pipeline]
   publicarViajeCompletado:
     action: send
     channel: { $ref: '#/channels/viajeCompletado' }
@@ -159,7 +161,7 @@ operations:
     action: send
     channel: { $ref: '#/channels/disrupcionDetectada' }
     x-productor: provider-sync
-    x-consumidores: [notification, support-liaison]
+    x-consumidores: [notification, support-liaison, virtual-assistant]  # ADR-0040
   publicarEstadoDeBuzonCambiado:
     action: send
     channel: { $ref: '#/channels/estadoDeBuzonCambiado' }
@@ -184,7 +186,9 @@ operations:
     action: send
     channel: { $ref: '#/channels/cuentaSuprimida' }
     x-productor: identity-access
-    x-consumidores: [event-pipeline, elemento-14]  # punto de extensión de la 2da entrega (ADR-0034)
+    # El módulo avanzado no lo consume: no trae usuarioId, y la supresión de su estado entra en la
+    # fase 1 de ADR-0030 (ADR-0040 precisa a ADR-0034).
+    x-consumidores: [event-pipeline]
 
 components:
   messages:
