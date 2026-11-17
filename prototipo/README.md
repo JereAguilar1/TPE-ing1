@@ -55,6 +55,15 @@ prototipo/
 │           ├── proyeccion_panel.py  # lecturas de reserva, viaje y panel, mantenidas por eventos internos
 │           ├── api.py               # API interna (openapi/itinerary.yaml)
 │           └── servicio.py          # arma los módulos y define las transacciones
+│       └── identity_access/         # identidad, buzones, bóveda, ABAC y auditoría (paso 7)
+│           ├── auditoria_y_revocacion.py # bitácora SHA-256 y detector de anomalías (ADR-0029, ADR-0030)
+│           ├── autenticacion_oidc.py     # OIDC simulado y OTP para invitados (ADR-0007, ADR-0028)
+│           ├── consentimiento_buzones.py # ciclo de vida de buzones y revocación en bloque (RF-01, ADR-0035)
+│           ├── custodia_boveda.py        # único módulo con KMS/AES-GCM (regla R5, ADR-0029)
+│           ├── motor_autorizacion_abac.py# políticas ABAC y vales JWS de 60 s (ADR-0028)
+│           ├── publicacion.py            # outbox: EstadoDeBuzonCambiado y CuentaSuprimida
+│           ├── api.py                    # API (openapi/identity-access.yaml)
+│           └── servicio.py               # arma los módulos y define las transacciones
 ├── tests/
 ├── Dockerfile              # una imagen para todos los servicios (se construye desde la raíz)
 ├── docker-compose.yml      # PostgreSQL, broker y servicios
@@ -127,6 +136,11 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | SonarCloud no analiza `contratos/analitica/*.sql` (`.sonarcloud.properties`) | Lo lee como PL/SQL de Oracle y marca como error el `CHAR` de SQL ANSI, que es el dialecto del contrato. Es un falso positivo | ADR-0016; `contratos/README.md` |
 | Las pruebas que necesitan PostgreSQL se saltean, con el motivo, si no está levantado | Las del dominio corren en cualquier máquina; las de persistencia piden `make infra-arriba` | ADR-0017 |
 | Todos los servicios usan la misma imagen, construida desde la raíz del repositorio para incluir `contratos/`; cada uno es un proceso con su comando | Un solo paquete y un proceso por servicio | ADR-0036 |
+| `identity-access.yaml` 1.1.0 agrega `POST /buzones/{id}/autorizacion` para completar el consentimiento OAuth (`Solicitado` → `Activo`) y guardar el *refresh token* bajo `DEK_u`. Las vías `reenvio` e `imapDelegado` pasan a `Activo` al crearse | El contrato 1.0.0 devolvía `urlAutorizacion` en `POST /buzones`, pero no tenía operación de retorno para activar el buzón OAuth | ADR-0027 (cambio compatible); iteración 2 §5.7 (RF-01) |
+| En local, la identidad mTLS de las rutas `x-interna: true` se simula con las cabeceras `X-Servicio-Cliente`, `X-Instancia-Cliente` y `X-Buckets-Arrendados` | Los servicios en `docker-compose.yml` hablan HTTP plano; `POST /buzones/{id}/token-efimero` exige `X-Servicio-Cliente: mail-ingest` (`403` en otro caso) y alimenta al detector de anomalías de 60 s | ADR-0029 (regla R5 y QA-13); ADR-0036 |
+| `KmsLocal` en `custodia_boveda.py` simula el HSM/KMS regional con `KEK_region` en memoria (derivada de `TROTAMUNDOS_KMS_SECRETO` o generada al azar) y `DEK_u` por usuario (`AES-256-GCM` + AAD). `test_arquitectura.py` verifica que ningún otro módulo importe `cryptography` (`R5-estricto`) | Reemplaza el KMS gestionado de nube sin guardar claves maestras en PostgreSQL ni credenciales en código | ADR-0029; vista de adaptadores §4 (`R5-estricto`); ADR-0036 |
+| `ProveedorOidcSimulado` mapea `codigo` (`oidc:<correo>:<region>`) a `usuario_identidad` y firma sesiones JWT (`HS256`) y vales ABAC (`TTL 60 s`) con `TROTAMUNDOS_JWT_SECRETO` y `TROTAMUNDOS_VALE_SECRETO` (al azar si no se fijan). `ConsultorDeDesignados` y `ConsultorDeRecursos` arrancan *fail-closed* hasta conectar `sharing` | Permite probar sesiones, OTP de invitados y vales ABAC en el paso 7 sin depender de un IdP externo ni de `sharing` (paso 13) | ADR-0007; ADR-0028; ADR-0036 |
+| En `identity-access`, `POST /privacidad/exportaciones` entrega el paquete de identidad, buzones y auditoría del servicio, y `DELETE /privacidad/cuenta` ejecuta la fase 1 local (destrucción de `DEK_u`, secretos, buzones, identidad R1 y `mapa_seudonimo_usuario`) y publica `CuentaSuprimida` en `P3` (`SobreSinUsuario`) | La purga coordinada sobre `itinerary`/`sharing`/`preferences` y la fase 2 en `analytics-store` llegan con `event-pipeline` en el paso 14 | ADR-0030 (`QA-14`); `eventos-de-dominio.yaml` |
 
 ## Cómo correrlo
 
@@ -169,6 +183,7 @@ Servicios que levanta `make servicios-arriba`:
 |---|---|---|
 | `itinerary-escritura` | 18101 | Los comandos de [`openapi/itinerary.yaml`](../contratos/openapi/itinerary.yaml) (etiqueta `comando`). Además corre el trabajo periódico, publica su *outbox* y consume `ReservaExtraida` y `ReservaObservada` del broker |
 | `itinerary-lectura` | 18102 | Las lecturas del mismo contrato (etiqueta `lectura`): panel, viajes, reservas y tipos de segmento |
+| `identity-access` | 18103 | Sesiones OIDC/OTP, buzones, bóveda (`KEK_region`/`DEK_u`), vales ABAC, auditoría encadenada y privacidad ([`openapi/identity-access.yaml`](../contratos/openapi/identity-access.yaml)). Publica `EstadoDeBuzonCambiado` y `CuentaSuprimida` |
 
 Variables de entorno opcionales: `TROTAMUNDOS_CONTRATOS`, `TROTAMUNDOS_DSN`, `TROTAMUNDOS_BROKER`,
 `TROTAMUNDOS_REGION`, `TROTAMUNDOS_INTERVALO_TAREAS` (segundos entre corridas del trabajo
@@ -193,7 +208,7 @@ fuera del alcance que fija [ADR-0034](../docs/03-adr/ADR-0034-punto-de-extension
 | [0004](../docs/03-adr/ADR-0004-obtencion-de-correo.md) Correo por *push* con reconciliación | ⏳ | Paso 8 |
 | [0005](../docs/03-adr/ADR-0005-capa-de-clientes-bff.md) Un BFF por tipo de cliente | ⏳ | Paso 11 |
 | [0006](../docs/03-adr/ADR-0006-capa-de-anticorrupcion.md) Capa de anticorrupción con complementos | ⏳ | Pasos 9 y 10 (la prueba ya reserva las carpetas `complementos/`) |
-| [0007](../docs/03-adr/ADR-0007-identidad-y-comparticion.md) OIDC, delegación OAuth y designados | ⏳ | Pasos 7 y 13 |
+| [0007](../docs/03-adr/ADR-0007-identidad-y-comparticion.md) OIDC, delegación OAuth y designados | 🟨 | Sesiones OIDC y ciclo de vida de buzones en `identity-access` (paso 7). Designados y compartición, paso 13 |
 | [0008](../docs/03-adr/ADR-0008-alcance-disponibilidad.md) Alcance y medición de la disponibilidad | ➖ | Medir disponibilidad real no tiene sentido en una notebook; lo crítico se ejercita con QA-05 |
 | [0009](../docs/03-adr/ADR-0009-contratos-spec-driven.md) Contratos como artefactos de primera clase | 🟨 | Todo cuerpo, respuesta y evento se valida contra `contratos/` en ejecución, y la integración continua corre todas las pruebas en cada cambio. La detección de cambios incompatibles entre versiones, paso 17 |
 | [0010](../docs/03-adr/ADR-0010-modelo-canonico-reserva-segmento-viaje.md) Agregados `Reserva` y `Viaje` | ✅ | Pasos 3 a 5: ninguna transacción escribe los dos (probado) y se coordinan por eventos internos |
@@ -214,14 +229,14 @@ fuera del alcance que fija [ADR-0034](../docs/03-adr/ADR-0034-punto-de-extension
 | [0025](../docs/03-adr/ADR-0025-observabilidad-sli-slo-presupuesto-error.md) Observabilidad y presupuesto de error | 🟨 | `traceparent` e `idDeCorrelacion` se propagan en HTTP y eventos. OpenTelemetry y SLO ➖: no están en el plan |
 | [0026](../docs/03-adr/ADR-0026-modelo-costo-y-camino-escalonado.md) Modelo de costo | ➖ | Es una decisión de operación, no de código |
 | [0027](../docs/03-adr/ADR-0027-versionado-y-evolucion-de-contratos.md) Evolución compatible de contratos | 🟨 | Los contratos evolucionan con SemVer y cambios compatibles (`itinerary.yaml` 1.1.0, AsyncAPI 1.3.0). El tipo de medio versionado de la API pública, paso 11 |
-| [0028](../docs/03-adr/ADR-0028-autorizacion-comparticion-y-publicacion.md) ABAC, vales firmados y designados | 🟨 | El mismo 404 para «no existe» y «no es tuyo». El vale interno, desde el paso 7; designados y publicación, paso 13 |
-| [0029](../docs/03-adr/ADR-0029-cifrado-custodia-y-rotacion-de-claves.md) Cifrado por sobres y custodia | ⏳ | Paso 7 (QA-13) |
-| [0030](../docs/03-adr/ADR-0030-auditoria-y-supresion-datos-personales.md) Auditoría y supresión de datos | 🟨 | Los errores no filtran datos internos. Auditoría, paso 7; supresión en el plano analítico, paso 14 |
+| [0028](../docs/03-adr/ADR-0028-autorizacion-comparticion-y-publicacion.md) ABAC, vales firmados y designados | 🟨 | El mismo 404 para «no existe» y «no es tuyo»; motor ABAC, vale JWS de 60 s y OTP de invitados en `identity-access` (paso 7). Verificación en `itinerary`, `sharing` y publicación, pasos 11 y 13 |
+| [0029](../docs/03-adr/ADR-0029-cifrado-custodia-y-rotacion-de-claves.md) Cifrado por sobres y custodia | ✅ | Paso 7 (`QA-13`): `KEK_region`/`DEK_u` con `AES-256-GCM`, regla `R5-estricto` probada, rotación sin corte, tokens efímeros ≤ 15 min, detector de anomalías de 60 s y revocación regional en bloque |
+| [0030](../docs/03-adr/ADR-0030-auditoria-y-supresion-datos-personales.md) Auditoría y supresión de datos | 🟨 | Los errores no filtran datos internos; bitácora encadenada `SHA-256`, exportación y fase 1 local con `CuentaSuprimida` en `identity-access` (paso 7). Purga coordinada y plano analítico, paso 14 |
 | [0031](../docs/03-adr/ADR-0031-residencia-de-datos-por-region.md) Residencia de datos por región | ➖ | La multirregión del paso 16 se simula en una sola jurisdicción; las clases de residencia no aplican |
 | [0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md) Internacionalización | 🟨 | Instantes en UTC con zona IANA aparte, en todo el modelo. Idioma y formateo, en los BFF (paso 11) |
 | [0033](../docs/03-adr/ADR-0033-capacidades-nativas-gps-y-degradacion.md) GPS en el móvil | ➖ | No hay cliente móvil nativo en el prototipo |
 | [0034](../docs/03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) Módulo avanzado y recorte del prototipo | 🟨 | El recorte guía este plan. La Opción B, pasos 18 y 19 |
-| [0035](../docs/03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) Buzones sin OAuth y formatos desconocidos | ⏳ | Pasos 8 y 9 |
+| [0035](../docs/03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) Buzones sin OAuth y formatos desconocidos | 🟨 | Alias de reenvío e `imapDelegado` con credencial delegada cifrada en `identity-access` (paso 7). Receptor `mail-ingest` y extractores, pasos 8 y 9 |
 | [0036](../docs/03-adr/ADR-0036-tecnologia-del-prototipo.md) Tecnología del prototipo | ✅ | Python 3.12, FastAPI, PostgreSQL, Redpanda y Docker Compose. Schemathesis, paso 17 |
 
 Además de los ADR: `preferences` se construye como servicio mínimo en el paso 12, porque su evento
@@ -241,7 +256,7 @@ implementa.
 | 4 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | ✅ |
 | 5 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | ✅ |
 | 6 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | ✅ |
-| 7 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | ⬜ |
+| 7 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | ✅ |
 | 8 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | ⬜ |
 | 9 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | ⬜ |
 | 10 | `provider-sync`: adaptador simulado, cortacircuitos, disrupciones | QA-10, ADR-0024 | ⬜ |
