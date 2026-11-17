@@ -1,5 +1,6 @@
 """Consolidación (ADR-0013): un caso por cada fila de la tabla de reglas, más cambios y contrato."""
 
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from ayudas import CREADA_EN, USUARIO, instante
@@ -250,3 +251,42 @@ def test_los_ids_de_segmentos_y_conflictos_no_dependen_del_orden(registrada):
     otra = _consolidada(*reversed(observaciones), fijados=[fijado])
 
     assert una.vista.conflictos and una.a_dict() == otra.a_dict()
+
+
+# --- Finalizada: 24 h después del fin del último tramo activo ------------------------------
+
+def test_la_reserva_se_finaliza_24_horas_despues_de_su_ultimo_tramo(registrada):
+    reserva = _consolidada(registrada())
+    fin = datetime(2026, 12, 1, 15, tzinfo=timezone.utc)  # el vuelo llega a las 15 h UTC
+
+    reconsolidar(reserva, fin + timedelta(hours=23, minutes=59))
+    assert reserva.estado == EstadoReserva.CONFIRMADA
+    version = reserva.version
+
+    resultado = reconsolidar(reserva, fin + timedelta(hours=24))
+    assert reserva.estado == EstadoReserva.FINALIZADA and reserva.version == version + 1
+    assert (resultado.estado_anterior, resultado.estado) == (EstadoReserva.CONFIRMADA,
+                                                             EstadoReserva.FINALIZADA)
+
+    # Una demora informada tarde corre el fin: la reserva vuelve a estar en curso.
+    reserva.registrar(registrada(version=instante(12), cambios={
+        "fin.instante": "2026-12-03T15:00:00Z"}))
+    reconsolidar(reserva, fin + timedelta(hours=24))
+    assert reserva.estado == EstadoReserva.CONFIRMADA
+
+
+def test_un_boleto_abierto_se_finaliza_al_dia_siguiente_del_fin_de_su_dia_local(registrada,
+                                                                                segmento_de_tren):
+    # El tren vale «el 5 de diciembre» en Buenos Aires (UTC-3): el día termina el 6 a las 3 h UTC.
+    reserva = _consolidada(registrada(segmentos=[segmento_de_tren], identificadores=()))
+
+    reconsolidar(reserva, datetime(2026, 12, 7, 2, 59, tzinfo=timezone.utc))
+    assert reserva.estado == EstadoReserva.CONFIRMADA
+    reconsolidar(reserva, datetime(2026, 12, 7, 3, tzinfo=timezone.utc))
+    assert reserva.estado == EstadoReserva.FINALIZADA
+
+
+def test_una_reserva_por_confirmar_no_se_finaliza(registrada):
+    reserva = _consolidada(registrada(banda="media"))
+    reconsolidar(reserva, datetime(2027, 1, 1, tzinfo=timezone.utc))
+    assert reserva.estado == EstadoReserva.POR_CONFIRMAR

@@ -60,6 +60,8 @@ from trotamundos.servicios.itinerary import (
     proyeccion_panel,
     publicacion,
 )
+from trotamundos.servicios.itinerary.fusion.consolidacion import reconsolidar
+from trotamundos.servicios.itinerary.fusion.eventos import eventos_del_cambio
 from trotamundos.servicios.itinerary.reservas import repositorio as reservas
 from trotamundos.servicios.itinerary.viajes import operaciones as viajes
 from trotamundos.servicios.itinerary.viajes import repositorio as repositorio_de_viajes
@@ -236,10 +238,12 @@ class Itinerary:
     # --- trabajo periódico ---------------------------------------------------------------
 
     def tareas_periodicas(self) -> None:
-        """Lo que corre cada `intervalo_tareas_s`: los eventos internos que quedaron sin
-        procesar, las transiciones por tiempo de los viajes (RF-08) y la purga de la bandeja
-        de entrada y las claves de idempotencia (ADR-0014)."""
+        """Lo que corre cada `intervalo_tareas_s`: las reservas que pasan a `Finalizada`, los
+        eventos internos que quedaron sin procesar (entre ellos, los de esas reservas), las
+        transiciones por tiempo de los viajes (RF-08) y la purga de la bandeja de entrada y las
+        claves de idempotencia (ADR-0014)."""
         ahora = self._reloj()
+        self._finalizar_reservas(ahora)
         with self._lectura() as conexion:
             pendientes = [f["usuario_id"] for f in conexion.execute(
                 "SELECT DISTINCT usuario_id FROM evento_interno").fetchall()]
@@ -260,6 +264,27 @@ class Itinerary:
                 repositorio.guardar(viaje)  # también si no cambió: recalcula la próxima transición
         with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
             purgar(conexion, ahora)
+
+    def _finalizar_reservas(self, ahora: datetime) -> None:
+        """Una transacción por reserva (ADR-0010): la marca `Finalizada` y publica
+        `ReservaActualizada`, que `viajes` procesa después como evento interno."""
+        with self._lectura() as conexion:
+            candidatas = reservas.RepositorioDeReservasPostgres(
+                conexion, self._registro).por_finalizar(ahora)
+        for usuario, reserva_id in candidatas:
+            with self._transaccion(usuario) as conexion:
+                repositorio = reservas.RepositorioDeReservasPostgres(conexion, self._registro)
+                reserva = repositorio.obtener(usuario, reserva_id)
+                if reserva is None:
+                    continue
+                version = reserva.version
+                consolidacion = reconsolidar(reserva, ahora)
+                if reserva.version == version:
+                    continue  # todavía no (un boleto abierto termina al final del día local)
+                repositorio.guardar(reserva)
+                self._publicar(conexion, usuario, eventos_del_cambio(
+                    reserva, consolidacion, None, Causa(region=self._configuracion.region), ahora,
+                    hubo_cambio=True))
 
     # --- API -----------------------------------------------------------------------------
 

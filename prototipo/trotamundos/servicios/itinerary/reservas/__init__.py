@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any, Iterable, Mapping
 from uuid import UUID
@@ -26,6 +26,7 @@ from trotamundos.comun.modelo import (
     Identificador,
     ObservacionCanonica,
     instante_a_texto,
+    limites_del_extremo,
 )
 from trotamundos.comun.tipos_de_segmento import RegistroDeTipos, registro_por_omision
 
@@ -59,6 +60,11 @@ class ReservaInvalida(ValueError):
 # de `ConflictoDeFuentes.campo` en `comun.yaml` (por ejemplo, `segmentos[0].inicio.instante`).
 # Las partes admiten cualquier carácter salvo los separadores de la ruta: las claves del detalle
 # las define cada descriptor, y un tipo nuevo no debe obligar a tocar este código (QA-15).
+# Una reserva confirmada pasa a `Finalizada` este tiempo después del fin de su último tramo
+# activo: el mismo margen con que el viaje pasa a `Completado` (iteración 2 §5.1), para que una
+# demora informada tarde no la haga ir y volver de estado. Supuesto a calibrar.
+MARGEN_DE_FINALIZACION = timedelta(hours=24)
+
 _CAMPO_FIJABLE = re.compile(r"^(cancelada|segmentos\[(0|[1-9]\d*)\]\.[^.\[\]]+(\.[^.\[\]]+)*)$")
 CAMPO_CANCELADA = "cancelada"
 
@@ -184,6 +190,7 @@ class Reserva:
         self._identificadores: set[Identificador] = set()
         self._confirmada_por_usuario = False
         self._descartada = False
+        self._finalizada = False
         self._vista: VistaConsolidada | None = None
         self._pendiente = False
 
@@ -192,7 +199,7 @@ class Reserva:
                   observaciones: Iterable[ObservacionRegistrada], fijados: Iterable[Fijado],
                   identificadores: Iterable[Identificador], confirmada_por_usuario: bool,
                   descartada: bool, vista: VistaConsolidada,
-                  registro: RegistroDeTipos | None = None) -> Reserva:
+                  registro: RegistroDeTipos | None = None, finalizada: bool = False) -> Reserva:
         """Reconstruye una reserva guardada, tal como quedó (sin validar de nuevo ni subir la
         versión): lo que se guardó ya cumplió las invariantes al entrar."""
         reserva = cls(id, usuario_id, creada_en, registro)
@@ -202,6 +209,7 @@ class Reserva:
         reserva._identificadores = set(identificadores)
         reserva._confirmada_por_usuario = confirmada_por_usuario
         reserva._descartada = descartada
+        reserva._finalizada = finalizada
         reserva._vista = vista
         reserva._estado_consolidado = reserva.estado
         return reserva
@@ -297,6 +305,17 @@ class Reserva:
             self._confirmada_por_usuario = True
             self._pendiente = True
 
+    def evaluar_finalizacion(self, vista: VistaConsolidada, ahora: datetime) -> None:
+        """`Finalizada` si pasó `MARGEN_DE_FINALIZACION` desde el fin de su último tramo activo
+        (o de cualquiera, si todos están cancelados). Si una fuente corre el fin para más
+        adelante, deja de estarlo. El estado solo lo muestra una reserva confirmada."""
+        tramos = [s for s in vista.segmentos if s.get("estado") != "cancelado"] or vista.segmentos
+        fin = max(limites_del_extremo(s["fin"])[1] for s in tramos)
+        finalizada = ahora >= fin + MARGEN_DE_FINALIZACION
+        if finalizada != self._finalizada:
+            self._finalizada = finalizada
+            self._pendiente = True
+
     # --- vista consolidada ---------------------------------------------------------------
 
     def establecer_vista(self, vista: VistaConsolidada) -> None:
@@ -353,6 +372,10 @@ class Reserva:
         return self._descartada
 
     @property
+    def finalizada(self) -> bool:
+        return self._finalizada
+
+    @property
     def identificadores(self) -> frozenset[Identificador]:
         return frozenset(self._identificadores)
 
@@ -377,8 +400,9 @@ class Reserva:
     def estado(self) -> EstadoReserva:
         """Sigue la máquina de estados de la iteración 2 §5.2: `PorConfirmar` → `Confirmada` →
         `Cancelada`. Una reserva por confirmar no pasa a `Cancelada` por datos de banda media,
-        que no disparan avisos críticos (ADR-0015). `Finalizada` depende del tiempo y la deriva el
-        ciclo de vida (paso 5 del prototipo)."""
+        que no disparan avisos críticos (ADR-0015). `Finalizada` depende del tiempo: la marca
+        `evaluar_finalizacion`, que corre en cada consolidación con hora y en el trabajo
+        periódico."""
         if self._descartada:
             return EstadoReserva.DESCARTADA
         if not (self._confirmada_por_usuario
@@ -386,6 +410,8 @@ class Reserva:
             return EstadoReserva.POR_CONFIRMAR
         if self.consolidada and self.vista.cancelada:
             return EstadoReserva.CANCELADA
+        if self._finalizada:
+            return EstadoReserva.FINALIZADA
         return EstadoReserva.CONFIRMADA
 
     def _exigir_estado(self, esperado: EstadoReserva) -> None:

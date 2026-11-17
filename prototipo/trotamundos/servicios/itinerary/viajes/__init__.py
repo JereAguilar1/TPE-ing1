@@ -16,13 +16,12 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any, Mapping
 from uuid import UUID
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from trotamundos.comun.modelo import RolEnViaje, instante_a_texto, instante_desde_texto
+from trotamundos.comun.modelo import RolEnViaje, instante_a_texto, limites_del_extremo
 from trotamundos.comun.tipos_de_segmento import RegistroDeTipos
 
 # Parámetros iniciales de la iteración 2 §5.11: supuestos a calibrar, no drivers.
@@ -71,25 +70,6 @@ def _distancia_km(a: Mapping[str, float], b: Mapping[str, float]) -> float:
     return 2 * 6371.0 * math.asin(math.sqrt(h))
 
 
-def _zona(nombre: str) -> ZoneInfo | timezone:
-    try:
-        return ZoneInfo(nombre)
-    except (ZoneInfoNotFoundError, ValueError):
-        return timezone.utc
-
-
-def _limites(extremo: Mapping[str, Any]) -> tuple[datetime, datetime]:
-    """El intervalo que cubre un extremo. Con `precision: dia` (boleto abierto) es el día local
-    entero; el instante es la medianoche UTC de esa fecha (ver el README del prototipo)."""
-    instante = instante_desde_texto(extremo["instante"])
-    if extremo["precision"] != "dia":
-        return instante, instante
-    zona = _zona(extremo["zonaHoraria"])
-    dia: date = instante.date()
-    return (datetime.combine(dia, time(), zona).astimezone(timezone.utc),
-            datetime.combine(dia + timedelta(days=1), time(), zona).astimezone(timezone.utc))
-
-
 # --- lo que el viaje sabe de cada reserva ----------------------------------------------------
 
 @dataclass(frozen=True)
@@ -132,8 +112,8 @@ class ResumenDeReserva:
     def tramos(self, registro: RegistroDeTipos) -> list[Tramo]:
         tramos = []
         for s in self.segmentos:
-            inicio, _ = _limites(s["inicio"])
-            _, fin = _limites(s["fin"])
+            inicio, _ = limites_del_extremo(s["inicio"])
+            _, fin = limites_del_extremo(s["fin"])
             tramos.append(Tramo(registro.rol(s["tipo"], s["versionTipo"]), inicio, fin,
                                 s["inicio"]["lugar"], s["fin"]["lugar"],
                                 self.cancelada or s["estado"] == "cancelado"))

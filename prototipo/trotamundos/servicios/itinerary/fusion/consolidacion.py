@@ -32,6 +32,7 @@ from __future__ import annotations
 import copy
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Iterable, Mapping
 from uuid import UUID, uuid5
 
@@ -295,14 +296,17 @@ class Consolidacion:
         return self.estado == EstadoReserva.CANCELADA != self.estado_anterior
 
 
-def reconsolidar(reserva: Reserva) -> Consolidacion:
+def reconsolidar(reserva: Reserva, ahora: datetime | None = None) -> Consolidacion:
     """Recalcula la vista de la reserva a partir de sus entradas y la guarda en el agregado.
+    Con `ahora`, también si está finalizada (el único dato del estado que depende del tiempo).
 
     Una reserva recién creada no informa cambios campo por campo: todo es nuevo.
     """
     anterior, estado_anterior = (reserva.vista, reserva.estado_consolidado) if reserva.consolidada \
         else (None, None)
     nueva = consolidar(reserva.id, reserva.observaciones, reserva.fijados, reserva.registro)
+    if ahora is not None:
+        reserva.evaluar_finalizacion(nueva, ahora)
     reserva.establecer_vista(nueva)
     if anterior is None:
         return Consolidacion((), nueva.conflictos, None, reserva.estado)

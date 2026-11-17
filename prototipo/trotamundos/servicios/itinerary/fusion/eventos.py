@@ -25,11 +25,13 @@ from trotamundos.servicios.itinerary.reservas import CAMPO_CANCELADA, Reserva
 PRODUCTOR = "itinerary"
 
 
-def eventos_del_cambio(reserva: Reserva, consolidacion: Consolidacion, fuente: Fuente,
+def eventos_del_cambio(reserva: Reserva, consolidacion: Consolidacion, fuente: Fuente | None,
                        causa: Causa, ahora: datetime, *, hubo_cambio: bool, creada: bool = False,
                        unificadas: Iterable[Reserva] = ()) -> list[Evento]:
     """Eventos de un cambio ya consolidado. `fuente` es quien lo provocó (para el cambio de
-    estado y la cancelación, si la vista no dice otra cosa)."""
+    estado y la cancelación, si la vista no dice otra cosa). Es `None` cuando lo provocó el
+    paso del tiempo (`Finalizada`): el contrato pide una fuente por cambio, así que el nuevo
+    estado se lee en la reserva publicada y no se lista en `cambios`."""
     def nuevo(tipo: str, carga: dict) -> Evento:
         return Evento.nuevo(tipo, carga, productor=PRODUCTOR, usuario_id=str(reserva.usuario_id),
                             region=causa.region, id_de_causa=causa.id_de_causa,
@@ -39,7 +41,7 @@ def eventos_del_cambio(reserva: Reserva, consolidacion: Consolidacion, fuente: F
     eventos: list[Evento] = []
     if hubo_cambio:
         cambios = list(consolidacion.cambios)
-        if consolidacion.estado_anterior not in (None, consolidacion.estado):
+        if fuente is not None and consolidacion.estado_anterior not in (None, consolidacion.estado):
             cambios.append(Cambio("estado", consolidacion.estado_anterior.value,
                                   consolidacion.estado.value, fuente))
         carga = {"reserva": reserva.a_dict(), "creada": creada,

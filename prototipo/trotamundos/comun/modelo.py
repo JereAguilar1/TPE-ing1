@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from enum import StrEnum
 from typing import Any, Mapping
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 class Fuente(StrEnum):
@@ -73,6 +74,26 @@ def instante_a_texto(instante: datetime) -> str:
     else:
         especificacion = "microseconds"
     return utc.replace(tzinfo=None).isoformat(timespec=especificacion) + "Z"
+
+
+def _zona(nombre: str) -> ZoneInfo | timezone:
+    try:
+        return ZoneInfo(nombre)
+    except (ZoneInfoNotFoundError, ValueError):
+        return timezone.utc
+
+
+def limites_del_extremo(extremo: Mapping[str, Any]) -> tuple[datetime, datetime]:
+    """El intervalo que cubre un extremo (con la forma de `Extremo` del contrato). Con
+    `precision: dia` (boleto abierto) es el día local entero; el instante es la medianoche UTC de
+    esa fecha (ver el README del prototipo)."""
+    instante = instante_desde_texto(extremo["instante"])
+    if extremo["precision"] != Precision.DIA:
+        return instante, instante
+    zona = _zona(extremo["zonaHoraria"])
+    dia: date = instante.date()
+    return (datetime.combine(dia, time(), zona).astimezone(timezone.utc),
+            datetime.combine(dia + timedelta(days=1), time(), zona).astimezone(timezone.utc))
 
 
 def _sin_nulos(campos: dict[str, Any]) -> dict[str, Any]:

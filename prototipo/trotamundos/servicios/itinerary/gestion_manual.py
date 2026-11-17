@@ -248,7 +248,7 @@ def _vigente(ctx: Contexto, reserva_id: UUID) -> Reserva:
 def _cerrar(ctx: Contexto, reserva: Reserva,
             duplicados: tuple[PosibleDuplicado, ...] = ()) -> Resultado:
     version = reserva.version
-    consolidacion = reconsolidar(reserva)
+    consolidacion = reconsolidar(reserva, ctx.ahora)
     ctx.repositorio.guardar(reserva)
     eventos = eventos_del_cambio(reserva, consolidacion, Fuente.MANUAL, ctx.causa, ctx.ahora,
                                  hubo_cambio=reserva.version != version)

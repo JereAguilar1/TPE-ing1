@@ -396,3 +396,28 @@ def test_el_viaje_guarda_el_cambio_de_una_reserva_aunque_no_cambie_su_periodo(it
 
     itinerary.eliminar_reserva(USUARIO, c["reserva"]["id"])
     assert itinerary.leer_viaje(USUARIO, a["viajeId"])["hasta"] == "2026-12-03T15:00:00Z"
+
+
+def test_el_trabajo_periodico_finaliza_la_reserva_y_lo_publica(itinerary, alta):
+    """`Finalizada` 24 h después del último tramo (el vuelo llega el 1/12 a las 15 h UTC). Lo
+    provoca el paso del tiempo: `ReservaActualizada` no lo lista en `cambios`, que pide fuente."""
+    _, creada = itinerary.crear_reserva(USUARIO, uuid4(), alta)
+    reserva_id = creada["reserva"]["id"]
+
+    itinerary.reloj["ahora"] = datetime(2026, 12, 2, 14, 59, tzinfo=timezone.utc)
+    itinerary.tareas_periodicas()
+    assert itinerary.leer_reserva(USUARIO, reserva_id)["estado"] == "Confirmada"
+
+    itinerary.reloj["ahora"] = datetime(2026, 12, 2, 15, tzinfo=timezone.utc)
+    itinerary.tareas_periodicas()
+    assert itinerary.leer_reserva(USUARIO, reserva_id)["estado"] == "Finalizada"
+    [evento] = [f for f in _filas(itinerary, "SELECT carga FROM bandeja_salida WHERE tipo = "
+                                              "'ReservaActualizada' ORDER BY seq")
+                if f["carga"]["reserva"]["estado"] == "Finalizada"]
+    assert evento["carga"]["cambios"] == []
+    # El viaje sigue teniéndola y guarda su estado nuevo.
+    [miembro] = _filas(itinerary, "SELECT resumen FROM viaje_reserva")
+    assert miembro["resumen"]["estado"] == "Finalizada"
+
+    itinerary.tareas_periodicas()  # ya finalizada: no se publica de nuevo
+    assert len(_filas(itinerary, "SELECT 1 FROM bandeja_salida WHERE tipo = 'ReservaActualizada'")) == 2

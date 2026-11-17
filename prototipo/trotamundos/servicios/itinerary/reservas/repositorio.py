@@ -33,8 +33,10 @@ from trotamundos.comun.modelo import (
 )
 from trotamundos.comun.tipos_de_segmento import RegistroDeTipos
 from trotamundos.servicios.itinerary.reservas import (
+    MARGEN_DE_FINALIZACION,
     Banda,
     ConflictoDeFuentes,
+    EstadoReserva,
     Fijado,
     ObservacionRegistrada,
     Reserva,
@@ -57,6 +59,7 @@ DDL = (
         fijados                jsonb       NOT NULL,
         PRIMARY KEY (usuario_id, reserva_id)
     );
+    ALTER TABLE reserva ADD COLUMN IF NOT EXISTS finalizada boolean NOT NULL DEFAULT false;
     """,
     """
     CREATE TABLE IF NOT EXISTS reserva_identificador (
@@ -175,6 +178,22 @@ class RepositorioDeReservasPostgres:
             (str(usuario_id), inicio, fin)).fetchall()
         return [r for f in filas if (r := self.obtener(usuario_id, f["reserva_id"])) is not None]
 
+    def por_finalizar(self, ahora: datetime, limite: int = 500) -> list[tuple[UUID, UUID]]:
+        """Pares (usuario, reserva) confirmadas cuyo último tramo activo terminó hace más de
+        `MARGEN_DE_FINALIZACION`. Mira el instante del fin, que nunca es posterior al fin real
+        (con `precision: dia` el día local termina después), así que puede devolver de más:
+        `Reserva.evaluar_finalizacion` decide."""
+        filas = self._conexion.execute(
+            """SELECT r.usuario_id, r.reserva_id
+               FROM reserva r JOIN segmento s USING (usuario_id, reserva_id)
+               WHERE r.estado = %s
+               GROUP BY r.usuario_id, r.reserva_id
+               HAVING coalesce(max(s.fin_instante) FILTER (WHERE s.estado <> 'cancelado'),
+                               max(s.fin_instante)) <= %s
+               ORDER BY r.usuario_id, r.reserva_id LIMIT %s""",
+            (EstadoReserva.CONFIRMADA.value, ahora - MARGEN_DE_FINALIZACION, limite)).fetchall()
+        return [(f["usuario_id"], f["reserva_id"]) for f in filas]
+
     # --- escritura -----------------------------------------------------------------------
 
     def guardar(self, reserva: Reserva) -> None:
@@ -183,15 +202,16 @@ class RepositorioDeReservasPostgres:
         vista = reserva.vista
         c.execute(
             """INSERT INTO reserva (usuario_id, reserva_id, estado, version, creada_en, cancelada,
-                                    confirmada_por_usuario, descartada, fijados)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    confirmada_por_usuario, descartada, finalizada, fijados)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                ON CONFLICT (usuario_id, reserva_id) DO UPDATE SET
                    estado = EXCLUDED.estado, version = EXCLUDED.version,
                    cancelada = EXCLUDED.cancelada, actualizada_en = now(),
                    confirmada_por_usuario = EXCLUDED.confirmada_por_usuario,
-                   descartada = EXCLUDED.descartada, fijados = EXCLUDED.fijados""",
+                   descartada = EXCLUDED.descartada, finalizada = EXCLUDED.finalizada,
+                   fijados = EXCLUDED.fijados""",
             (u, r, reserva.estado.value, reserva.version, reserva.creada_en, vista.cancelada,
-             reserva.confirmada_por_usuario, reserva.descartada,
+             reserva.confirmada_por_usuario, reserva.descartada, reserva.finalizada,
              Jsonb({f.campo: {"valor": f.valor, "fijadoEn": instante_a_texto(f.fijado_en)}
                     for f in reserva.fijados.values()})))
 
@@ -281,7 +301,8 @@ class RepositorioDeReservasPostgres:
             identificadores=[Identificador(i["emisor"], i["codigo"])
                              for i in self._todas("reserva_identificador", fila, "emisor, codigo")],
             confirmada_por_usuario=fila["confirmada_por_usuario"],
-            descartada=fila["descartada"], vista=vista, registro=self._registro)
+            descartada=fila["descartada"], vista=vista, registro=self._registro,
+            finalizada=fila["finalizada"])
 
 
 def _extremo_a_columnas(extremo: Mapping[str, Any]) -> tuple:

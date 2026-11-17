@@ -121,7 +121,7 @@ def ingerir(repositorio: RepositorioDeReservas, usuario_id: UUID, registrada: Ob
 
     aplicada = reserva.registrar(registrada)
     reserva.agregar_identificadores(set(registrada.observacion.identificadores) - ajenos)
-    consolidacion = reconsolidar(reserva)
+    consolidacion = reconsolidar(reserva, ahora)
 
     if creada:
         fechas = [fecha_local(s["inicio"]) for s in reserva.vista.segmentos]
