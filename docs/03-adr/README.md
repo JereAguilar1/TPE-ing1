@@ -95,14 +95,15 @@ El análisis comparativo de estas decisiones está en
 
 ### 2da entrega — Iteración 5 (Opción B: asistente virtual)
 
-Decisiones D37 a D40, con sus alternativas en [Iteración 5 — Paso 4](../02-proceso-add/iteracion-5/paso-4-alternativas.md).
+Decisiones D37 a D41, con sus alternativas en [Iteración 5 — Paso 4](../02-proceso-add/iteracion-5/paso-4-alternativas.md).
 
 | ADR | Decisión | Estado | Drivers principales |
 |---|---|---|---|
-| [ADR-0037](ADR-0037-interpretacion-de-intenciones-del-asistente.md) | El asistente entiende por intenciones detrás de un intérprete intercambiable: reglas en el prototipo y un modelo de lenguaje enchufable con datos redactados | `aceptado` | RF-B1, RF-B2, QA-14, QA-16, CON-10 |
-| [ADR-0038](ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md) | Consultas directas y corrección del itinerario solo con confirmación explícita; los cambios ante el proveedor no los hace | `aceptado` | RF-B1, RF-06, CON-06, QA-12 |
+| [ADR-0037](ADR-0037-interpretacion-de-intenciones-del-asistente.md) | El asistente entiende por intenciones detrás de un intérprete intercambiable: reglas en el prototipo y un modelo de lenguaje enchufable con datos redactados; patrones y mensajes en catálogos por idioma | `aceptado` | RF-B1, RF-B2, QA-14, QA-16, QA-18, CON-10 |
+| [ADR-0038](ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md) | Consultas directas; corrección del itinerario y problemas menores (reservas por confirmar y conflictos) solo con confirmación explícita; los cambios ante el proveedor no los hace | `aceptado` | RF-B1, RF-06, QA-11, CON-06, QA-12 |
 | [ADR-0039](ADR-0039-politica-de-derivacion-a-la-agencia.md) | Cuatro disparadores de derivación a la agencia, con confirmación y caso idempotente por `POST /casos` | `aceptado` | RF-B2, RF-12, CON-06, CRN-12 |
 | [ADR-0040](ADR-0040-sesion-conversacional-y-privacidad.md) | Sesión conversacional mínima de 30 días, supresión de fase 1 por `usuario_id` y disrupciones por evento (precisa a ADR-0034) | `aceptado` | RF-B1, QA-14, CON-10, QA-12 |
+| [ADR-0041](ADR-0041-alias-de-reenvio-generado-por-identity-access.md) | El alias de reenvío lo genera `identity-access` al conectar el buzón y `mail-ingest` lo recibe por evento (precisa a ADR-0035) | `aceptado` | CON-08, RF-01, QA-13, CON-04 |
 
 ## Plantilla
 

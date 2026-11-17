@@ -1,11 +1,11 @@
 # Iteración 5 — Diseñar el módulo avanzado: asistente virtual (Opción B)
 
-> **Estado:** ✅ Completa · **Fecha:** 2026-11-17 · **Responsable de la iteración:** Francisco Lozano · **Aprobación:** el profesor aceptó una iteración 5 y ADR nuevos para la Opción B (2026-11-16)
+> **Estado:** ✅ Completa · **Fecha:** 2026-11-17 · **Responsable de la iteración:** Francisco Lozano · **Participantes:** los cuatro integrantes, que tomaron juntos las decisiones D37 a D41 · **Aprobación:** el profesor aceptó una iteración 5 y ADR nuevos para la Opción B (2026-11-16)
 
 | Página de esta iteración | Contenido |
 |---|---|
 | Esta página | Plan, pasos 1, 2, 3, 5 y 6 del método, vista de módulos del asistente y sus secuencias |
-| [Paso 4 — Conceptos de diseño y alternativas](paso-4-alternativas.md) | Las 4 decisiones de la iteración (D37 a D40), con las alternativas evaluadas y descartadas |
+| [Paso 4 — Conceptos de diseño y alternativas](paso-4-alternativas.md) | Las 5 decisiones de la iteración (D37 a D41), con las alternativas evaluadas y descartadas |
 | [Paso 7 — Análisis y kanban](paso-7-analisis.md) | Criterios de salida, estado de los drivers, inconsistencias encontradas en la 1ra entrega y riesgos |
 
 ---
@@ -19,7 +19,7 @@ la 2da entrega, esta iteración diseña ese interior.
 
 | Criterio de salida | Cómo se verifica |
 |---|---|
-| 1. Cada decisión del interior del asistente tiene su ADR en MADR | ADR-0037 a ADR-0040 en `docs/03-adr` |
+| 1. Cada decisión del interior del asistente tiene su ADR en MADR | ADR-0037 a ADR-0040 en `docs/03-adr` (más ADR-0041, que precisa una inconsistencia de ADR-0035) |
 | 2. El asistente tiene contrato antes de tener código (`CON-04`) | `contratos/openapi/virtual-assistant.yaml`, validado con `openapi-spec-validator` |
 | 3. Cero interfaces nuevas en servicios existentes (`CON-06`) | El asistente solo usa operaciones que ya estaban en `itinerary.yaml` y `support-liaison.yaml` |
 | 4. `RF-B1` y `RF-B2` quedan trazados a decisiones | Kanban del [paso 7](paso-7-analisis.md) |
@@ -35,7 +35,7 @@ la 2da entrega, esta iteración diseña ese interior.
 | **Requisitos funcionales** | **RF-B1** (consultas de estado, reprogramaciones y problemas menores) y **RF-B2** (derivar a la agencia solo lo que el bot no resuelve), registrados en la 1ra entrega sin diseñar | [1.3](../../01-analisis-inicial/03-requisitos-funcionales.md#requisitos-funcionales-de-la-2da-entrega) |
 | **Restricciones** | **CON-06** (al menos un módulo avanzado), **CON-05** (alcance acotado), **CON-04** (*spec-driven*), **CON-10** (datos personales), **CON-A4** (`< 15` elementos) | [1.5](../../01-analisis-inicial/05-restricciones.md) |
 | **Decisiones heredadas** | La frontera del elemento nº 14 ([ADR-0034](../../03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md)); `POST /casos` idempotente (RF-12); edición manual con fijados y conflictos ([ADR-0013](../../03-adr/ADR-0013-deduplicacion-y-conflictos.md)); supresión en dos fases ([ADR-0030](../../03-adr/ADR-0030-auditoria-y-supresion-datos-personales.md)); degradación por niveles ([ADR-0020](../../03-adr/ADR-0020-contrapresion-y-sobrecarga.md)) | `docs/03-adr` |
-| **Contratos existentes** | `GET /viajes`, `GET /viajes/{id}` y `PUT /reservas/{id}` de `itinerary`; `POST /casos` de `support-liaison`; `DisrupcionDetectada` | [`contratos/`](../../../contratos/README.md) |
+| **Contratos existentes** | `GET /panel`, `GET /viajes`, `GET /viajes/{id}`, `PUT /reservas/{id}` y los comandos de confirmación y de conflictos de `itinerary`; `POST /casos` de `support-liaison`; `DisrupcionDetectada` | [`contratos/`](../../../contratos/README.md) |
 | **Estado del prototipo** | Pasos 1 a 8 construidos: `itinerary`, `identity-access` y `mail-ingest` | [plan del prototipo](../../../prototipo/README.md#plan-de-construcción) |
 
 ### Lo que las entradas dicen antes de diseñar nada
@@ -50,6 +50,11 @@ la 2da entrega, esta iteración diseña ese interior.
 3. **ADR-0034 tiene un punto que no se puede aplicar tal como está escrito:** suscribirse a
    `CuentaSuprimida` para borrar el estado propio, cuando ese evento no trae el `usuarioId`. Se
    resuelve en D40 (ver también el [paso 7](paso-7-analisis.md#inconsistencias-encontradas-en-la-1ra-entrega)).
+4. **«Problemas menores» tiene que significar algo concreto.** El itinerario ya tiene dos situaciones
+   que esperan una decisión del viajero y que `itinerary` sabe resolver: una reserva por confirmar
+   (banda media, [ADR-0015](../../03-adr/ADR-0015-politica-de-confianza-de-extraccion.md)) y un
+   conflicto entre fuentes ([ADR-0013](../../03-adr/ADR-0013-deduplicacion-y-conflictos.md)). El
+   asistente puede guiar al viajero en las dos sin interfaces nuevas.
 
 ---
 
@@ -62,11 +67,12 @@ la 2da entrega, esta iteración diseña ese interior.
 
 | Driver | Estado al empezar | Qué debe lograr esta iteración |
 |---|---|---|
-| **RF-B1** | ⬜ registrado, sin diseñar | Intenciones que entiende, consultas de estado y corrección confirmada del itinerario |
+| **RF-B1** | ⬜ registrado, sin diseñar | Intenciones que entiende, consultas de estado, corrección confirmada del itinerario y problemas menores (reservas por confirmar y conflictos) |
 | **RF-B2** | ⬜ registrado, sin diseñar | Disparadores explícitos de derivación y caso idempotente |
 | **CON-06** | 🟨 verificado en papel | Interior diseñado y contrato publicado, sin tocar la frontera |
 | **QA-14 / CON-10** | 🟩 en el resto del sistema | Que la conversación no sea una fuga de datos personales: retención, supresión y nada a terceros |
 | **QA-04** | 🟩 | Que el asistente sea carga degradable y no compita con `itinerary` |
+| **QA-18 / CRN-10** | 🟩 | Que el asistente no tenga textos para el usuario fijos en el código ([ADR-0032](../../03-adr/ADR-0032-internacionalizacion-y-localizacion.md)) |
 | **QA-12** | 🟩 | Que una sesión o una reserva ajena respondan como inexistentes |
 | **CON-01** | ✅ cuatro iteraciones | Quinta iteración, para la 2da entrega |
 
@@ -91,10 +97,11 @@ de un evento que ya existía.
 
 | # | Decisión | Concepto elegido | ADR |
 |---|---|---|---|
-| D37 | Cómo entiende al viajero | Puerto `InterpreteDeIntenciones`: reglas en el prototipo, modelo de lenguaje enchufable con datos redactados | [ADR-0037](../../03-adr/ADR-0037-interpretacion-de-intenciones-del-asistente.md) |
-| D38 | Qué resuelve solo | Consultas directas; corrección del itinerario propuesta y confirmada; cambios ante el proveedor, derivados | [ADR-0038](../../03-adr/ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md) |
+| D37 | Cómo entiende al viajero | Puerto `InterpreteDeIntenciones`: reglas en el prototipo, modelo de lenguaje enchufable con datos redactados; patrones y mensajes en catálogos por idioma | [ADR-0037](../../03-adr/ADR-0037-interpretacion-de-intenciones-del-asistente.md) |
+| D38 | Qué resuelve solo | Consultas directas; corrección del itinerario y problemas menores, propuestos y confirmados; cambios ante el proveedor, derivados | [ADR-0038](../../03-adr/ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md) |
 | D39 | Cuándo deriva | Cuatro disparadores explícitos, con confirmación, por `POST /casos` | [ADR-0039](../../03-adr/ADR-0039-politica-de-derivacion-a-la-agencia.md) |
 | D40 | Qué recuerda | Sesión propia y mínima, 30 días, supresión de fase 1, disrupciones por evento | [ADR-0040](../../03-adr/ADR-0040-sesion-conversacional-y-privacidad.md) |
+| D41 | Quién genera el alias de reenvío (precisión de ADR-0035) | `identity-access`, al conectar el buzón; `mail-ingest` lo recibe por evento | [ADR-0041](../../03-adr/ADR-0041-alias-de-reenvio-generado-por-identity-access.md) |
 
 ---
 
@@ -111,23 +118,26 @@ flowchart LR
         direction LR
         API --> DIA["dialogo<br/><i>un turno: entender,<br/>decidir, responder</i>"]
         DIA --> INT["interprete<br/><i>puerto + reglas</i>"]
-        DIA --> ACC["acciones<br/><i>proponer · confirmar ·<br/>corregir reserva</i>"]
+        DIA --> ACC["acciones<br/><i>proponer · confirmar · corregir ·<br/>problemas menores</i>"]
         DIA --> DER["derivacion<br/><i>disparadores · caso</i>"]
         DIA --> SES["sesiones<br/><i>turnos · acción pendiente ·<br/>retención</i>"]
-        DIA --> CTX["contexto<br/><i>viajes del viajero ·<br/>disrupciones conocidas</i>"]
+        DIA --> CTX["contexto<br/><i>panel y viajes del viajero ·<br/>disrupciones conocidas</i>"]
+        DIA --> CAT[("catálogos por idioma<br/><i>patrones y mensajes</i>")]
+        INT --> CAT
         INT -. "enchufable" .-> LLM["complementos/<br/>modelo de lenguaje<br/><i>(diseñado, no construido)</i>"]
     end
 
-    CTX -->|"GET /viajes · GET /viajes/{id}"| ITR["itinerary-lectura"]
-    ACC -->|"PUT /reservas/{id}"| ITW["itinerary-escritura"]
+    CTX -->|"GET /panel · GET /viajes · GET /viajes/{id}"| ITR["itinerary-lectura"]
+    ACC -->|"PUT /reservas/{id} · confirmacion · resolucion"| ITW["itinerary-escritura"]
     DER -->|"POST /casos"| SUP["support-liaison"]
 
     subgraph LEYENDA["Leyenda — tipos de elemento"]
         direction LR
         LEY_MOD["módulo interno"]
+        LEY_REC[("recurso estático")]
         LEY_EXT(["elemento o evento externo"])
         LEY_FUT["previsto, no construido"]
-        LEY_MOD ~~~ LEY_EXT ~~~ LEY_FUT
+        LEY_MOD ~~~ LEY_REC ~~~ LEY_EXT ~~~ LEY_FUT
     end
     style LLM stroke-dasharray: 5 5
     style LEY_FUT stroke-dasharray: 5 5
@@ -139,6 +149,7 @@ flowchart LR
 | Notación | Significado en esta vista |
 |---|---|
 | Rectángulo | **Módulo interno** de `virtual-assistant` |
+| Cilindro | **Recurso estático**: catálogos de patrones y de mensajes por idioma, sin lógica (ADR-0032, ADR-0037) |
 | Rectángulo punteado | Complemento **previsto y no construido** (el adaptador de modelo de lenguaje, ADR-0037) |
 | Óvalo | Elemento o evento externo al asistente |
 | `-->` flecha | Dependencia «usa a» (o llamada HTTP, si está rotulada con la operación) |
@@ -147,18 +158,21 @@ flowchart LR
 | Módulo | Responsabilidad única | Drivers | ADR |
 |---|---|---|---|
 | `api` | Expone `virtual-assistant.yaml`, valida cuerpos y verifica la sesión del viajero | CON-04, QA-12 | ADR-0028, ADR-0034 |
-| `dialogo` | Atiende un turno: interpreta, consulta el contexto, decide si responde, propone o deriva, y registra el turno | RF-B1, RF-B2 | ADR-0038, ADR-0039 |
+| `dialogo` | Atiende un turno: interpreta, consulta el contexto, decide si responde, propone o deriva, y registra el turno. Sus textos salen del catálogo de mensajes | RF-B1, RF-B2, QA-18 | ADR-0037, ADR-0038, ADR-0039 |
 | `interprete` | Puerto `InterpreteDeIntenciones` y su implementación por reglas: intención, entidades y confianza | RF-B1, QA-14 | ADR-0037 |
-| `acciones` | Arma la corrección de una reserva, la propone con vencimiento y la ejecuta solo con confirmación | RF-B1, RF-06 | ADR-0038 |
+| `acciones` | Arma la corrección de una reserva o la resolución de un problema menor (confirmar o descartar una reserva por confirmar, resolver un conflicto), la propone con vencimiento y la ejecuta solo con confirmación | RF-B1, RF-06, QA-11 | ADR-0038 |
 | `derivacion` | Evalúa los cuatro disparadores, arma la síntesis y abre el caso idempotente | RF-B2, RF-12 | ADR-0039 |
-| `contexto` | Lee los viajes del viajero en `itinerary` y mantiene la proyección de disrupciones (consume `DisrupcionDetectada`) | RF-B1, RF-B2 | ADR-0038, ADR-0040 |
+| `contexto` | Lee el panel del viajero (viajes, reservas por confirmar y conflictos abiertos) y sus viajes en `itinerary`, y mantiene la proyección de disrupciones (consume `DisrupcionDetectada`) | RF-B1, RF-B2 | ADR-0038, ADR-0040 |
 | `sesiones` | Sesiones y turnos particionados por `usuario_id`, acción pendiente y retención de 30 días | QA-14, CON-10 | ADR-0040 |
+| `catalogos/` (recurso) | Patrones de cada intención y mensajes `ICU MessageFormat` por idioma; el prototipo trae solo español | QA-18, CRN-10 | ADR-0032, ADR-0037 |
 | `complementos/` | Adaptador de modelo de lenguaje con redacción de datos personales (previsto) | RF-B1, QA-14 | ADR-0037 |
 
 **Reglas de dependencia del asistente.** Ningún módulo salvo `interprete` sabe cómo se interpreta un
-texto; solo `contexto`, `acciones` y `derivacion` hablan con otros servicios, cada uno con una sola
-operación de un solo servicio; el asistente no importa código de ningún otro servicio (regla de
-`ADR-0001`, verificada por `tests/test_arquitectura.py`).
+texto, y ningún texto para el viajero está fuera de los catálogos. Solo `contexto`, `acciones` y
+`derivacion` hablan con otros servicios, y cada uno con uno solo: `contexto` lee de
+`itinerary-lectura`, `acciones` escribe en `itinerary-escritura` y `derivacion` abre casos en
+`support-liaison`. El asistente no importa código de ningún otro servicio (regla de `ADR-0001`,
+verificada por `tests/test_arquitectura.py`).
 
 ### 5.2 Intenciones que entiende
 
@@ -168,6 +182,8 @@ operación de un solo servicio; el asistente no importa código de ningún otro 
 | `estadoDelViaje` | «¿cómo está mi viaje a Mendoza?» | Resume el viaje, sus reservas y conflictos abiertos | ADR-0038 |
 | `proximoTramo` | «¿a qué hora sale mi vuelo?» | Responde el próximo tramo, con hora local y disrupciones conocidas | ADR-0038 |
 | `corregirHorario` | «me pasaron el vuelo AR1402 al jueves a las 18:30» | Propone la corrección; con confirmación, `PUT /reservas/{id}` | ADR-0038 |
+| `confirmarReserva` | «¿qué es esta reserva por confirmar?», «tengo un hotel para confirmar» | Muestra la reserva por confirmar y propone confirmarla o descartarla; con confirmación, `POST /reservas/{id}/confirmacion` | ADR-0038 |
+| `resolverConflicto` | «¿por qué dice que hay un conflicto?», «quedate con el horario de la aerolínea» | Muestra los dos valores en conflicto y propone mantener el del viajero o aceptar el de la fuente; con confirmación, `POST /reservas/{id}/conflictos/{cid}/resolucion` | ADR-0038 |
 | `cambioAnteProveedor` | «quiero cambiar el vuelo con la aerolínea», «quiero un reembolso» | Propone derivar a la agencia | ADR-0039 |
 | `pedirAgencia` | «quiero hablar con mi agencia», «con una persona» | Propone derivar a la agencia | ADR-0039 |
 | `confirmacion` | Una `confirmacion` del cuerpo, o «sí» con una acción pendiente | Ejecuta o descarta la acción pendiente | ADR-0038 |
@@ -233,7 +249,7 @@ sequenceDiagram
     V->>A: «¿qué pasa con mi vuelo?»
     A-->>V: «Tu vuelo fue cancelado por el proveedor.» + accionPropuesta (derivarALaAgencia)
     V->>A: confirmacion { accionId, confirmar }
-    A->>S: POST /casos (Idempotency-Key de la acción, motivo cancelacion, idDeCausa)
+    A->>S: POST /casos (Idempotency-Key de la acción, motivo otro, descripción e idDeCausa)
     S-->>A: 201 Caso (agencia, estado Derivado)
     A-->>V: accionRealizada (derivarALaAgencia, casoId, agencia)
 ```
@@ -243,7 +259,7 @@ sequenceDiagram
 | Interfaz | Contrato | Novedad |
 |---|---|---|
 | API del asistente (solo para los BFF) | [`virtual-assistant.yaml`](../../../contratos/openapi/virtual-assistant.yaml) 1.0.0 | **Nueva**, del elemento nº 14 |
-| `GET /viajes`, `GET /viajes/{id}`, `PUT /reservas/{id}` | [`itinerary.yaml`](../../../contratos/openapi/itinerary.yaml) | Sin cambios |
+| `GET /panel`, `GET /viajes`, `GET /viajes/{id}`, `PUT /reservas/{id}`, `POST /reservas/{id}/confirmacion`, `POST /reservas/{id}/conflictos/{cid}/resolucion` | [`itinerary.yaml`](../../../contratos/openapi/itinerary.yaml) | Sin cambios |
 | `POST /casos` | [`support-liaison.yaml`](../../../contratos/openapi/support-liaison.yaml) | Sin cambios |
 | `DisrupcionDetectada` | [`eventos-de-dominio.yaml`](../../../contratos/asyncapi/eventos-de-dominio.yaml) 1.5.0 | Suma a `virtual-assistant` como consumidor |
 
@@ -279,9 +295,10 @@ página:
 | ADR | Decisión |
 |---|---|
 | [ADR-0037](../../03-adr/ADR-0037-interpretacion-de-intenciones-del-asistente.md) | Intérprete intercambiable: reglas en el prototipo, modelo de lenguaje enchufable con datos redactados |
-| [ADR-0038](../../03-adr/ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md) | Consultas directas y corrección del itinerario solo con confirmación explícita |
+| [ADR-0038](../../03-adr/ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md) | Consultas directas; corrección del itinerario y problemas menores solo con confirmación explícita |
 | [ADR-0039](../../03-adr/ADR-0039-politica-de-derivacion-a-la-agencia.md) | Cuatro disparadores de derivación, con confirmación y caso idempotente |
 | [ADR-0040](../../03-adr/ADR-0040-sesion-conversacional-y-privacidad.md) | Sesión mínima de 30 días, supresión de fase 1 y disrupciones por evento (precisa a ADR-0034) |
+| [ADR-0041](../../03-adr/ADR-0041-alias-de-reenvio-generado-por-identity-access.md) | El alias de reenvío lo genera `identity-access` (precisa a ADR-0035) |
 
 ---
 

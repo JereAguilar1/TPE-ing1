@@ -35,6 +35,7 @@ se anuncia la elegida), y el paso 7 es donde se verifica honestamente qué qued�
 | [**Iteración 2**](iteracion-2/README.md) | Identificar las estructuras que soportan la funcionalidad primaria | ✅ Completa |
 | [**Iteración 3**](iteracion-3/README.md) | Refinar para rendimiento, disponibilidad y escalabilidad | ✅ Completa |
 | [**Iteración 4**](iteracion-4/README.md) | Refinar para interoperabilidad, seguridad, evolucionabilidad y uso internacional | ✅ Completa |
+| [**Iteración 5**](iteracion-5/README.md) *(2da entrega)* | Diseñar el módulo avanzado: asistente virtual (Opción B) | ✅ Completa |
 
 El fundamento de este orden está en el [plan de iteraciones](../00-gestion/plan-de-iteraciones.md#por-qué-este-orden-y-no-otro).
 

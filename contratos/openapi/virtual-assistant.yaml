@@ -9,8 +9,9 @@ info:
 
     Trazabilidad:
     - Elemento autónomo nº 14 sobre el punto de extensión de ADR-0034: se expone solo a los BFF y
-      consume interfaces que ya existían (`GET /viajes`, `GET /viajes/{id}` y `PUT /reservas/{id}`
-      de `itinerary`, `POST /casos` de `support-liaison`).
+      consume interfaces que ya existían (`GET /panel`, `GET /viajes`, `GET /viajes/{id}`, `PUT /reservas/{id}`,
+      `POST /reservas/{id}/confirmacion` y `POST /reservas/{id}/conflictos/{cid}/resolucion` de
+      `itinerary`, y `POST /casos` de `support-liaison`).
     - Comprensión por intenciones detrás de un intérprete intercambiable: ADR-0037.
     - Qué resuelve solo y cómo pide confirmación antes de cambiar algo: ADR-0038.
     - Cuándo y cómo deriva a la agencia: ADR-0039.
@@ -116,6 +117,8 @@ components:
         - estadoDelViaje
         - proximoTramo
         - corregirHorario
+        - confirmarReserva
+        - resolverConflicto
         - cambioAnteProveedor
         - pedirAgencia
         - confirmacion
@@ -123,7 +126,10 @@ components:
 
     MensajeDelViajero:
       type: object
-      minProperties: 1
+      description: Lleva `texto`, `confirmacion` o los dos; `viajeId` solo, no.
+      anyOf:
+        - required: [texto]
+        - required: [confirmacion]
       properties:
         texto: { type: string, minLength: 1, maxLength: 1000 }
         viajeId:
@@ -142,17 +148,24 @@ components:
       required: [id, tipo, resumen, venceEn]
       properties:
         id: { $ref: 'comun.yaml#/components/schemas/Id' }
-        tipo: { type: string, enum: [corregirReserva, derivarALaAgencia] }
+        tipo: { $ref: '#/components/schemas/TipoDeAccion' }
         resumen: { type: string, description: 'Qué va a cambiar o qué se va a pedir, en palabras del viajero.' }
         reservaId: { $ref: 'comun.yaml#/components/schemas/Id' }
         viajeId: { $ref: 'comun.yaml#/components/schemas/Id' }
         venceEn: { type: string, format: date-time }
 
+    TipoDeAccion:
+      type: string
+      description: |
+        `corregirReserva`, `confirmarReserva`, `descartarReserva` y `resolverConflicto` cambian el
+        itinerario (ADR-0038); `derivarALaAgencia` abre un caso (ADR-0039).
+      enum: [corregirReserva, confirmarReserva, descartarReserva, resolverConflicto, derivarALaAgencia]
+
     AccionRealizada:
       type: object
       required: [tipo]
       properties:
-        tipo: { type: string, enum: [corregirReserva, derivarALaAgencia] }
+        tipo: { $ref: '#/components/schemas/TipoDeAccion' }
         reservaId: { $ref: 'comun.yaml#/components/schemas/Id' }
         casoId: { $ref: 'comun.yaml#/components/schemas/Id' }
         agencia: { type: string }

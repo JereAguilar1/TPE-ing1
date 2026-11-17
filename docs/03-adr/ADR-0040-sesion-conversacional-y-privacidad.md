@@ -1,7 +1,7 @@
 ---
 estado: aceptado
 fecha: 2026-11-17
-decisores: Francisco Lozano
+decisores: Jeremias Aguilar, Francisco Lozano, Juan Emilio Pardo, Ivo Iriarte
 consultados: —
 informados: equipo completo
 iteracion: 5

@@ -1,11 +1,11 @@
 ---
 estado: aceptado
 fecha: 2026-11-17
-decisores: Francisco Lozano
+decisores: Jeremias Aguilar, Francisco Lozano, Juan Emilio Pardo, Ivo Iriarte
 consultados: —
 informados: equipo completo
 iteracion: 5
-drivers: RF-B1, RF-B2, QA-13, QA-14, QA-16, CON-04, CON-05, CON-09, CON-10
+drivers: RF-B1, RF-B2, QA-13, QA-14, QA-16, QA-18, CRN-10, CON-04, CON-05, CON-09, CON-10
 ---
 
 # ADR-0037: El asistente entiende por intenciones detrás de un intérprete intercambiable: reglas en el prototipo y un modelo de lenguaje enchufable, con datos personales redactados
@@ -36,6 +36,8 @@ uno.
 * **QA-13 / QA-14 / CON-10** — datos personales: minimización y control de a quién se envían.
 * **QA-16 / CON-04** — el prototipo tiene que ser trazable y verificable con pruebas.
 * **CON-05 / CON-09** — alcance acotado y cuatro personas con dedicación parcial.
+* **QA-18 / CRN-10** — ningún texto para el usuario fijo en el código de un servicio
+  ([ADR-0032](ADR-0032-internacionalizacion-y-localizacion.md)).
 
 ## Opciones consideradas
 
@@ -66,6 +68,12 @@ Se adopta **I3**:
    mismo umbral bajo de [ADR-0015](ADR-0015-politica-de-confianza-de-extraccion.md), supuesto a
    calibrar) se trata como no entendida: el asistente repregunta en vez de adivinar, y eso alimenta la
    derivación de [ADR-0039](ADR-0039-politica-de-derivacion-a-la-agencia.md).
+5. **Ni las reglas ni las respuestas están fijas en el código** ([ADR-0032](ADR-0032-internacionalizacion-y-localizacion.md)).
+   Los patrones de cada intención forman un **catálogo por idioma**, y lo que el asistente le dice al
+   viajero sale de un **catálogo de mensajes** con marcadores (`ICU MessageFormat`), elegido por el
+   idioma de la sesión. Las fechas y horas se formatean en la zona horaria del lugar del tramo. El
+   prototipo trae solo los catálogos en español rioplatense; otro idioma es otro par de catálogos,
+   sin tocar el código.
 
 ### Consecuencias
 
@@ -86,6 +94,7 @@ Se adopta **I3**:
   («el jueves», «mañana a las 9») en la zona horaria del tramo.
 * Prueba de que una frase fuera de los patrones devuelve `noEntendido` y no una acción.
 * Prueba de arquitectura: ningún módulo del asistente salvo el intérprete conoce cómo se interpreta.
+* Prueba de que el código del asistente no tiene textos para el usuario: todos salen del catálogo.
 
 ## Pros y contras de las opciones
 

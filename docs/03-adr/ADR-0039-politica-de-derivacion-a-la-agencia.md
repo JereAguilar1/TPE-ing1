@@ -1,7 +1,7 @@
 ---
 estado: aceptado
 fecha: 2026-11-17
-decisores: Francisco Lozano
+decisores: Jeremias Aguilar, Francisco Lozano, Juan Emilio Pardo, Ivo Iriarte
 consultados: —
 informados: equipo completo
 iteracion: 5
@@ -49,14 +49,15 @@ situaciones, y solo en ellas:
 | **Cambio ante el proveedor** | Intención `cambioAnteProveedor`: reprogramar o cancelar con la aerolínea o el hotel, reembolsos, reclamos | `reprogramacion`, `cancelacion` u `otro`, según el pedido | — |
 | **El viajero lo pide** | Intención `pedirAgencia` («quiero hablar con mi agencia», «con una persona») | `otro` | — |
 | **No entiende dos veces seguidas** | Dos turnos consecutivos con `noEntendido` ([ADR-0037](ADR-0037-interpretacion-de-intenciones-del-asistente.md)) | `otro` | — |
-| **Disrupción sin salida simple** | La reserva por la que pregunta tiene una disrupción conocida de severidad `alta` ([ADR-0040](ADR-0040-sesion-conversacional-y-privacidad.md)): corregir el itinerario no resuelve un vuelo cancelado | `cancelacion` o `cambioDeHorario` | El `disrupcionId` |
+| **Disrupción sin salida simple** | La reserva por la que pregunta tiene una disrupción conocida de severidad `alta` ([ADR-0040](ADR-0040-sesion-conversacional-y-privacidad.md)): corregir el itinerario no resuelve un vuelo cancelado | `otro`: `DisrupcionDetectada` no dice si es una cancelación o una demora, así que la descripción de la disrupción va en la del caso | El `disrupcionId` |
 
 Cómo se deriva:
 
 1. **Siempre con confirmación,** también cuando el viajero lo pidió: derivar contacta a un tercero, y
    el viajero ve qué se le va a enviar a su agencia antes de que salga.
 2. **Hace falta un viaje.** `POST /casos` pide `viajeId`: si la conversación no está sobre un viaje y
-   el viajero tiene varios, el asistente pregunta cuál antes de proponer.
+   el viajero tiene varios, el asistente pregunta cuál antes de proponer; si tiene uno solo, usa ese.
+   Si no tiene ninguno, el caso no se puede abrir: el asistente lo explica y no propone derivar.
 3. **La síntesis es estructurada y mínima.** La `descripcion` resume el pedido y los turnos
    relevantes (qué reserva, qué pasó, qué quiere el viajero) sin copiar la conversación entera, en
    ≤ 2.000 caracteres.
@@ -81,6 +82,7 @@ Cómo se deriva:
 * Una prueba por disparador, que verifica la propuesta y el `motivo` y el `idDeCausa` del caso.
 * Prueba de idempotencia: confirmar dos veces la misma derivación abre un solo caso.
 * Prueba de que sin confirmación no se llama a `POST /casos`, y de la respuesta ante `422`.
+* Prueba de que, sin ningún viaje, el asistente no propone derivar y lo explica.
 * Prueba de que una consulta de estado nunca termina en derivación.
 
 ## Pros y contras de las opciones

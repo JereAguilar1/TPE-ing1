@@ -2,11 +2,12 @@
 
 > Volver a la [iteración 5](README.md).
 
-Las cuatro decisiones de esta iteración refinan **el interior** del elemento nº 14 que
+Cuatro decisiones de esta iteración refinan **el interior** del elemento nº 14 que
 [ADR-0034](../../03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) dejó como frontera: cómo
 entiende al viajero (**D37**), qué resuelve solo (**D38**), cuándo deriva a la agencia (**D39**) y qué
 recuerda de la conversación (**D40**). Ninguna toca un servicio existente: la frontera de la
-iteración 4 se respeta tal cual (`CON-06`).
+iteración 4 se respeta tal cual (`CON-06`). La quinta (**D41**) precisa una inconsistencia de la 1ra
+entrega que apareció al revisar las entradas: quién genera el alias de reenvío.
 
 Las cuatro se apoyan entre sí: D37 decide qué entiende el asistente y con qué confianza; D38 y D39
 deciden qué hace con eso; D40 guarda lo mínimo para que el diálogo de D38 y D39 funcione.
@@ -43,14 +44,15 @@ asistente no actúa: repregunta.
 
 **Problema:** el enunciado pide «reprogramaciones». Trotamundos no vende ni cambia pasajes: registra lo
 que el viajero ya reservó. Lo que sí puede hacer el asistente es mantener el itinerario al día cuando
-el viajero ya cambió algo, con el comando de la gestión manual (`PUT /reservas/{id}`). Pero un
-malentendido no puede terminar en un cambio.
+el viajero ya cambió algo, con el comando de la gestión manual (`PUT /reservas/{id}`), y ayudarlo
+con los dos «problemas menores» que el itinerario ya tiene: una reserva por confirmar y un conflicto
+entre fuentes. Pero un malentendido no puede terminar en un cambio.
 
 | Alternativa | Cubre «reprogramaciones» (`RF-B1`) | Riesgo de un cambio por error | Reusa reglas del dominio (`RF-06`, `ADR-0013`) | Interfaces nuevas (`CON-06`) |
 |---|---|---|---|---|
 | **K1. Solo consultas; todo cambio se deriva** | ❌ | ✅ nulo | — | ✅ `0` |
 | **K2. El asistente cambia el itinerario cuando entiende el pedido** | ✅ | ❌ un malentendido cambia el itinerario | ✅ | ✅ `0` |
-| **K3. Consultas directas; corrección del itinerario propuesta y confirmada; cambios ante el proveedor, derivados** ⬅ **elegido** | ✅ en lo que el sistema puede hacer | ✅ el viajero ve el cambio exacto antes | ✅ fijados, conflictos y versión | ✅ `0` |
+| **K3. Consultas directas; corrección del itinerario y problemas menores, propuestos y confirmados; cambios ante el proveedor, derivados** ⬅ **elegido** | ✅ en lo que el sistema puede hacer | ✅ el viajero ve el cambio exacto antes | ✅ fijados, conflictos y versión | ✅ `0` |
 
 ### Por qué K3
 
@@ -58,7 +60,9 @@ malentendido no puede terminar en un cambio.
 sistema puede hacer (corregir su propio itinerario) de lo que no (cambiar la reserva ante el
 proveedor), y pone una confirmación explícita, con vencimiento, entre la propuesta y el cambio. Como
 la corrección entra por `PUT /reservas/{id}`, hereda los fijados, los conflictos y el control de
-versión de la gestión manual sin lógica duplicada.
+versión de la gestión manual sin lógica duplicada. Los problemas menores usan los comandos que
+`itinerary` ya tenía para eso (`POST /reservas/{id}/confirmacion` y
+`POST /reservas/{id}/conflictos/{cid}/resolucion`), con la misma confirmación.
 
 → [ADR-0038](../../03-adr/ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md)
 
@@ -79,7 +83,8 @@ agencia; derivar de menos deja al viajero atrapado justo cuando tiene un problem
 
 Los cuatro disparadores cubren los casos reales: un cambio ante el proveedor, el pedido explícito del
 viajero, dos malentendidos seguidos y una disrupción de severidad alta que corregir el itinerario no
-resuelve. Cada uno tiene su `motivo` en el caso, y la disrupción lleva su `idDeCausa`. La derivación
+resuelve. Cada uno tiene su `motivo` en el caso; la disrupción va como `otro`, porque el evento no
+dice si fue una cancelación o una demora, con su descripción y su `idDeCausa`. La derivación
 se confirma siempre, porque contacta a un tercero, y usa `POST /casos` tal como está: idempotencia,
 instantánea del viaje y `CasoDerivado` vienen sin cambios.
 
@@ -109,3 +114,26 @@ de [ADR-0030](../../03-adr/ADR-0030-auditoria-y-supresion-datos-personales.md), 
 de ADR-0034**, que se registra en el ADR nuevo porque un ADR aceptado no se edita.
 
 → [ADR-0040](../../03-adr/ADR-0040-sesion-conversacional-y-privacidad.md)
+
+---
+
+## D41 — Quién genera el alias de reenvío (`CON-08`, precisión de ADR-0035)
+
+**Problema:** [ADR-0035](../../03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) dice que
+el alias `viajes+<token>@ingesta.trotamundos.app` lo asigna `mail-ingest`, pero el contrato publicado
+`identity-access.yaml` lo devuelve en `POST /buzones`, y así se construyó (pasos 7 y 8). Un ADR
+aceptado no se edita: hace falta decidir cuál de los dos manda y registrarlo.
+
+| Alternativa | El viajero ve su alias al conectar el buzón | Interfaces nuevas (`CON-06`) | Coincide con el contrato publicado (`CON-04`) |
+|---|---|---|---|
+| **N1. Lo genera `mail-ingest`, con una llamada sincrónica desde `identity-access`** | ✅ | ❌ una llamada nueva | ❌ |
+| **N2. Lo genera `mail-ingest`, de forma asincrónica** | ❌ lo ve después | ✅ | ❌ |
+| **N3. Lo genera `identity-access` y lo publica en `EstadoDeBuzonCambiado`** ⬅ **elegido** | ✅ | ✅ | ✅ |
+
+### Por qué N3
+
+Es la única que cumple las tres cosas, y es lo que ya dicen los contratos y lo que está construido.
+La verificación del reenvío de ADR-0035 (DKIM, SPF o ARC y titular) no cambia: solo cambia quién
+genera el alias.
+
+→ [ADR-0041](../../03-adr/ADR-0041-alias-de-reenvio-generado-por-identity-access.md)
