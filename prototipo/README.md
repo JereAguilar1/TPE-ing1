@@ -191,7 +191,10 @@ make infra-abajo
 **Integración continua.** En cada cambio de `prototipo/` o `contratos/`,
 [`.github/workflows/pruebas.yml`](../.github/workflows/pruebas.yml) levanta PostgreSQL y Redpanda
 con el mismo `docker-compose.yml` y corre todas las pruebas. Ahí se define
-`TROTAMUNDOS_EXIGIR_INFRA=1`: sin base o sin broker, las pruebas fallan en lugar de saltearse.
+`TROTAMUNDOS_EXIGIR_INFRA=1`: sin base o sin broker, las pruebas fallan en lugar de saltearse. En
+paralelo, el trabajo `servicios` construye la imagen y levanta todo el compose (`make
+servicios-arriba`): si algún servicio no arranca, falla aunque sus pruebas estén en verde, y muestra
+los registros de los contenedores.
 
 **Contraseña de la base local.** No está en el código: `make infra-arriba` la genera al azar la
 primera vez y la guarda en `prototipo/.env`, que git ignora. Docker Compose y las pruebas la leen
@@ -232,6 +235,11 @@ usan para no mezclarse). Con `TROTAMUNDOS_BROKER` vacío, un servicio no publica
 Qué ADR implementa el prototipo hasta ahora, cuál se implementa en un paso posterior y cuál queda
 fuera del alcance que fija [ADR-0034](../docs/03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md)
 (una tajada vertical por los 5 ASR, no el sistema completo). Se actualiza al cerrar cada paso.
+
+Los pasos 13 (`sharing`) y 16 (multirregión) quedaron fuera del [recorte para la
+entrega](#recorte-para-la-entrega): las filas que los nombran describen lo que se haría si se
+completa el 100 % del contenido. Lo que al congelar quede sin construir se lista en [Diseñado y no
+construido](#diseñado-y-no-construido).
 
 ✅ implementado · 🟨 parcial · ⏳ en un paso posterior · ➖ fuera de alcance
 
@@ -281,28 +289,109 @@ Opción B (ADR-0034).
 ## Plan de construcción
 
 Cada paso se entrega en uno o más commits chicos. La columna «Trazabilidad» indica qué decisiones
-implementa.
+implementa. La columna «Prioridad» ordena lo que falta según el recorte acordado por el grupo
+(ver [abajo](#recorte-para-la-entrega)). Antes de empezar un paso, quien lo toma pone su nombre en
+«Responsable» y sube el cambio enseguida: un paso con responsable no lo empieza otro.
 
-| # | Paso | Trazabilidad | Estado |
-|---|---|---|---|
-| 1 | Base: tecnología, infraestructura, validación contra `contratos/` | ADR-0009, ADR-0036 | ✅ |
-| 2 | Registro de tipos de segmento y modelos canónicos | ADR-0010, ADR-0011 | ✅ |
-| 3 | `itinerary`: agregado `Reserva` y fusión determinista | ADR-0010, ADR-0013 | ✅ |
-| 4 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | ✅ |
-| 5 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | ✅ |
-| 6 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | ✅ |
-| 7 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | ✅ |
-| 8 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | ✅ |
-| 9 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | ⬜ |
-| 10 | `provider-sync`: adaptador simulado, cortacircuitos, disrupciones | QA-10, ADR-0024 | ⬜ |
-| 11 | BFF y `api-gateway`: panel, límite de tasa, plazos | QA-02, ADR-0020 | ⬜ |
-| 12 | `notification`, `support-liaison` y `preferences` mínimo | UC-5, UC-7, ADR-0034 | ⬜ |
-| 13 | `sharing`: compartición y `ResumenPublicable` | QA-12, ADR-0028 | ⬜ |
-| 14 | `event-pipeline` y plano analítico | QA-09, ADR-0016 | ⬜ |
-| 15 | Tipo `tren` sin tocar código de dominio | QA-15 | ⬜ |
-| 16 | Multirregión simulada: región primaria por usuario, testigo transregional y conmutación | QA-05, ADR-0018 | ⬜ |
-| 17 | Pruebas de contrato y de escenarios (QA-01, QA-04, QA-05) | ADR-0017 | ⬜ |
-| 18 | Iteración 5 de ADD: diseño de la Opción B (ADRs y contrato) | CON-06 | ⬜ |
-| 19 | `virtual-assistant`: intenciones y derivación a la agencia | RF-B1, RF-B2 | ⬜ |
-| 20 | Interfaz web mínima de demostración | RF-09 | ⬜ |
-| 21 | Matriz código ↔ ADR, guion de demostración y README final | QA-16 | ⬜ |
+| # | Paso | Trazabilidad | Prioridad | Estado | Responsable |
+|---|---|---|---|---|---|
+| 1 | Base: tecnología, infraestructura, validación contra `contratos/` | ADR-0009, ADR-0036 | — | ✅ | Francisco Lozano |
+| 2 | Registro de tipos de segmento y modelos canónicos | ADR-0010, ADR-0011 | — | ✅ | Francisco Lozano |
+| 3 | `itinerary`: agregado `Reserva` y fusión determinista | ADR-0010, ADR-0013 | — | ✅ | Francisco Lozano |
+| 4 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | — | ✅ | Francisco Lozano |
+| 5 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | — | ✅ | Francisco Lozano |
+| 6 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | — | ✅ | Francisco Lozano |
+| 7 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | — | ✅ | Jeremias Aguilar |
+| 8 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | — | ✅ | Francisco Lozano |
+| 9 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | Sí o sí | ⬜ |  |
+| 10 | `provider-sync`: adaptador simulado, cortacircuitos, disrupciones | QA-10, ADR-0024 | Si sobra (reducido) | ⬜ |  |
+| 11 | BFF y `api-gateway`: panel, límite de tasa, plazos | QA-02, ADR-0020 | Debería (reducido) | ⬜ |  |
+| 12 | `notification`, `support-liaison` y `preferences` mínimo | UC-5, UC-7, ADR-0034 | Sí o sí (reducido) | ⬜ |  |
+| 13 | `sharing`: compartición y `ResumenPublicable` | QA-12, ADR-0028 | Completar al 100 % | ⬜ |  |
+| 14 | `event-pipeline` y plano analítico | QA-09, ADR-0016 | Si sobra (reducido) | ⬜ |  |
+| 15 | Tipo `tren` sin tocar código de dominio | QA-15 | Debería | ⬜ |  |
+| 16 | Multirregión simulada: región primaria por usuario, testigo transregional y conmutación | QA-05, ADR-0018 | Completar al 100 % | ⬜ |  |
+| 17 | Pruebas de contrato y de escenarios (QA-01, QA-04, QA-05) | ADR-0017 | Debería (reducido) | ⬜ |  |
+| 18 | Iteración 5 de ADD: diseño de la Opción B (ADRs y contrato) | CON-06 | Sí o sí | ⬜ |  |
+| 19 | `virtual-assistant`: intenciones y derivación a la agencia | RF-B1, RF-B2 | Sí o sí | ⬜ |  |
+| 20 | Interfaz web mínima de demostración | RF-09 | Debería (reducido) | ⬜ |  |
+| 21 | Matriz código ↔ ADR, guion de demostración y README final | QA-16 | Sí o sí | ⬜ |  |
+
+### Recorte para la entrega
+
+Quedan menos de siete días y 13 pasos. El enunciado pide «una rigurosa gestión del tiempo» y
+acotar el alcance del prototipo (§2), y [ADR-0034](../docs/03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md)
+ya fijó el criterio: una tajada vertical que demuestre los ASR (QA-01, QA-04, QA-05, QA-11, QA-13),
+un adaptador o extractor de ejemplo (QA-10, QA-15), el aislamiento analítico (QA-09) y el módulo
+avanzado. Por eso el grupo construye primero esa tajada, en este orden:
+
+| Prioridad | Pasos | Qué entra |
+|---|---|---|
+| **Sí o sí** | 9, 12, 18, 19, 21 | `booking-extraction` con un extractor y las bandas de confianza (QA-11, cierra QA-01). Del paso 12, solo `support-liaison` con `POST /casos`, que usa la derivación de la Opción B. La iteración 5 de ADD y `virtual-assistant` (CON-06). El cierre: matriz código ↔ ADR, guion de demostración y README final |
+| **Debería** | 11, 15, 17, 20 | Solo `bff-web` (el asistente se expone por el BFF, ADR-0034). El tipo `tren` sin tocar código de dominio (QA-15). Escenarios de QA-01 de punta a punta y de QA-04 con ráfaga (la prueba de humo con los contenedores ya está en la integración continua, adelantada el 17/11). Una página con el panel y el chat del asistente |
+| **Si sobra** | 10, 14 | Un adaptador simulado que publica `ReservaObservada` y `DisrupcionDetectada` (QA-10). Un consumidor de eventos a un esquema analítico aparte, con una prueba de aislamiento (QA-09) |
+
+**Fechas.** La entrega es el **lunes 23 de noviembre de 2026 a las 23:00**. El **congelamiento** es
+el **domingo 22 a las 23:00**, 24 h antes de la entrega: desde ahí no se empieza ningún paso nuevo,
+aunque sobren horas. El lunes 23, hasta la entrega, queda para el cierre (paso 21) y el ensayo de la
+defensa. Lo que al congelar no esté terminado se registra abajo como diseñado y no construido.
+
+La iteración 5 (paso 18) va primero: sin sus ADR y su contrato, el asistente (paso 19) no puede
+empezar sin inventar decisiones.
+
+### Para completar el 100 % del contenido
+
+Si la tajada queda terminada antes del congelamiento, se completa lo que el recorte dejó afuera,
+en este orden (primero lo que termina algo ya empezado, después lo nuevo):
+
+| Orden | Paso | Qué falta respecto de la versión reducida |
+|---|---|---|
+| 1 | 10 | Cortacircuitos, reintentos y cuotas (ADR-0024) |
+| 2 | 14 | El modelo dimensional completo (ADR-0016) y la supresión en fase 2 (ADR-0030) |
+| 3 | 12 | `notification` y `preferences` |
+| 4 | 11 | `bff-mobile` y `api-gateway`, con límite de tasa y plazos (ADR-0020) |
+| 5 | 17 | Pruebas de contrato con Schemathesis y el escenario de QA-05 |
+| 6 | 13 | `sharing`: compartición con designados y en redes (ADR-0028) |
+| 7 | 16 | Multirregión: región primaria, testigo transregional y conmutación (ADR-0018). Una versión mínima (dos bases y una conmutación) alcanza para sostener ASR-3 |
+| 8 | 20 | Más pantallas que el panel y el chat |
+
+### Matriz código ↔ ADR
+
+Qué código implementa cada decisión y qué prueba lo verifica (QA-16). La completa quien cierra cada
+paso; el paso 21 la revisa entera. Las rutas son relativas a `prototipo/`.
+
+| Código | Implementa | Lo verifica |
+|---|---|---|
+| `trotamundos/comun/contratos.py`, `tipos_de_segmento.py` | ADR-0009, ADR-0011, ADR-0027; todo `contratos/` | `tests/test_contratos.py`, `tests/test_tipos_de_segmento.py` |
+| `trotamundos/comun/modelo.py` | ADR-0010 (modelo canónico), ADR-0032 (instantes UTC con zona) | `tests/test_modelo.py` |
+| `trotamundos/comun/eventos.py` | AsyncAPI (sobre y carga); ADR-0014, ADR-0025 | `tests/test_eventos.py` |
+| `trotamundos/comun/persistencia.py` | ADR-0012 (*outbox*), ADR-0014 (bandeja de entrada, `Idempotency-Key`) | `tests/test_persistencia.py` |
+| `trotamundos/comun/publicador.py`, `consumidor.py`, `carriles.py` | ADR-0012, ADR-0014, ADR-0020 (carriles P1–P3) | `tests/test_publicador.py`, `tests/test_consumidor.py`, `tests/test_carriles.py` |
+| `trotamundos/comun/errores.py` | `Problema` de `comun.yaml`; ADR-0028 (mismo 404), ADR-0030 (sin datos internos) | `tests/test_errores.py` |
+| `trotamundos/comun/sesion.py` | ADR-0007 (sesión OIDC) | `tests/mail_ingest/test_mail_ingest.py` (filtros) |
+| Ningún servicio importa a otro; módulos según las vistas N2 | ADR-0001, vista de módulos N1 y N2, regla R5 | `tests/test_arquitectura.py` |
+| `requirements.txt` igual a `pyproject.toml` | ADR-0036 | `tests/test_dependencias.py` |
+| `servicios/itinerary/reservas/`, `fusion/` | ADR-0010, ADR-0013 (identidad, precedencia, conflictos), ADR-0015 (bandas) | `tests/itinerary/test_reservas.py`, `test_consolidacion.py`, `test_identidad.py`, `test_propiedades_fusion.py`, `test_repositorio.py` |
+| `servicios/itinerary/viajes/` | ADR-0010, RF-07 (agrupación), RF-08 (ciclo de vida) | `tests/itinerary/test_viajes.py`, `test_repositorio_viajes.py` |
+| `servicios/itinerary/gestion_manual.py` | RF-06, ADR-0013 (fijados) | `tests/itinerary/test_gestion_manual.py` |
+| `servicios/itinerary/ingesta.py`, `publicacion.py`, `servicio.py` | ADR-0012, ADR-0014, ADR-0020, ADR-0018 (`versionUsuario`) | `tests/itinerary/test_servicio.py`, `test_publicacion.py`, `test_broker_itinerary.py` |
+| `servicios/itinerary/api.py`, `proyeccion_panel.py` | `openapi/itinerary.yaml`; ADR-0021 (lectura y escritura) | `tests/itinerary/test_api.py`, `test_servicio.py` |
+| `servicios/identity_access/custodia_boveda.py`, `consentimiento_buzones.py` | ADR-0029 (sobres, R5, rotación, revocación), ADR-0035, QA-13 | `tests/identity_access/test_boveda_y_auditoria.py`, `test_api_identity_access.py` |
+| `servicios/identity_access/auditoria_y_revocacion.py` | ADR-0029 (detector), ADR-0030 (bitácora encadenada) | `tests/identity_access/test_boveda_y_auditoria.py` |
+| `servicios/identity_access/autenticacion_oidc.py`, `motor_autorizacion_abac.py` | ADR-0007, ADR-0028 (OTP, ABAC, vales) | `tests/identity_access/test_api_identity_access.py` |
+| `servicios/identity_access/servicio.py`, `api.py` | `openapi/identity-access.yaml`; ADR-0030 (exportación y supresión) | `tests/identity_access/test_api_identity_access.py`, `test_arranque_identity_access.py` |
+| `servicios/mail_ingest/suscripciones.py`, `receptor.py`, `reconciliador.py`, `cola.py` | ADR-0004 (*push* y reconciliación), ADR-0020, ADR-0024 (espera) | `tests/mail_ingest/test_mail_ingest.py`, `test_modulos.py` |
+| `servicios/mail_ingest/filtros.py`, `api.py` | RF-04; `openapi/mail-ingest-filtros.yaml`, `mail-ingest-webhooks.yaml` | `tests/mail_ingest/test_mail_ingest.py`, `test_modulos.py` |
+| `servicios/mail_ingest/descargador.py`, `normalizador.py`, `deduplicador.py`, `publicacion.py` | ADR-0029 (token efímero), ADR-0014; AsyncAPI `MensajeDeViajeRecibido` | `tests/mail_ingest/test_mail_ingest.py`, `test_arranque_mail_ingest.py` |
+| `servicios/mail_ingest/receptor_reenvio.py` | ADR-0035 (reenvío verificado) | `tests/mail_ingest/test_mail_ingest.py` |
+
+### Diseñado y no construido
+
+Lo que el prototipo no construye queda resuelto en la documentación de la 1ra entrega; este
+apartado lo dice explícitamente para que no se lea como un faltante. Se completa al congelar.
+
+| Qué | Dónde está diseñado | Por qué no se construye |
+|---|---|---|
+| Compartir itinerarios con designados y en redes sociales (paso 13) | [ADR-0028](../docs/03-adr/ADR-0028-autorizacion-comparticion-y-publicacion.md), `contratos/openapi/sharing.yaml` | No es un ASR ni lo necesita la Opción B (recorte de ADR-0034) |
+| Multirregión y conmutación ante la pérdida de una región (paso 16) | [ADR-0002](../docs/03-adr/ADR-0002-despliegue-multirregion.md), [ADR-0018](../docs/03-adr/ADR-0018-consistencia-datos-multirregion.md), [vista de despliegue N2](../docs/04-vistas/vista-despliegue-nivel-2.md) | Es el paso más caro del plan. ASR-3 (QA-05) queda demostrado solo en el diseño |
+
