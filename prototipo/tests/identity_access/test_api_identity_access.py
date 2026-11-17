@@ -304,6 +304,10 @@ def test_privacidad_exportacion_y_supresion_fase_1(dsn, esquema, contratos):
     assert r_exp.status_code == 202
     assert r_exp.json()["estado"] == "Lista"
     assert len(cliente.get("/privacidad/exportaciones", headers=auth).json()) == 1
+    # El paquete queda guardado con la identidad de la persona (ADR-0030).
+    [fila] = _filas(dsn, esquema, "SELECT paquete FROM exportacion_privacidad")
+    assert fila["paquete"]["identidad"]["correo"] == "viajero@test.app"
+    assert fila["paquete"]["identidad"]["regionPrimaria"] == "AM"
 
     r_sup = cliente.delete(
         "/privacidad/cuenta",
@@ -311,6 +315,8 @@ def test_privacidad_exportacion_y_supresion_fase_1(dsn, esquema, contratos):
     )
     assert r_sup.status_code == 202
     assert "solicitudId" in r_sup.json()
+    # La exportación tiene datos personales: se va con la cuenta.
+    assert _filas(dsn, esquema, "SELECT * FROM exportacion_privacidad") == []
     assert servicio.verificar_integridad_auditoria() is True
 
 
@@ -344,8 +350,14 @@ def test_tras_la_revocacion_regional_se_reautoriza_y_se_conectan_buzones(dsn, es
     assert cliente.post(
         f"/buzones/{buzon_id}/autorizacion", headers=auth, json={"codigo": "antes"}
     ).status_code == 200
+    reenvio_id = cliente.post(
+        "/buzones", headers={**auth, "Idempotency-Key": str(uuid4())}, json={"via": "reenvio"}
+    ).json()["id"]
 
+    # Solo el buzón OAuth guarda un token: el de reenvío no tiene nada que revocar y sigue Activo.
     assert servicio.revocar_region_en_bloque("AM", 1) == 1
+    estados = {b["id"]: b["estado"] for b in cliente.get("/buzones", headers=auth).json()}
+    assert estados == {buzon_id: "RequiereReautorizacion", reenvio_id: "Activo"}
     # Las DEK_u envueltas con la versión revocada se descartan: no queda nada ilegible guardado.
     assert _filas(dsn, esquema, "SELECT * FROM boveda_dek") == []
     assert _filas(dsn, esquema, "SELECT * FROM boveda_secreto") == []

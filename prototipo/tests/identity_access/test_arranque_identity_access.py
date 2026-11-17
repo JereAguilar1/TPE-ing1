@@ -28,6 +28,39 @@ def test_la_fabrica_de_uvicorn_arma_la_app():
     assert isinstance(servicio.crear_app(), FastAPI)
 
 
+def test_el_trabajo_periodico_purga_lo_vencido(dsn, esquema, contratos):
+    """Bandeja de entrada, claves de idempotencia (ADR-0014) y códigos de invitado vencidos."""
+    configuracion = dataclasses.replace(Configuracion.desde_entorno(), dsn_postgres=dsn,
+                                        broker="", intervalo_tareas_s=0.05)
+    identity = IdentityAccess(configuracion, esquema=esquema, contratos=contratos)
+    identity.crear_esquema()
+    vencidas = (
+        """INSERT INTO comando_idempotente (usuario_id, clave, operacion, huella, estado, creado_en)
+           VALUES (gen_random_uuid(), gen_random_uuid(), 'POST /buzones', 'h', 201,
+                   now() - interval '30 days')""",
+        """INSERT INTO bandeja_entrada (consumidor, evento_id, recibido_en)
+           VALUES ('identity-access', gen_random_uuid(), now() - interval '30 days')""",
+        """INSERT INTO codigo_invitado (comparticion_id, correo, codigo_hash, expira_en)
+           VALUES (gen_random_uuid(), 'invitada@test.app', 'h', now() - interval '1 minute')""",
+    )
+    with conectar(dsn, esquema) as conexion:
+        for sentencia in vencidas:
+            conexion.execute(sentencia)
+
+    def quedan() -> int:
+        with conectar(dsn, esquema) as conexion:
+            return conexion.execute(
+                """SELECT (SELECT count(*) FROM comando_idempotente)
+                        + (SELECT count(*) FROM bandeja_entrada)
+                        + (SELECT count(*) FROM codigo_invitado) AS n""").fetchone()["n"]
+
+    with TestClient(identity.app()):
+        limite = time.monotonic() + 10
+        while quedan() and time.monotonic() < limite:
+            time.sleep(0.05)
+    assert quedan() == 0
+
+
 def _pendientes(dsn: str, esquema: str) -> int:
     with conectar(dsn, esquema) as conexion:
         return conexion.execute(

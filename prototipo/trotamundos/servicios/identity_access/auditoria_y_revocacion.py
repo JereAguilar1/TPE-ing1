@@ -13,7 +13,7 @@ import zlib
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping, Protocol
+from typing import Any, Mapping
 from uuid import UUID, uuid4
 
 import psycopg
@@ -52,12 +52,6 @@ DDL = (
     );
     """,
 )
-
-
-class BovedaDeEmergencia(Protocol):
-    """Puerto mínimo para inhabilitar una versión de `KEK_region` en fase 1 de revocación."""
-
-    def inhabilitar_version_kek(self, region: str, version: int) -> None: ...
 
 
 @dataclass(frozen=True)

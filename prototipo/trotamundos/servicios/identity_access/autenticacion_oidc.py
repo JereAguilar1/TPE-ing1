@@ -7,7 +7,6 @@ Gestiona la federación OIDC simulada (`E-14`), la emisión de sesiones con `reg
 from __future__ import annotations
 
 import hashlib
-import os
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -121,10 +120,6 @@ class EnviadorOtpEnMemoria:
 
     def enviar(self, correo: str, comparticion_id: UUID, codigo: str) -> None:
         self.enviados[(comparticion_id, correo.lower())] = codigo
-
-
-def _clave_jwt_por_omision() -> str:
-    return os.environ.get("TROTAMUNDOS_JWT_SECRETO") or secrets.token_hex(32)
 
 
 def crear_sesion(
@@ -382,6 +377,21 @@ def obtener_region_usuario(conexion: psycopg.Connection, usuario_id: UUID) -> st
         (usuario_id,),
     ).fetchone()
     return str(fila["region_primaria"]) if fila else None
+
+
+def datos_de_identidad(conexion: psycopg.Connection, usuario_id: UUID) -> dict[str, str] | None:
+    """Lo que `identity-access` guarda de la persona (para la exportación, ADR-0030)."""
+    fila = conexion.execute(
+        "SELECT correo, region_primaria, creado_en FROM usuario_identidad WHERE usuario_id = %s",
+        (usuario_id,),
+    ).fetchone()
+    if fila is None:
+        return None
+    return {
+        "correo": fila["correo"],
+        "regionPrimaria": fila["region_primaria"],
+        "creadoEn": fila["creado_en"].astimezone(timezone.utc).isoformat(),
+    }
 
 
 def obtener_seudonimo(conexion: psycopg.Connection, usuario_id: UUID) -> str | None:

@@ -21,6 +21,7 @@ from typing import Any, AsyncIterator, Callable, Mapping
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI
+from psycopg.types.json import Jsonb
 
 from trotamundos.comun.carriles import asegurar_topicos, carriles_posibles, topico
 from trotamundos.comun.config import Configuracion
@@ -69,6 +70,8 @@ DDL = (
         creado_en    timestamptz NOT NULL
     );
     CREATE INDEX IF NOT EXISTS exportacion_por_usuario ON exportacion_privacidad (usuario_id);
+    -- El paquete firmado que descarga el titular (ADR-0030); se borra con la cuenta.
+    ALTER TABLE exportacion_privacidad ADD COLUMN IF NOT EXISTS paquete jsonb;
     """,
 )
 
@@ -404,6 +407,7 @@ class IdentityAccess:
             eid = self._nuevo_id()
             paquete = {
                 "usuarioId": str(usuario_id),
+                "identidad": autenticacion_oidc.datos_de_identidad(con, usuario_id),
                 "buzones": consentimiento_buzones.listar_buzones(con, usuario_id),
                 "auditoria": auditoria_y_revocacion.historial_de_usuario(con, usuario_id),
             }
@@ -414,10 +418,10 @@ class IdentityAccess:
             con.execute(
                 """
                 INSERT INTO exportacion_privacidad (
-                    id, usuario_id, estado, url_descarga, firma, creado_en
-                ) VALUES (%s, %s, 'Lista', %s, %s, %s)
+                    id, usuario_id, estado, url_descarga, firma, creado_en, paquete
+                ) VALUES (%s, %s, 'Lista', %s, %s, %s, %s)
                 """,
-                (eid, usuario_id, url_descarga, firma, instante),
+                (eid, usuario_id, url_descarga, firma, instante, Jsonb(paquete)),
             )
             auditoria_y_revocacion.registrar_evento(
                 con,
@@ -489,6 +493,7 @@ class IdentityAccess:
                     self._contratos,
                 )
             con.execute("DELETE FROM buzon WHERE usuario_id = %s", (usuario_id,))
+            con.execute("DELETE FROM exportacion_privacidad WHERE usuario_id = %s", (usuario_id,))
             custodia_boveda.destruir_dek(
                 con, usuario_id=usuario_id, actor=str(usuario_id), ahora=instante
             )
@@ -565,20 +570,33 @@ class IdentityAccess:
             return auditoria_y_revocacion.verificar_cadena(con)
 
     def purgar_vencidos(self) -> None:
+        """Bandeja de entrada y claves de idempotencia vencidas (ADR-0014) y códigos de invitado
+        que ya no se pueden canjear."""
+        ahora = self._reloj()
         with transaccion(self._configuracion.dsn_postgres, self._esquema) as con:
-            purgar(con, self._reloj())
+            purgar(con, ahora)
+            con.execute("DELETE FROM codigo_invitado WHERE expira_en < %s", (ahora,))
 
     # --- API y broker (ADR-0012, ADR-0020) ---------------------------------------------------
 
     def app(self) -> FastAPI:
         """La API de `identity-access`. Al arrancar crea el esquema (y recupera las versiones de
-        `KEK_region`) y, con un broker configurado, publica la *outbox*."""
+        `KEK_region`), corre la purga cada `intervalo_tareas_s` (0 la apaga) y, con un broker
+        configurado, publica la *outbox*."""
+        intervalo = self._configuracion.intervalo_tareas_s
 
         @asynccontextmanager
         async def ciclo_de_vida(_: FastAPI) -> AsyncIterator[None]:
             self.crear_esquema()
-            async with self.con_broker():
-                yield
+            tareas = [asyncio.create_task(self._bucle(intervalo))] if intervalo > 0 else []
+            try:
+                async with self.con_broker():
+                    yield
+            finally:
+                for tarea in tareas:
+                    tarea.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await tarea
 
         return api.crear_app(self, self._contratos, self._secreto_jwt, lifespan=ciclo_de_vida)
 
@@ -615,6 +633,14 @@ class IdentityAccess:
             with contextlib.suppress(asyncio.CancelledError):
                 await publicando
             await publicador.detener()
+
+    async def _bucle(self, intervalo: float) -> None:
+        while True:
+            await asyncio.sleep(intervalo)
+            try:
+                await asyncio.to_thread(self.purgar_vencidos)
+            except Exception:  # la purga sigue en la próxima vuelta
+                _registro_de_errores.exception("Falló la purga de identity-access")
 
     async def _publicar_siempre(self, publicador: PublicadorDeOutbox,
                                 detener: asyncio.Event) -> None:

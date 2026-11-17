@@ -361,7 +361,9 @@ def revocar_region_en_bloque(
     """Ejecuta la revocación regional en dos fases de ADR-0029 (< 15 min).
 
     1. Inhabilita `KEK_region` `v{version_kek}` al instante (y rota si era la vigente).
-    2. Pasa todos los buzones `Activo` de la región a `RequiereReautorizacion`.
+    2. Pasa a `RequiereReautorizacion` los buzones `Activo` de la región que guardan un token o
+       credencial en la bóveda. Los de `reenvio` no guardan ninguno: siguen `Activo`. Un buzón
+       `imapDelegado` se reconecta dándolo de baja y conectándolo con una credencial nueva.
     """
     instante = (ahora or datetime.now(timezone.utc)).astimezone(timezone.utc)
     boveda.revocar_version_kek(
@@ -369,7 +371,10 @@ def revocar_region_en_bloque(
     )
 
     filas = conexion.execute(
-        "SELECT id, usuario_id FROM buzon WHERE region = %s AND estado = 'Activo'",
+        """
+        SELECT id, usuario_id FROM buzon
+        WHERE region = %s AND estado = 'Activo' AND via <> 'reenvio'
+        """,
         (region,),
     ).fetchall()
     eventos: list[tuple[UUID, dict[str, Any]]] = []
