@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 import jwt
@@ -449,3 +448,34 @@ def test_la_supresion_de_cuenta_publica_la_revocacion_de_cada_buzon(dsn, esquema
         if f["tipo"] == "EstadoDeBuzonCambiado" and f["carga"]["estadoNuevo"] == "Revocado"
     )
     assert [f["carril"] for f in filas if f["tipo"] == "CuentaSuprimida"] == ["P3"]
+
+
+def test_el_buzon_activo_publica_lo_que_mail_ingest_necesita(dsn, esquema, contratos):
+    """AsyncAPI 1.4: vía, proveedor, alias y correo del titular, solo al pasar a `Activo`."""
+    cliente, _, _ = _armar(dsn, esquema, contratos)
+    token, _ = _iniciar_sesion(cliente)
+    auth = {"Authorization": f"Bearer {token}"}
+    reenvio = cliente.post(
+        "/buzones", headers={**auth, "Idempotency-Key": str(uuid4())}, json={"via": "reenvio"}
+    ).json()
+    oauth_id = cliente.post(
+        "/buzones", headers={**auth, "Idempotency-Key": str(uuid4())},
+        json={"via": "oauth", "proveedor": "gmail"},
+    ).json()["id"]
+    cliente.post(f"/buzones/{oauth_id}/autorizacion", headers=auth, json={"codigo": "ok"})
+    cliente.delete(f"/buzones/{oauth_id}", headers=auth)
+
+    cargas = [f["carga"] for f in _filas(
+        dsn, esquema,
+        "SELECT carga FROM bandeja_salida WHERE tipo = 'EstadoDeBuzonCambiado' ORDER BY seq")]
+    assert cargas[0] == {
+        "buzonId": reenvio["id"], "estadoAnterior": "Solicitado", "estadoNuevo": "Activo",
+        "motivo": "otorgado", "via": "reenvio", "aliasReenvio": reenvio["aliasReenvio"],
+        "correoDelTitular": "viajero@test.app"}
+    assert cargas[1] == {
+        "buzonId": oauth_id, "estadoAnterior": "Solicitado", "estadoNuevo": "Activo",
+        "motivo": "otorgado", "via": "oauth", "proveedor": "gmail",
+        "correoDelTitular": "viajero@test.app"}
+    # Al revocarse alcanza con el id: el correo no viaja de más.
+    assert cargas[2] == {"buzonId": oauth_id, "estadoAnterior": "Activo",
+                         "estadoNuevo": "Revocado", "motivo": "desconectadoPorUsuario"}

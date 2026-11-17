@@ -82,6 +82,18 @@ def listar_buzones(conexion: psycopg.Connection, usuario_id: UUID) -> list[dict[
     return [_serializar_buzon(f) for f in filas]
 
 
+def datos_de_ingesta(conexion: psycopg.Connection, buzon_id: UUID) -> dict[str, str]:
+    """Vía, proveedor y alias del buzón, con los nombres de `EstadoDeBuzonCambiado`."""
+    fila = conexion.execute(
+        "SELECT via, proveedor, alias_reenvio FROM buzon WHERE id = %s", (buzon_id,)
+    ).fetchone()
+    if fila is None:
+        return {}
+    datos = {"via": fila["via"], "proveedor": fila["proveedor"],
+             "aliasReenvio": fila["alias_reenvio"]}
+    return {clave: valor for clave, valor in datos.items() if valor is not None}
+
+
 def conectar_buzon(
     conexion: psycopg.Connection,
     kms: boveda.KmsLocal,

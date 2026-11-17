@@ -111,7 +111,10 @@ class IdentityAccess:
         self._consultor_recursos = (
             consultor_recursos or motor_autorizacion_abac.ConsultorDeRecursosNulo()
         )
-        self._detector = detector_anomalias or auditoria_y_revocacion.DetectorDeAnomalias()
+        # El p99 de tokens por minuto de una réplica de mail-ingest es un supuesto a calibrar
+        # (ADR-0029): pasar 3 veces ese valor bloquea la réplica.
+        self._detector = detector_anomalias or auditoria_y_revocacion.DetectorDeAnomalias(
+            int(os.environ.get("TROTAMUNDOS_P99_TOKENS_POR_MINUTO", "20")))
         self._secreto_jwt = (
             secreto_jwt or os.environ.get("TROTAMUNDOS_JWT_SECRETO") or secrets.token_hex(32)
         )
@@ -222,19 +225,7 @@ class IdentityAccess:
             except consentimiento_buzones.SolicitudBuzonInvalida as exc:
                 raise Problema(400, str(exc)) from exc
 
-            eventos = [
-                Evento.nuevo(
-                    "EstadoDeBuzonCambiado",
-                    cambio,
-                    productor=PRODUCTOR,
-                    usuario_id=str(usuario_id),
-                    region=region,
-                    traceparent=traceparent,
-                )
-                for cambio in cambios
-            ]
-            if eventos:
-                publicacion.registrar(con, eventos, self._contratos)
+            self._publicar_cambios_de_buzon(con, usuario_id, region, cambios, traceparent)
             guardar_respuesta(
                 con,
                 usuario_id,
@@ -274,19 +265,7 @@ class IdentityAccess:
                 autenticacion_oidc.obtener_region_usuario(con, usuario_id)
                 or self._configuracion.region
             )
-            eventos = [
-                Evento.nuevo(
-                    "EstadoDeBuzonCambiado",
-                    cambio,
-                    productor=PRODUCTOR,
-                    usuario_id=str(usuario_id),
-                    region=region,
-                    traceparent=traceparent,
-                )
-                for cambio in cambios
-            ]
-            if eventos:
-                publicacion.registrar(con, eventos, self._contratos)
+            self._publicar_cambios_de_buzon(con, usuario_id, region, cambios, traceparent)
             return respuesta
 
     def desconectar_buzon(
@@ -309,19 +288,7 @@ class IdentityAccess:
                 autenticacion_oidc.obtener_region_usuario(con, usuario_id)
                 or self._configuracion.region
             )
-            eventos = [
-                Evento.nuevo(
-                    "EstadoDeBuzonCambiado",
-                    cambio,
-                    productor=PRODUCTOR,
-                    usuario_id=str(usuario_id),
-                    region=region,
-                    traceparent=traceparent,
-                )
-                for cambio in cambios
-            ]
-            if eventos:
-                publicacion.registrar(con, eventos, self._contratos)
+            self._publicar_cambios_de_buzon(con, usuario_id, region, cambios, traceparent)
 
     def emitir_token_efimero(
         self,
@@ -476,22 +443,7 @@ class IdentityAccess:
                 cambios += consentimiento_buzones.desconectar_buzon(
                     con, usuario_id=usuario_id, buzon_id=UUID(buzon["id"]), ahora=instante
                 )
-            if cambios:
-                publicacion.registrar(
-                    con,
-                    [
-                        Evento.nuevo(
-                            "EstadoDeBuzonCambiado",
-                            cambio,
-                            productor=PRODUCTOR,
-                            usuario_id=str(usuario_id),
-                            region=region,
-                            traceparent=traceparent,
-                        )
-                        for cambio in cambios
-                    ],
-                    self._contratos,
-                )
+            self._publicar_cambios_de_buzon(con, usuario_id, region, cambios, traceparent)
             con.execute("DELETE FROM buzon WHERE usuario_id = %s", (usuario_id,))
             con.execute("DELETE FROM exportacion_privacidad WHERE usuario_id = %s", (usuario_id,))
             custodia_boveda.destruir_dek(
@@ -551,19 +503,34 @@ class IdentityAccess:
                 actor=actor,
                 ahora=self._reloj(),
             )
-            eventos = [
-                Evento.nuevo(
-                    "EstadoDeBuzonCambiado",
-                    cambio,
-                    productor=PRODUCTOR,
-                    usuario_id=str(uid),
-                    region=region,
-                )
-                for uid, cambio in cambios
-            ]
-            if eventos:
-                publicacion.registrar(con, eventos, self._contratos)
-            return len(eventos)
+            for uid, cambio in cambios:
+                self._publicar_cambios_de_buzon(con, uid, region, [cambio])
+            return len(cambios)
+
+    def _publicar_cambios_de_buzon(
+        self,
+        con: Any,
+        usuario_id: UUID,
+        region: str,
+        cambios: list[dict[str, Any]],
+        traceparent: str | None = None,
+    ) -> None:
+        """Escribe un `EstadoDeBuzonCambiado` por cambio en la *outbox*. Cuando el buzón queda
+        `Activo` suma lo que `mail-ingest` necesita para atenderlo: vía, proveedor, alias y el
+        correo del titular (AsyncAPI 1.4, ADR-0004, ADR-0035)."""
+        eventos = []
+        for cambio in cambios:
+            carga = dict(cambio)
+            if carga["estadoNuevo"] == "Activo":
+                carga.update(consentimiento_buzones.datos_de_ingesta(con, UUID(carga["buzonId"])))
+                identidad = autenticacion_oidc.datos_de_identidad(con, usuario_id)
+                if identidad is not None:
+                    carga["correoDelTitular"] = identidad["correo"]
+            eventos.append(Evento.nuevo(
+                "EstadoDeBuzonCambiado", carga, productor=PRODUCTOR,
+                usuario_id=str(usuario_id), region=region, traceparent=traceparent))
+        if eventos:
+            publicacion.registrar(con, eventos, self._contratos)
 
     def verificar_integridad_auditoria(self) -> bool:
         with transaccion(self._configuracion.dsn_postgres, self._esquema) as con:

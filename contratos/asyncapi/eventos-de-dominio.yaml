@@ -1,7 +1,7 @@
 asyncapi: 3.0.0
 info:
   title: Trotamundos — eventos de dominio
-  version: 1.3.0
+  version: 1.4.0
   description: |
     Catálogo de eventos publicados en el *broker* (ADR-0001, ADR-0009).
 
@@ -383,6 +383,15 @@ components:
           estadoAnterior: { $ref: '#/components/schemas/EstadoBuzon' }
           estadoNuevo: { $ref: '#/components/schemas/EstadoBuzon' }
           motivo: { type: string, enum: [otorgado, renovacionFallida, revocadoPorProveedor, alcanceReducido, desconectadoPorUsuario] }
+          # Lo que mail-ingest necesita para atender el buzón (ADR-0004, ADR-0035). Solo viaja
+          # cuando estadoNuevo es Activo; en los demás cambios alcanza con buzonId.
+          via: { type: string, enum: [oauth, reenvio, imapDelegado] }
+          proveedor: { type: string, examples: [gmail, outlook] }
+          aliasReenvio: { type: string, format: email, description: Solo para la vía reenvio. }
+          correoDelTitular:
+            type: string
+            format: email
+            description: Correo verificado del titular; el remitente de un reenvío tiene que coincidir con él (ADR-0035).
     PreferenciasActualizadas:
       name: PreferenciasActualizadas
       headers: { $ref: '#/components/schemas/Sobre' }
