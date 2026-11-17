@@ -2,7 +2,7 @@
 PYTHON ?= python3.12
 PY ?= .venv/bin/python
 
-.PHONY: instalar pruebas infra-arriba servicios-arriba infra-abajo
+.PHONY: instalar pruebas infra-arriba servicios-arriba infra-abajo FORZAR
 
 instalar:
 	$(PYTHON) -m venv .venv
@@ -12,11 +12,21 @@ instalar:
 pruebas:
 	$(PY) -m pytest -q
 
-# La contraseña de la base local no está en el código: se genera al azar la primera vez y queda
-# en .env, que git ignora. Docker Compose la lee de ahí, y las pruebas también (comun/config.py).
-.env:
-	@python3 -c "import secrets; print('POSTGRES_PASSWORD=' + secrets.token_urlsafe(24))" > .env
-	@echo "Se creó .env con una contraseña al azar para la base local."
+# Los secretos locales no están en el código: se generan al azar la primera vez y quedan en .env,
+# que git ignora. Docker Compose los lee de ahí, y las pruebas también (comun/config.py). Si a un
+# .env viejo le falta alguno, se agrega sin tocar los que ya tiene: cambiar la semilla del KMS o la
+# clave de las sesiones dejaría ilegibles los buzones guardados e inválidas las sesiones abiertas.
+SECRETOS_LOCALES = POSTGRES_PASSWORD TROTAMUNDOS_KMS_SECRETO TROTAMUNDOS_JWT_SECRETO TROTAMUNDOS_VALE_SECRETO
+
+.env: FORZAR
+	@python3 -c "import pathlib, secrets, sys; \
+	p = pathlib.Path('.env'); t = p.read_text() if p.exists() else ''; \
+	t = t if not t or t.endswith(chr(10)) else t + chr(10); \
+	faltan = [k for k in sys.argv[1:] if not any(l.startswith(k + '=') for l in t.splitlines())]; \
+	p.write_text(t + ''.join(k + '=' + secrets.token_urlsafe(32) + chr(10) for k in faltan)); \
+	faltan and print('Se agregaron a .env, al azar: ' + ', '.join(faltan))" $(SECRETOS_LOCALES)
+
+FORZAR:
 
 # PostgreSQL y el broker: lo que necesitan las pruebas.
 infra-arriba: .env

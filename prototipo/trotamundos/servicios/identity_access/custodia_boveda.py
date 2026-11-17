@@ -43,6 +43,17 @@ DDL = (
     );
     CREATE INDEX IF NOT EXISTS boveda_secreto_por_usuario ON boveda_secreto (usuario_id);
     """,
+    # Solo metadatos de las versiones de `KEK_region` (nunca el material de la clave): es lo que un
+    # KMS gestionado conserva por su cuenta y lo que `KmsLocal` recupera al reiniciar.
+    """
+    CREATE TABLE IF NOT EXISTS kek_version (
+        region     text        NOT NULL,
+        version    integer     NOT NULL,
+        habilitada boolean     NOT NULL,
+        creada_en  timestamptz NOT NULL,
+        PRIMARY KEY (region, version)
+    );
+    """,
 )
 
 
@@ -121,6 +132,14 @@ class KmsLocal:
         else:
             self._claves[(region, version)].habilitada = False
 
+    def restaurar(self, region: str, version_actual: int, inhabilitadas: set[int]) -> None:
+        """Recupera la versión vigente y las inhabilitadas de una región tras un reinicio."""
+        self._version_actual[region] = version_actual
+        for version in range(1, version_actual + 1):
+            self._claves[(region, version)] = _VersionKek(
+                self._derivar_kek(region, version), version not in inhabilitadas
+            )
+
     def esta_habilitada(self, region: str, version: int) -> bool:
         entrada = self._claves.get((region, version))
         return True if entrada is None else entrada.habilitada
@@ -137,6 +156,35 @@ def _aad(usuario_id: UUID, proposito: str, key_version: int) -> bytes:
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
+
+
+def _registrar_version_kek(
+    conexion: psycopg.Connection, region: str, version: int, ahora: datetime
+) -> None:
+    conexion.execute(
+        """
+        INSERT INTO kek_version (region, version, habilitada, creada_en)
+        VALUES (%s, %s, true, %s)
+        ON CONFLICT (region, version) DO NOTHING
+        """,
+        (region, version, ahora),
+    )
+
+
+def restaurar_kms(conexion: psycopg.Connection, kms: KmsLocal) -> None:
+    """Carga en `kms` las versiones de `KEK_region` registradas (al arrancar el servicio)."""
+    filas = conexion.execute(
+        "SELECT region, version, habilitada FROM kek_version ORDER BY region, version"
+    ).fetchall()
+    por_region: dict[str, list[tuple[int, bool]]] = {}
+    for fila in filas:
+        por_region.setdefault(fila["region"], []).append((int(fila["version"]), fila["habilitada"]))
+    for region, versiones in por_region.items():
+        kms.restaurar(
+            region,
+            max(v for v, _ in versiones),
+            {v for v, habilitada in versiones if not habilitada},
+        )
 
 
 def _obtener_o_crear_dek(
@@ -156,6 +204,7 @@ def _obtener_o_crear_dek(
 
     dek = AESGCM.generate_key(bit_length=256)
     version, envuelta = kms.envolver(region, dek)
+    _registrar_version_kek(conexion, region, version, ahora)
     conexion.execute(
         """
         INSERT INTO boveda_dek (usuario_id, region, kek_version, dek_envuelta, creada_en)
@@ -351,7 +400,9 @@ def rotar_kek(
 ) -> tuple[int, int]:
     """Rota `KEK_region` a `v{N+1}` y re-envuelve las `DEK_u` sin tocar los secretos (ADR-0029)."""
     instante = (ahora or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    _registrar_version_kek(conexion, region, kms.version_actual(region), instante)
     nueva_version = kms.rotar_region(region)
+    _registrar_version_kek(conexion, region, nueva_version, instante)
     filas = conexion.execute(
         "SELECT usuario_id, kek_version, dek_envuelta FROM boveda_dek WHERE region = %s",
         (region,),
@@ -380,3 +431,60 @@ def rotar_kek(
         ocurrido_en=instante,
     )
     return nueva_version, cantidad
+
+
+def revocar_version_kek(
+    conexion: psycopg.Connection,
+    kms: KmsLocal,
+    region: str,
+    version: int,
+    *,
+    actor: str,
+    ahora: datetime | None = None,
+) -> int:
+    """Fase 1 de la revocación regional (ADR-0029): inhabilita `KEK_region` `v{version}`.
+
+    Las `DEK_u` envueltas con esa versión y los secretos que protegían quedan ilegibles para
+    siempre, así que se descartan. Si era la versión vigente, se pasa a `v{N+1}` para que las
+    reautorizaciones y los buzones nuevos se cifren con una clave sana. Devuelve la versión vigente.
+    """
+    instante = (ahora or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    vigente = kms.version_actual(region)
+    _registrar_version_kek(conexion, region, vigente, instante)
+    kms.inhabilitar_version_kek(region, version)
+    conexion.execute(
+        """
+        INSERT INTO kek_version (region, version, habilitada, creada_en)
+        VALUES (%s, %s, false, %s)
+        ON CONFLICT (region, version) DO UPDATE SET habilitada = false
+        """,
+        (region, version, instante),
+    )
+    if version >= vigente:
+        vigente = kms.rotar_region(region)
+        _registrar_version_kek(conexion, region, vigente, instante)
+
+    conexion.execute(
+        """
+        DELETE FROM boveda_secreto WHERE usuario_id IN (
+            SELECT usuario_id FROM boveda_dek WHERE region = %s AND kek_version = %s
+        )
+        """,
+        (region, version),
+    )
+    descartadas = conexion.execute(
+        "DELETE FROM boveda_dek WHERE region = %s AND kek_version = %s",
+        (region, version),
+    ).rowcount
+    auditoria.registrar_evento(
+        conexion,
+        actor=actor,
+        accion="inhabilitar_kek_region",
+        recurso_tipo="kms_region",
+        recurso_id=region,
+        resultado="permitido",
+        detalle={"versionInhabilitada": version, "versionVigente": vigente,
+                 "deksDescartadas": descartadas},
+        ocurrido_en=instante,
+    )
+    return vigente

@@ -98,6 +98,10 @@ services:
       TROTAMUNDOS_DSN: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres:5432/trotamundos
       TROTAMUNDOS_BROKER: broker:9092
       TROTAMUNDOS_REGION: AM
+      # De .env (make infra-arriba): fijos para que un reinicio no deje ilegible la bóveda.
+      TROTAMUNDOS_KMS_SECRETO: ${TROTAMUNDOS_KMS_SECRETO}
+      TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
+      TROTAMUNDOS_VALE_SECRETO: ${TROTAMUNDOS_VALE_SECRETO}
     ports:
       - "18103:8000"
     depends_on:

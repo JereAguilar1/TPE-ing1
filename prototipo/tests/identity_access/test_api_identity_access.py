@@ -10,12 +10,14 @@ import jwt
 from fastapi.testclient import TestClient
 
 from trotamundos.comun.config import Configuracion
+from trotamundos.comun.persistencia import conectar
 from trotamundos.servicios.identity_access import api
 from trotamundos.servicios.identity_access.auditoria_y_revocacion import (
     DetectorDeAnomalias,
     bucket_de_usuario,
 )
 from trotamundos.servicios.identity_access.autenticacion_oidc import EnviadorOtpEnMemoria
+from trotamundos.servicios.identity_access.custodia_boveda import KmsLocal
 from trotamundos.servicios.identity_access.motor_autorizacion_abac import (
     AtributosRecurso,
     verificar_vale,
@@ -48,6 +50,7 @@ def _armar(
     *,
     comparticiones: dict[UUID, tuple[UUID, frozenset[str], str]] | None = None,
     p99_base: int = 20,
+    kms: KmsLocal | None = None,
 ):
     cfg = dataclasses.replace(Configuracion.desde_entorno(), dsn_postgres=dsn, broker="")
     consultor = _ConsultorPrueba(comparticiones or {})
@@ -60,6 +63,7 @@ def _armar(
         enviador_otp=enviador,
         consultor_recursos=consultor,
         detector_anomalias=DetectorDeAnomalias(p99_base_por_minuto=p99_base),
+        kms=kms,
         secreto_jwt="secreto-jwt-pruebas-32-bytes-min",
         secreto_vale="secreto-vale-pruebas-32-bytes-mi",
     )
@@ -308,3 +312,128 @@ def test_privacidad_exportacion_y_supresion_fase_1(dsn, esquema, contratos):
     assert r_sup.status_code == 202
     assert "solicitudId" in r_sup.json()
     assert servicio.verificar_integridad_auditoria() is True
+
+
+_MAIL_INGEST = {"X-Servicio-Cliente": "mail-ingest"}
+
+
+def _conectar_imap(cliente: TestClient, auth: dict[str, str]) -> str:
+    resp = cliente.post(
+        "/buzones",
+        headers={**auth, "Idempotency-Key": str(uuid4())},
+        json={"via": "imapDelegado", "credencialDelegada": "app-pwd-revocable"},
+    )
+    assert resp.status_code == 201
+    return resp.json()["id"]
+
+
+def _filas(dsn: str, esquema: str, consulta: str) -> list[dict]:
+    with conectar(dsn, esquema) as conexion:
+        return conexion.execute(consulta).fetchall()
+
+
+def test_tras_la_revocacion_regional_se_reautoriza_y_se_conectan_buzones(dsn, esquema, contratos):
+    """ADR-0029: la KEK revocada deja ilegibles los tokens, pero la región sigue operando."""
+    cliente, servicio, _ = _armar(dsn, esquema, contratos)
+    token, _ = _iniciar_sesion(cliente)
+    auth = {"Authorization": f"Bearer {token}"}
+    r_oauth = cliente.post(
+        "/buzones", headers={**auth, "Idempotency-Key": str(uuid4())}, json={"via": "oauth"}
+    )
+    buzon_id = r_oauth.json()["id"]
+    assert cliente.post(
+        f"/buzones/{buzon_id}/autorizacion", headers=auth, json={"codigo": "antes"}
+    ).status_code == 200
+
+    assert servicio.revocar_region_en_bloque("AM", 1) == 1
+    # Las DEK_u envueltas con la versión revocada se descartan: no queda nada ilegible guardado.
+    assert _filas(dsn, esquema, "SELECT * FROM boveda_dek") == []
+    assert _filas(dsn, esquema, "SELECT * FROM boveda_secreto") == []
+
+    # El usuario reautoriza: su token nuevo queda bajo una DEK_u nueva, envuelta con KEK v2.
+    r_reaut = cliente.post(
+        f"/buzones/{buzon_id}/autorizacion", headers=auth, json={"codigo": "despues"}
+    )
+    assert r_reaut.status_code == 200
+    assert r_reaut.json()["estado"] == "Activo"
+    assert [f["kek_version"] for f in _filas(dsn, esquema, "SELECT * FROM boveda_dek")] == [2]
+    assert cliente.post(
+        f"/buzones/{buzon_id}/token-efimero", headers=_MAIL_INGEST
+    ).status_code == 200
+
+    # Otros usuarios de la región también pueden conectar buzones nuevos.
+    token_otro, _ = _iniciar_sesion(cliente, "oidc:otra@test.app:AM")
+    _conectar_imap(cliente, {"Authorization": f"Bearer {token_otro}"})
+    assert servicio.verificar_integridad_auditoria() is True
+
+
+def test_la_boveda_recupera_sus_versiones_de_kek_tras_reiniciar(dsn, esquema, contratos):
+    """Un reinicio con la misma semilla no rehabilita la KEK revocada ni pierde la vigente."""
+    semilla = b"semilla-kms-de-pruebas-32-bytes!"
+    cliente, servicio, _ = _armar(dsn, esquema, contratos, kms=KmsLocal(semilla))
+    token, _ = _iniciar_sesion(cliente)
+    auth = {"Authorization": f"Bearer {token}"}
+    _conectar_imap(cliente, auth)
+    servicio.revocar_region_en_bloque("AM", 1)
+    token_otro, _ = _iniciar_sesion(cliente, "oidc:otra@test.app:AM")
+    buzon_nuevo = _conectar_imap(cliente, {"Authorization": f"Bearer {token_otro}"})
+
+    kms_reiniciado = KmsLocal(semilla)
+    cliente2, _, _ = _armar(dsn, esquema, contratos, kms=kms_reiniciado)
+
+    assert kms_reiniciado.version_actual("AM") == 2
+    assert kms_reiniciado.esta_habilitada("AM", 1) is False
+    assert cliente2.post(
+        f"/buzones/{buzon_nuevo}/token-efimero", headers=_MAIL_INGEST
+    ).status_code == 200
+    _conectar_imap(cliente2, auth)
+    versiones = {f["kek_version"] for f in _filas(dsn, esquema, "SELECT * FROM boveda_dek")}
+    assert versiones == {2}
+
+
+def test_con_la_semilla_del_entorno_los_buzones_sobreviven_a_un_reinicio(
+    dsn, esquema, contratos, monkeypatch
+):
+    """`docker-compose.yml` pasa `TROTAMUNDOS_KMS_SECRETO` desde `.env`: otro proceso descifra."""
+    monkeypatch.setenv("TROTAMUNDOS_KMS_SECRETO", "semilla-fija-del-entorno")
+    cliente, _, _ = _armar(dsn, esquema, contratos)
+    token, _ = _iniciar_sesion(cliente)
+    buzon_id = _conectar_imap(cliente, {"Authorization": f"Bearer {token}"})
+
+    cliente_reiniciado, _, _ = _armar(dsn, esquema, contratos)
+    assert cliente_reiniciado.post(
+        f"/buzones/{buzon_id}/token-efimero", headers=_MAIL_INGEST
+    ).status_code == 200
+
+
+def test_la_supresion_de_cuenta_publica_la_revocacion_de_cada_buzon(dsn, esquema, contratos):
+    """`mail-ingest` consume `EstadoDeBuzonCambiado`: tiene que enterarse de que deje de leer."""
+    cliente, _, _ = _armar(dsn, esquema, contratos)
+    token, _ = _iniciar_sesion(cliente)
+    auth = {"Authorization": f"Bearer {token}"}
+    buzon_imap = _conectar_imap(cliente, auth)
+    r_reenvio = cliente.post(
+        "/buzones", headers={**auth, "Idempotency-Key": str(uuid4())}, json={"via": "reenvio"}
+    )
+    buzon_reenvio = r_reenvio.json()["id"]
+
+    assert cliente.delete(
+        "/privacidad/cuenta", headers={**auth, "Idempotency-Key": str(uuid4())}
+    ).status_code == 202
+
+    filas = _filas(
+        dsn, esquema,
+        "SELECT tipo, carga, carril FROM bandeja_salida ORDER BY creado_en, tipo",
+    )
+    revocados = {
+        f["carga"]["buzonId"]
+        for f in filas
+        if f["tipo"] == "EstadoDeBuzonCambiado" and f["carga"]["estadoNuevo"] == "Revocado"
+    }
+    assert revocados == {buzon_imap, buzon_reenvio}
+    assert all(
+        f["carga"]["motivo"] == "desconectadoPorUsuario" and f["carril"] == "P2"
+        for f in filas
+        if f["tipo"] == "EstadoDeBuzonCambiado" and f["carga"]["estadoNuevo"] == "Revocado"
+    )
+    assert [f["carril"] for f in filas if f["tipo"] == "CuentaSuprimida"] == ["P3"]

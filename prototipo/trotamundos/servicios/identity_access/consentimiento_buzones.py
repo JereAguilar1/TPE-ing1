@@ -360,11 +360,13 @@ def revocar_region_en_bloque(
 ) -> list[tuple[UUID, dict[str, Any]]]:
     """Ejecuta la revocación regional en dos fases de ADR-0029 (< 15 min).
 
-    1. Inhabilita `KEK_region` `v{version_kek}` al instante.
+    1. Inhabilita `KEK_region` `v{version_kek}` al instante (y rota si era la vigente).
     2. Pasa todos los buzones `Activo` de la región a `RequiereReautorizacion`.
     """
     instante = (ahora or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    kms.inhabilitar_version_kek(region, version_kek)
+    boveda.revocar_version_kek(
+        conexion, kms, region, version_kek, actor=actor, ahora=instante
+    )
 
     filas = conexion.execute(
         "SELECT id, usuario_id FROM buzon WHERE region = %s AND estado = 'Activo'",

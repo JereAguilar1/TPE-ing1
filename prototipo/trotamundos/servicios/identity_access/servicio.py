@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import hashlib
 import json
+import logging
 import os
 import secrets
 from contextlib import asynccontextmanager
@@ -50,6 +51,8 @@ from trotamundos.servicios.identity_access import (
 ESQUEMA = "identity_access"
 PRODUCTOR = "identity-access"
 PAUSA_DEL_PUBLICADOR_S = 0.5
+
+_registro_de_errores = logging.getLogger(__name__)
 
 DDL = (
     *auditoria_y_revocacion.DDL,
@@ -117,6 +120,9 @@ class IdentityAccess:
 
     def crear_esquema(self) -> None:
         crear_esquema(self._configuracion.dsn_postgres, self._esquema, DDL)
+        # Las versiones de KEK_region (vigente e inhabilitadas) sobreviven a un reinicio.
+        with transaccion(self._configuracion.dsn_postgres, self._esquema) as con:
+            custodia_boveda.restaurar_kms(con, self._kms)
 
     # --- Sesiones ----------------------------------------------------------------------------
 
@@ -256,7 +262,7 @@ class IdentityAccess:
                 )
             except consentimiento_buzones.BuzonNoEncontrado as exc:
                 raise no_encontrado() from exc
-            except consentimiento_buzones.ConflictoDeBuzon as exc:
+            except (consentimiento_buzones.ConflictoDeBuzon, custodia_boveda.ErrorDeBoveda) as exc:
                 raise Problema(409, str(exc)) from exc
             except consentimiento_buzones.SolicitudBuzonInvalida as exc:
                 raise Problema(400, str(exc)) from exc
@@ -455,10 +461,32 @@ class IdentityAccess:
                 return previa.estado, previa.cuerpo
 
             # Fase 1 (ADR-0030): destruye secretos y DEK_u, borra buzones e identidad R1, y emite
-            # CuentaSuprimida sin usuarioId (SobreSinUsuario) para el plano analítico.
+            # CuentaSuprimida sin usuarioId (SobreSinUsuario) para el plano analítico. Cada buzón
+            # revocado se publica como en DELETE /buzones/{id}, para que mail-ingest deje de leerlo.
+            region = (
+                autenticacion_oidc.obtener_region_usuario(con, usuario_id)
+                or self._configuracion.region
+            )
+            cambios = []
             for buzon in consentimiento_buzones.listar_buzones(con, usuario_id):
-                consentimiento_buzones.desconectar_buzon(
+                cambios += consentimiento_buzones.desconectar_buzon(
                     con, usuario_id=usuario_id, buzon_id=UUID(buzon["id"]), ahora=instante
+                )
+            if cambios:
+                publicacion.registrar(
+                    con,
+                    [
+                        Evento.nuevo(
+                            "EstadoDeBuzonCambiado",
+                            cambio,
+                            productor=PRODUCTOR,
+                            usuario_id=str(usuario_id),
+                            region=region,
+                            traceparent=traceparent,
+                        )
+                        for cambio in cambios
+                    ],
+                    self._contratos,
                 )
             con.execute("DELETE FROM buzon WHERE usuario_id = %s", (usuario_id,))
             custodia_boveda.destruir_dek(
@@ -540,44 +568,65 @@ class IdentityAccess:
         with transaccion(self._configuracion.dsn_postgres, self._esquema) as con:
             purgar(con, self._reloj())
 
+    # --- API y broker (ADR-0012, ADR-0020) ---------------------------------------------------
 
-def crear_app(configuracion: Configuracion | None = None) -> FastAPI:
-    """Fábrica ASGI de `identity-access` (para `uvicorn --factory`)."""
-    config = configuracion or Configuracion.desde_entorno()
-    contratos = contratos_por_omision(config)
-    servicio = IdentityAccess(config, contratos=contratos)
+    def app(self) -> FastAPI:
+        """La API de `identity-access`. Al arrancar crea el esquema (y recupera las versiones de
+        `KEK_region`) y, con un broker configurado, publica la *outbox*."""
 
-    @asynccontextmanager
-    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        servicio.crear_esquema()
-        tareas: list[asyncio.Task[None]] = []
-        publicador: PublicadorDeOutbox | None = None
+        @asynccontextmanager
+        async def ciclo_de_vida(_: FastAPI) -> AsyncIterator[None]:
+            self.crear_esquema()
+            async with self.con_broker():
+                yield
 
-        if config.broker:
-            topicos = [
-                topico(contratos.canal(e), c, config.prefijo_topicos)
-                for e in publicacion.PUBLICA
-                for c in carriles_posibles(contratos, e)
-            ]
-            await asegurar_topicos(config.broker, topicos)
-            publicador = PublicadorDeOutbox(
-                config.dsn_postgres,
-                config.broker,
-                ESQUEMA,
-                prefijo_topicos=config.prefijo_topicos,
-                pausa_s=PAUSA_DEL_PUBLICADOR_S,
-            )
-            await publicador.iniciar()
-            tareas.append(asyncio.create_task(publicador.correr()))
+        return api.crear_app(self, self._contratos, self._secreto_jwt, lifespan=ciclo_de_vida)
 
+    def topicos(self) -> list[str]:
+        """Los tópicos que publica: uno por evento y carril posible."""
+        prefijo = self._configuracion.prefijo_topicos
+        return [topico(self._contratos, tipo, carril, prefijo)
+                for tipo in sorted(publicacion.PUBLICA)
+                for carril in carriles_posibles(self._contratos, tipo)]
+
+    def publicador(self) -> PublicadorDeOutbox:
+        c = self._configuracion
+        return PublicadorDeOutbox(c.dsn_postgres, self._esquema, c.broker, self._contratos,
+                                  c.prefijo_topicos)
+
+    @contextlib.asynccontextmanager
+    async def con_broker(self) -> AsyncIterator[list[asyncio.Task]]:
+        """Arranca el publicador de la *outbox* si hay broker y lo detiene al salir."""
+        servidores = self._configuracion.broker
+        if not servidores:
+            yield []
+            return
+        await asegurar_topicos(servidores, self.topicos())
+        publicador = self.publicador()
+        await publicador.iniciar()
+        detener = asyncio.Event()
+        # Referencia propia: el bucle de eventos solo guarda referencias débiles a las tareas.
+        publicando = asyncio.create_task(self._publicar_siempre(publicador, detener))
         try:
-            yield
+            yield [publicando]
         finally:
-            for t in tareas:
-                t.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await t
-            if publicador is not None:
-                await publicador.detener()
+            detener.set()
+            publicando.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await publicando
+            await publicador.detener()
 
-    return api.crear_app(servicio, contratos, servicio._secreto_jwt, lifespan=lifespan)
+    async def _publicar_siempre(self, publicador: PublicadorDeOutbox,
+                                detener: asyncio.Event) -> None:
+        while not detener.is_set():
+            try:
+                if await publicador.publicar_pendientes() == 0:
+                    await asyncio.sleep(PAUSA_DEL_PUBLICADOR_S)
+            except Exception:  # el broker o la base no responden: se reintenta
+                _registro_de_errores.exception("Falló la publicación de la outbox de identity-access")
+                await asyncio.sleep(PAUSA_DEL_PUBLICADOR_S)
+
+
+def crear_app() -> FastAPI:
+    """Fábrica para Uvicorn: `uvicorn --factory trotamundos.servicios.identity_access.servicio:crear_app`."""
+    return IdentityAccess().app()
