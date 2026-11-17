@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — identity-access
-  version: 1.1.0
+  version: 1.1.1
   description: |
     Identidad, consentimiento de buzones, custodia de tokens delegados, autorización y derechos
     sobre datos personales.
@@ -115,7 +115,7 @@ paths:
     post:
       tags: [buzones]
       operationId: conectarBuzon
-      summary: Inicia la conexión de un buzón (estado `Solicitado`, RF-01)
+      summary: Conecta un buzón (RF-01). `oauth` queda `Solicitado` hasta autorizarlo; `reenvio` e `imapDelegado`, `Activo`
       security: [{ oidc: [] }]
       parameters:
         - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
