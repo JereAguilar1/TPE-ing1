@@ -41,3 +41,28 @@ jobs:
       - name: Bajar la infraestructura
         if: always()
         run: make infra-abajo
+
+  # Las pruebas revisan cada pieza por separado, pero no arrancan los servicios juntos: un servicio
+  # puede tener todas sus pruebas en verde y no arrancar (pasó en el paso 7). Este trabajo construye
+  # la imagen y levanta todo el compose; si algún contenedor no queda sano, la construcción falla.
+  servicios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: prototipo
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construir la imagen y levantar todos los servicios (docker-compose.yml)
+        run: make servicios-arriba
+
+      - name: Estado y registros de los contenedores (si algo falló)
+        if: failure()
+        run: |
+          docker compose ps -a
+          docker compose logs --no-color --tail=200
+
+      - name: Bajar todo
+        if: always()
+        run: make infra-abajo
