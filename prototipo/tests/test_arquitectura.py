@@ -257,3 +257,22 @@ DEPENDENCIAS_DE_MAIL_INGEST = {
 
 def test_los_modulos_de_mail_ingest_respetan_la_vista_n2():
     assert violaciones_internas(PAQUETE, "mail_ingest", DEPENDENCIAS_DE_MAIL_INGEST) == []
+
+
+# --- `support_liaison` (iteración 2 §5.7; adaptadores de agencia como complementos, ADR-0006) ----
+
+DEPENDENCIAS_DE_SUPPORT_LIAISON = {
+    "interfaz_de_agencia": set(),
+    "complementos": {"interfaz_de_agencia"},
+    "casos": set(),
+    "preferencias": set(),
+    "instantanea": set(),
+    "publicacion": set(),
+    "api": set(),
+    "servicio": {"interfaz_de_agencia", "complementos", "casos", "preferencias", "instantanea",
+                 "publicacion", "api"},
+}
+
+
+def test_los_modulos_de_support_liaison_respetan_sus_dependencias():
+    assert violaciones_internas(PAQUETE, "support_liaison", DEPENDENCIAS_DE_SUPPORT_LIAISON) == []
