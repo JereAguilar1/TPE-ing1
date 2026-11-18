@@ -276,3 +276,32 @@ DEPENDENCIAS_DE_SUPPORT_LIAISON = {
 
 def test_los_modulos_de_support_liaison_respetan_sus_dependencias():
     assert violaciones_internas(PAQUETE, "support_liaison", DEPENDENCIAS_DE_SUPPORT_LIAISON) == []
+
+
+# --- `virtual_assistant` (vista de módulos del asistente, iteración 5; ADR-0037) -------------------
+
+DEPENDENCIAS_DE_VIRTUAL_ASSISTANT = {
+    "catalogo": set(),
+    "interprete": {"catalogo"},
+    "sesiones": set(),
+    "contexto": set(),
+    "acciones": set(),
+    "derivacion": {"catalogo"},
+    "dialogo": {"interprete", "acciones", "derivacion", "sesiones", "contexto", "catalogo"},
+    "api": set(),
+    "servicio": {"catalogo", "interprete", "sesiones", "contexto", "acciones", "derivacion",
+                 "dialogo", "api"},
+}
+
+
+def test_los_modulos_de_virtual_assistant_respetan_su_vista():
+    assert violaciones_internas(PAQUETE, "virtual_assistant",
+                                DEPENDENCIAS_DE_VIRTUAL_ASSISTANT) == []
+
+
+def test_en_el_asistente_solo_contexto_acciones_y_derivacion_hablan_con_otros_servicios():
+    """Cada uno con uno solo: `itinerary-lectura`, `itinerary-escritura` y `support-liaison`."""
+    carpeta = PAQUETE / "servicios" / "virtual_assistant"
+    con_http = sorted(a.stem for a in carpeta.rglob("*.py")
+                      if "httpx" in _importaciones(PAQUETE, a))
+    assert con_http == ["acciones", "contexto", "derivacion"]
