@@ -8,11 +8,13 @@ Proyecto: TPE de Ingeniería de Software I (UNICEN), grupo 15, **Trotamundos**. 
 
 - **No modificar nada** en `docs/01-analisis-inicial`, `docs/02-proceso-add`, `docs/04-vistas` ni
   `docs/05-trazabilidad`: es la 1ra entrega, ya presentada. Si encontrás una inconsistencia ahí,
-  informala; no la corrijas. Las únicas excepciones son la iteración de ADD de la Opción B (paso 18),
-  que aprobó el profesor: agregar `docs/02-proceso-add/iteracion-5/` y su fila en la tabla de
-  iteraciones de `docs/02-proceso-add/README.md`, y agregar sus vistas como archivos nuevos en
-  `docs/04-vistas` (`*-asistente.md`) con sus filas en el índice de `docs/04-vistas/README.md`. Las
-  iteraciones 1 a 4, las vistas existentes y el resto de esos índices no se tocan.
+  informala; no la corrijas. La iteración de ADD de la Opción B (paso 18, aprobada por el profesor)
+  ya está hecha: `docs/02-proceso-add/iteracion-5/` sigue desde ahora **las mismas reglas que las
+  iteraciones 1 a 4** y no se modifica. Si el código del asistente no coincide con ella, se informa
+  y se registra en «Decisiones de implementación» o en un ADR nuevo. La única excepción que queda es
+  agregar vistas del asistente como archivos nuevos en `docs/04-vistas` (`*-asistente.md`) con sus
+  filas en el índice de `docs/04-vistas/README.md`; las vistas existentes y el resto de los índices
+  no se tocan.
 - **`docs/00-gestion`** (equipo, bitácora, plan): consultar al grupo antes de cambiar cualquier cosa,
   salvo las filas de la bitácora al terminar un paso (ver «Alcance de la entrega»).
 - **`docs/03-adr`**: se pueden agregar ADR nuevos, pero un ADR aceptado no se edita; se escribe otro

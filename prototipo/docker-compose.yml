@@ -167,3 +167,32 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  virtual-assistant:
+    # Asistente virtual de la Opción B (paso 19, ADR-0037 a ADR-0040). Lee de itinerary-lectura,
+    # corrige en itinerary-escritura y deriva casos en support-liaison, siempre con la sesión del
+    # viajero; consume DisrupcionDetectada.
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.virtual_assistant.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TROTAMUNDOS_DSN: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres:5432/trotamundos
+      TROTAMUNDOS_BROKER: broker:9092
+      TROTAMUNDOS_REGION: AM
+      TROTAMUNDOS_URL_ITINERARY_LECTURA: http://itinerary-lectura:8000
+      TROTAMUNDOS_URL_ITINERARY_ESCRITURA: http://itinerary-escritura:8000
+      TROTAMUNDOS_URL_SUPPORT_LIAISON: http://support-liaison:8000
+      # De .env (make infra-arriba): la sesión la emite identity-access con el mismo secreto.
+      TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
+    ports:
+      - "18106:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

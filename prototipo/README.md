@@ -89,6 +89,17 @@ prototipo/
 │           ├── complementos/         # agencia simulada
 │           ├── api.py                # POST /casos y sus lecturas (support-liaison.yaml)
 │           └── servicio.py           # arma los módulos y define las transacciones
+│       └── virtual_assistant/       # asistente virtual de la Opción B (paso 19, ADR-0037 a 0040)
+│           ├── catalogos/es/         # patrones de cada intención y mensajes (recurso, sin código)
+│           ├── catalogo.py           # lee los catálogos y formatea mensajes y fechas
+│           ├── interprete.py         # puerto InterpreteDeIntenciones y su implementación por reglas
+│           ├── dialogo.py            # un turno: entender, decidir, responder (sin base)
+│           ├── acciones.py           # corrección y problemas menores, solo con confirmación
+│           ├── derivacion.py         # los cuatro disparadores, la síntesis y POST /casos
+│           ├── contexto.py           # panel y viajes en nombre del viajero; disrupciones conocidas
+│           ├── sesiones.py           # sesiones, turnos, acción pendiente y retención de 30 días
+│           ├── api.py                # virtual-assistant.yaml
+│           └── servicio.py           # arma los módulos y define las transacciones
 ├── tests/
 ├── Dockerfile              # una imagen para todos los servicios (se construye desde la raíz)
 ├── docker-compose.yml      # PostgreSQL, broker y servicios
@@ -105,6 +116,7 @@ prototipo/
 | `comun/modelo.py` solo usa la biblioteca estándar | R7, vista de módulos N1 |
 | Ningún módulo menciona un tipo de segmento concreto (`vuelo`, `tren`…). Solo pueden hacerlo los complementos (adaptadores y extractores), que van en carpetas `complementos/` | I4, vista de módulos N2; ADR-0011 |
 | Dentro de `itinerary`, cada módulo importa solo los módulos que la vista N2 le permite (`reservas` no conoce a `fusion` ni a `viajes`; `ingesta` solo conoce a `fusion`; `api` solo a `gestion_manual` y `proyeccion_panel`; `proyeccion_panel` y `publicacion` no importan dominio). La excepción declarada es `servicio`, el punto de armado, que ningún módulo importa. Un módulo que no está en la tabla hace fallar la prueba | I1, I3, I5, vista de módulos N2 |
+| Dentro de `virtual_assistant`, cada módulo importa solo lo que permite la vista de módulos del asistente, y solo `contexto`, `acciones` y `derivacion` hablan con otros servicios. Solo `interprete` usa los patrones, los módulos que le responden al viajero no tienen frases en el código y cada clave de mensaje usada existe en el catálogo | ADR-0037; vista de módulos del asistente |
 
 ### Decisiones de implementación
 
@@ -181,6 +193,20 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | La agencia es un complemento (`adaptador-agencia-simulada`), sin interfaz de estado: el viajero marca el caso resuelto. Si no acusa recibo, el caso queda `Abierto` y se reintenta con espera de `5 s × 2^n` (tope 15 min) durante 24 h; el viajero recibe igual el caso, con su estado real | Iteración 2 §5.7 prevé los dos casos de agencia; la espera y las 24 h son las de ADR-0024, sin cortacircuitos ni mamparo, que son del paso 10 | ADR-0006; ADR-0024 |
 | `POST /casos` repetido con la misma `Idempotency-Key` devuelve el caso en su **estado actual** (por ejemplo, `Derivado` si la agencia acusó recibo después); `Caso.agencia` es el nombre de la agencia | El viajero ve qué pasó con su pedido, no una foto vieja. El nombre es lo que se le muestra | `support-liaison.yaml`; ADR-0014 |
 | El caso no se copia al testigo transregional ni se purga a los 24 meses en el prototipo | La multirregión (paso 16) quedó fuera del recorte; la supresión por `usuario_id`, con la del resto del plano operacional | ADR-0018; ADR-0030 |
+| El asistente suma el módulo `catalogo`, que lee los catálogos y formatea los mensajes, y `dialogo` no toca la base: recibe el estado de la sesión y devuelve el nuevo, que guarda `servicio` | La vista de módulos del asistente deja los catálogos como recurso sin lógica; alguien tiene que leerlos. Así `dialogo` se prueba sin base y las transacciones quedan en un solo lugar, como en el resto de los servicios | ADR-0037; vista de módulos del asistente |
+| Los mensajes usan el subconjunto de ICU MessageFormat que necesita el catálogo: argumentos simples (`{titulo}`) y plurales (`{n, plural, one {…} other {…}}`), sin biblioteca externa. Los días de la semana salen del mismo catálogo | Alcanza para el español del prototipo sin sumar una dependencia; otro idioma con reglas de plural más ricas pediría la biblioteca ICU | ADR-0032; ADR-0037 |
+| Fechas relativas del intérprete: «hoy», «mañana» y «pasado mañana» se cuentan en la zona del tramo. Un día de la semana, sobre un tramo, es el más cercano a la fecha del tramo sin caer antes de hoy (el vuelo del jueves 3/12 «pasado al sábado» queda el 5/12); sin tramo, el próximo después de hoy. Una fecha sin año es la próxima vez que llega. «De la mañana», «de la tarde» y «de la noche» son franjas del día, no fechas: «a las 9 de la noche» son las 21. Un tramo que vale todo el día (`precision: dia`) solo cambia de fecha | ADR-0037 pide fechas relativas en la zona del tramo pero no fija estos casos; el ejemplo de ADR-0038 cuenta el día desde la fecha del vuelo | ADR-0037; ADR-0038; ADR-0032 |
+| El intérprete reconoce el código de una reserva solo como palabra entera (con o sin espacios o guiones: «AR 1402») y de 3 caracteres o más | Un código corto o contenido en otro («AR14» en «AR1402») elegía la reserva equivocada | ADR-0037 |
+| El asistente propone derivar **una sola vez por disrupción**: al abrir el caso, la proyección guarda su `casoId`, y una nueva consulta sobre esa reserva lo recuerda en lugar de proponer otro caso. Pedir la agencia por otro motivo sigue funcionando | La `Idempotency-Key` de ADR-0039 se deriva de la acción, así que dos propuestas distintas abrían dos casos por la misma disrupción | ADR-0039; ADR-0040 |
+| Un viaje en foco que ya no existe o no es del viajero deja de estar en foco en el turno siguiente | Si no, el asistente quedaba contestando «no encuentro ese viaje» y derivaba sobre un viaje inexistente | ADR-0040 |
+| «Una consulta de estado nunca termina en derivación» se interpreta así: una consulta nunca abre un caso, y solo **propone** derivar cuando la reserva por la que se pregunta (el próximo tramo, o la nombrada por su código) tiene una disrupción de severidad alta. El caso se abre recién con la confirmación | Es lo que muestra la secuencia de derivación por disrupción («¿qué pasa con mi vuelo?») y el disparador de disrupción de ADR-0039 | ADR-0039; secuencias del asistente |
+| Para confirmar una reserva o resolver un conflicto, si el mensaje no dice qué hacer («confirmala», «mantené el mío»), el asistente muestra los datos y pregunta, sin proponer una opción por omisión | Proponer una opción que el viajero no eligió lo llevaría a confirmar algo sin leerlo | ADR-0038 |
+| Un «sí» escrito no confirma: la confirmación es siempre la `confirmacion` con el `accionId`, y el asistente vuelve a mostrar la propuesta. Un mensaje con `texto` y `confirmacion` se atiende como confirmación y el texto queda como el turno del viajero | ADR-0038 pide una confirmación explícita de ese `accionId` | ADR-0038; `virtual-assistant.yaml` |
+| La confirmación **reclama** la acción pendiente en una transacción corta, antes de llamar a `itinerary` o a `support-liaison`: otra confirmación simultánea de la misma acción responde `409`. Si el otro servicio no responde, la acción vuelve a quedar pendiente hasta que venza | No se mantiene una transacción abierta durante una llamada a otro servicio, y una acción no se ejecuta dos veces | ADR-0038; ADR-0014 |
+| Si el viajero tiene varios viajes y no dijo de cuál habla, el asistente le pregunta y le pide que repita el pedido eligiendo el viaje (`viajeId` del mensaje o el nombre del viaje); no guarda el pedido a medias | Mantiene la sesión en lo que fija ADR-0040 (viaje en foco, acción pendiente y contador) | ADR-0039; ADR-0040 |
+| La proyección de disrupciones del asistente se purga con la ventana de la bandeja de entrada (14 días) | ADR-0040 dice que se purga con la bandeja de entrada | ADR-0040; ADR-0014 |
+| El asistente responde siempre en español: sin `preferences` no conoce el idioma del viajero, y ADR-0040 dice que no consume `PreferenciasActualizadas` hasta que haga falta el idioma | El prototipo trae solo el catálogo en español (ADR-0037) | ADR-0037; ADR-0040 |
+| El asistente todavía no tiene ruta pública en `bff-web` (paso 11): las pruebas y la demostración lo llaman directo, con la sesión del viajero | El contrato lo expone solo a los BFF, que no están construidos | ADR-0005; `virtual-assistant.yaml` |
 | La sesión OIDC de las operaciones públicas se verifica en `comun/sesion.py` (`HS256` con `TROTAMUNDOS_JWT_SECRETO`, compartido por `.env`); la usan `identity-access` y la API de filtros de `mail-ingest` | El token lo emite `identity-access`. En producción cada servicio verificaría con la clave pública de `identity-access` | ADR-0007 |
 | El alias de reenvío lo genera `identity-access` al conectar el buzón y lo devuelve en `POST /buzones`; `mail-ingest` lo recibe por `EstadoDeBuzonCambiado` | ADR-0035 dice que lo asigna `mail-ingest`, pero el contrato `identity-access.yaml` lo devuelve al conectar el buzón, y el contrato manda (AGENTS.md). Lo precisa [ADR-0041](../docs/03-adr/ADR-0041-alias-de-reenvio-generado-por-identity-access.md) | ADR-0035; ADR-0041; `identity-access.yaml` |
 | AsyncAPI 1.4.0: `EstadoDeBuzonCambiado` suma `via`, `proveedor`, `aliasReenvio` y `correoDelTitular`, que viajan solo cuando el buzón pasa a `Activo` | `mail-ingest` necesita saber cómo atender cada buzón y, para un reenvío, con qué correo comparar el remitente (ADR-0035). Acordado con el grupo frente a un endpoint interno en `identity-access`: un solo mecanismo y sin llamadas sincrónicas. En los demás cambios alcanza con `buzonId`, así el correo no viaja de más | ADR-0004; ADR-0027 (cambio compatible); ADR-0035 |
@@ -237,6 +263,7 @@ Servicios que levanta `make servicios-arriba`:
 | `identity-access` | 18103 | Sesiones OIDC/OTP, buzones, bóveda (`KEK_region`/`DEK_u`), vales ABAC, auditoría encadenada y privacidad ([`openapi/identity-access.yaml`](../contratos/openapi/identity-access.yaml)). Publica `EstadoDeBuzonCambiado` y `CuentaSuprimida` |
 | `mail-ingest` | 18104 | Avisos de los proveedores (`/webhooks/correo`), reenvío verificado (`/webhooks/correo/reenvio`) y filtros del usuario ([`mail-ingest-webhooks.yaml`](../contratos/openapi/mail-ingest-webhooks.yaml), [`mail-ingest-filtros.yaml`](../contratos/openapi/mail-ingest-filtros.yaml)). Consume `EstadoDeBuzonCambiado`, pide los tokens a `identity-access` y publica `MensajeDeViajeRecibido` |
 | `support-liaison` | 18105 | Casos de soporte derivados a la agencia preferida ([`support-liaison.yaml`](../contratos/openapi/support-liaison.yaml)). Toma la instantánea del viaje de `itinerary-lectura`, consume `PreferenciasActualizadas` y publica `CasoDerivado` |
+| `virtual-assistant` | 18106 | Asistente virtual de la Opción B ([`virtual-assistant.yaml`](../contratos/openapi/virtual-assistant.yaml)). Lee de `itinerary-lectura`, corrige en `itinerary-escritura` y deriva en `support-liaison`, siempre con la sesión del viajero; consume `DisrupcionDetectada` |
 
 Variables de entorno opcionales: `TROTAMUNDOS_CONTRATOS`, `TROTAMUNDOS_DSN`, `TROTAMUNDOS_BROKER`,
 `TROTAMUNDOS_REGION`, `TROTAMUNDOS_INTERVALO_TAREAS` (segundos entre corridas del trabajo
@@ -244,6 +271,8 @@ periódico; 0 lo apaga) y `TROTAMUNDOS_PREFIJO_TOPICOS` (antepuesto a los tópic
 usan para no mezclarse). Con `TROTAMUNDOS_BROKER` vacío, un servicio no publica ni consume.
 `mail-ingest` usa además `TROTAMUNDOS_URL_IDENTITY_ACCESS` (por omisión, `http://localhost:18103`), y
 `support-liaison`, `TROTAMUNDOS_URL_ITINERARY_LECTURA` (por omisión, `http://localhost:18102`).
+`virtual-assistant` usa esa misma, `TROTAMUNDOS_URL_ITINERARY_ESCRITURA` (`http://localhost:18101`) y
+`TROTAMUNDOS_URL_SUPPORT_LIAISON` (`http://localhost:18105`).
 `TROTAMUNDOS_MODO` elige el modo de despliegue de `itinerary`: `completo` (por omisión), `lectura` o
 `escritura`.
 
@@ -295,13 +324,13 @@ construido](#diseñado-y-no-construido).
 | [0031](../docs/03-adr/ADR-0031-residencia-de-datos-por-region.md) Residencia de datos por región | ➖ | La multirregión del paso 16 se simula en una sola jurisdicción; las clases de residencia no aplican |
 | [0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md) Internacionalización | 🟨 | Instantes en UTC con zona IANA aparte, en todo el modelo. Idioma y formateo, en los BFF (paso 11) |
 | [0033](../docs/03-adr/ADR-0033-capacidades-nativas-gps-y-degradacion.md) GPS en el móvil | ➖ | No hay cliente móvil nativo en el prototipo |
-| [0034](../docs/03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) Módulo avanzado y recorte del prototipo | 🟨 | El recorte guía este plan. La Opción B, diseñada en la [iteración 5](../docs/02-proceso-add/iteracion-5/README.md) (paso 18); ADR-0040 precisa su punto sobre `CuentaSuprimida`. El código, paso 19 |
+| [0034](../docs/03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) Módulo avanzado y recorte del prototipo | 🟨 | El recorte guía este plan. La Opción B, diseñada en la [iteración 5](../docs/02-proceso-add/iteracion-5/README.md) (paso 18) y construida en `virtual-assistant` (paso 19) sin interfaces nuevas en el núcleo (CON-06); ADR-0040 precisa su punto sobre `CuentaSuprimida` |
 | [0035](../docs/03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) Buzones sin OAuth y formatos desconocidos | 🟨 | Alias de reenvío e `imapDelegado` con credencial delegada cifrada en `identity-access` (paso 7). Receptor de reenvío con DKIM/SPF/ARC y titular verificados, con rechazos auditados (paso 8). Formatos desconocidos, paso 9 |
 | [0036](../docs/03-adr/ADR-0036-tecnologia-del-prototipo.md) Tecnología del prototipo | ✅ | Python 3.12, FastAPI, PostgreSQL, Redpanda y Docker Compose. Schemathesis, paso 17 |
-| [0037](../docs/03-adr/ADR-0037-interpretacion-de-intenciones-del-asistente.md) Intérprete de intenciones intercambiable | ⏳ | Paso 19: reglas detrás del puerto. El adaptador de modelo de lenguaje queda diseñado y no construido |
-| [0038](../docs/03-adr/ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md) Consultas y corrección confirmada | ⏳ | Paso 19 |
-| [0039](../docs/03-adr/ADR-0039-politica-de-derivacion-a-la-agencia.md) Derivación a la agencia | ⏳ | `POST /casos` ya está (paso 12); los disparadores de derivación, paso 19 |
-| [0040](../docs/03-adr/ADR-0040-sesion-conversacional-y-privacidad.md) Sesión conversacional y privacidad | ⏳ | Paso 19: sesiones, retención y `DisrupcionDetectada`. La supresión de fase 1 por `usuario_id`, con la del resto del plano operacional (paso 14) |
+| [0037](../docs/03-adr/ADR-0037-interpretacion-de-intenciones-del-asistente.md) Intérprete de intenciones intercambiable | 🟨 | Paso 19: puerto `InterpreteDeIntenciones` con reglas, umbral 0,6 y catálogos de patrones y mensajes en español. El adaptador de modelo de lenguaje con redacción de datos personales queda diseñado y no construido |
+| [0038](../docs/03-adr/ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md) Consultas y corrección confirmada | ✅ | Paso 19: consultas, corrección en dos pasos con vencimiento de 10 min y `409` releído, problemas menores y cambios ante el proveedor derivados |
+| [0039](../docs/03-adr/ADR-0039-politica-de-derivacion-a-la-agencia.md) Derivación a la agencia | ✅ | Los cuatro disparadores, la síntesis y el caso idempotente por la acción (paso 19), sobre `POST /casos` (paso 12) |
+| [0040](../docs/03-adr/ADR-0040-sesion-conversacional-y-privacidad.md) Sesión conversacional y privacidad | 🟨 | Paso 19: sesiones por `usuario_id`, retención de 30 días y `DisrupcionDetectada` con bandeja de entrada. La supresión de fase 1 por `usuario_id`, con la del resto del plano operacional (paso 14); la degradación ante `Disrupción masiva`, diseñada y no construida |
 | [0041](../docs/03-adr/ADR-0041-alias-de-reenvio-generado-por-identity-access.md) Alias de reenvío generado por `identity-access` | ✅ | Pasos 7 (alta del buzón) y 8 (`mail-ingest` lo recibe por `EstadoDeBuzonCambiado`) |
 
 Además de los ADR: `preferences` se construye como servicio mínimo en el paso 12, porque su evento
@@ -335,7 +364,7 @@ implementa. La columna «Prioridad» ordena lo que falta según el recorte acord
 | 16 | Multirregión simulada: región primaria por usuario, testigo transregional y conmutación | QA-05, ADR-0018 | Completar al 100 % | ⬜ |  |
 | 17 | Pruebas de contrato y de escenarios (QA-01, QA-04, QA-05) | ADR-0017 | Debería (reducido) | ⬜ |  |
 | 18 | Iteración 5 de ADD: diseño de la Opción B (ADRs y contrato) | CON-06 | Sí o sí | ✅ | Francisco Lozano |
-| 19 | `virtual-assistant`: intenciones y derivación a la agencia | RF-B1, RF-B2 | Sí o sí | ⬜ |  |
+| 19 | `virtual-assistant`: intenciones y derivación a la agencia | RF-B1, RF-B2 | Sí o sí | ✅ | Francisco Lozano |
 | 20 | Interfaz web mínima de demostración | RF-09 | Debería (reducido) | ⬜ |  |
 | 21 | Matriz código ↔ ADR, guion de demostración y README final | QA-16 | Sí o sí | ⬜ |  |
 
@@ -409,6 +438,10 @@ paso; el paso 21 la revisa entera. Las rutas son relativas a `prototipo/`.
 | `servicios/support_liaison/casos.py`, `servicio.py`, `api.py` | `support-liaison.yaml`; RF-12, UC-7 (instantánea, estados, idempotencia, `422` sin agencia); ADR-0014; ADR-0024 (espera) | `tests/support_liaison/test_support_liaison.py`, `test_arranque_support_liaison.py` |
 | `servicios/support_liaison/interfaz_de_agencia.py`, `complementos/` | ADR-0006 (agencia como complemento) | `tests/support_liaison/test_support_liaison.py` |
 | `servicios/support_liaison/preferencias.py`, `instantanea.py`, `publicacion.py` | UC-7 (copia local de la agencia, viaje leído en nombre del viajero); ADR-0028 (mismo `404`); AsyncAPI `CasoDerivado` | `tests/support_liaison/test_support_liaison.py`, `test_arranque_support_liaison.py` |
+| `servicios/virtual_assistant/interprete.py`, `catalogo.py`, `catalogos/es/` | ADR-0037 (puerto, reglas, umbral 0,6, fechas relativas en la zona del tramo, catálogos por idioma); ADR-0032 | `tests/virtual_assistant/test_interprete.py`, `tests/test_arquitectura.py` |
+| `servicios/virtual_assistant/dialogo.py`, `acciones.py` | ADR-0038 (consultas, corrección en dos pasos, `409` releído, problemas menores); RF-B1; ADR-0013 (la corrección entra como edición manual) | `tests/virtual_assistant/test_virtual_assistant.py` |
+| `servicios/virtual_assistant/derivacion.py` | ADR-0039 (cuatro disparadores, síntesis, idempotencia por la acción, `422`); RF-B2; `support-liaison.yaml` | `tests/virtual_assistant/test_virtual_assistant.py` |
+| `servicios/virtual_assistant/sesiones.py`, `contexto.py`, `servicio.py`, `api.py` | ADR-0040 (sesión por `usuario_id`, `404` ajeno, retención, `DisrupcionDetectada` con bandeja de entrada); `virtual-assistant.yaml`; ADR-0014 | `tests/virtual_assistant/test_virtual_assistant.py`, `test_arranque_virtual_assistant.py` |
 
 ### Diseñado y no construido
 
@@ -418,5 +451,8 @@ apartado lo dice explícitamente para que no se lea como un faltante. Se complet
 | Qué | Dónde está diseñado | Por qué no se construye |
 |---|---|---|
 | Compartir itinerarios con designados y en redes sociales (paso 13) | [ADR-0028](../docs/03-adr/ADR-0028-autorizacion-comparticion-y-publicacion.md), `contratos/openapi/sharing.yaml` | No es un ASR ni lo necesita la Opción B (recorte de ADR-0034) |
+| Adaptador de modelo de lenguaje del asistente, con redacción de datos personales y vuelta a las reglas | [ADR-0037](../docs/03-adr/ADR-0037-interpretacion-de-intenciones-del-asistente.md), [vista de módulos del asistente](../docs/04-vistas/vista-modulos-asistente.md) (`complementos/`) | Lo decidió así ADR-0037: el prototipo es determinista y no necesita secretos ni costo por mensaje. Es un complemento detrás del mismo puerto |
+| Catálogos del asistente en otros idiomas | [ADR-0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md), ADR-0037 | El prototipo trae solo español (ADR-0037); otro idioma es otro par de archivos en `catalogos/` |
+| Degradación del asistente ante `Disrupción masiva` | [ADR-0040](../docs/03-adr/ADR-0040-sesion-conversacional-y-privacidad.md) §6, [ADR-0020](../docs/03-adr/ADR-0020-contrapresion-y-sobrecarga.md) | Los modos de degradación de ADR-0020 son de los pasos 11 y 17; cuando estén, el asistente se suma como carga de prioridad 2/3 |
 | Multirregión y conmutación ante la pérdida de una región (paso 16) | [ADR-0002](../docs/03-adr/ADR-0002-despliegue-multirregion.md), [ADR-0018](../docs/03-adr/ADR-0018-consistencia-datos-multirregion.md), [vista de despliegue N2](../docs/04-vistas/vista-despliegue-nivel-2.md) | Es el paso más caro del plan. ASR-3 (QA-05) queda demostrado solo en el diseño |
 
