@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — support-liaison
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Derivación de casos de soporte a la agencia preferida del usuario (RF-12, UC-7).
 
@@ -41,6 +41,8 @@ paths:
           content:
             application/vnd.trotamundos.v1+json:
               schema: { $ref: '#/components/schemas/Caso' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
         '422':
           description: El usuario no tiene agencia preferida; el cuerpo indica cómo configurarla.
@@ -58,6 +60,7 @@ paths:
           content:
             application/vnd.trotamundos.v1+json:
               schema: { $ref: '#/components/schemas/Caso' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
   /casos/{id}/resolucion:
     parameters:
@@ -71,6 +74,7 @@ paths:
           content:
             application/vnd.trotamundos.v1+json:
               schema: { $ref: '#/components/schemas/Caso' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
         '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
 components:

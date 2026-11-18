@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — identity-access
-  version: 1.1.1
+  version: 1.2.0
   description: |
     Identidad, consentimiento de buzones, custodia de tokens delegados, autorización y derechos
     sobre datos personales.
@@ -112,6 +112,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Buzon' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
     post:
       tags: [buzones]
       operationId: conectarBuzon
@@ -152,6 +153,7 @@ paths:
                       urlAutorizacion: { type: string, format: uri }
                       aliasReenvio: { type: string, format: email }
         '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
 
   /buzones/{id}:
     parameters:
@@ -163,6 +165,7 @@ paths:
       security: [{ oidc: [] }]
       responses:
         '204': { description: Revocado; se publica `EstadoDeBuzonCambiado`. }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
 
   /buzones/{id}/autorizacion:
@@ -190,6 +193,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Buzon' }
         '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
         '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
 
@@ -271,6 +275,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Exportacion' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
     post:
       tags: [privacidad]
       operationId: pedirExportacion
@@ -284,6 +289,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Exportacion' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
 
   /privacidad/cuenta:
     delete:
@@ -306,6 +313,8 @@ paths:
                   solicitudId: { $ref: 'comun.yaml#/components/schemas/Id' }
                   plazoFase1: { type: string, format: date-time }
                   plazoFase2: { type: string, format: date-time }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
 
 components:
   securitySchemes:
