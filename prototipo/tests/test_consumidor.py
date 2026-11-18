@@ -139,3 +139,25 @@ async def test_p3_se_puede_pausar(bd, servidores, carriles):
         await consumidor.detener()
 
     assert len(vistos) == 1
+
+
+def test_rechazo_privado_no_guarda_correo_ni_valores_del_error(bd):
+    from types import SimpleNamespace
+    from trotamundos.comun.contratos import ErrorDeContrato
+
+    def manejar(evento):
+        raise ErrorDeContrato("mensaje", ["dato privado del correo"])
+
+    consumidor = ConsumidorConCarriles("", "extraccion", {}, manejar, *bd,
+                                       conservar_contenido_rechazado=False)
+    mensaje = SimpleNamespace(
+        topic="correo.p2", partition=0, offset=1,
+        headers=[("tipo", b"MensajeDeViajeRecibido"), ("usuarioId", USUARIO_A.encode()),
+                 ("asunto", b"dato privado del correo")],
+        value=b'{"cuerpoTexto":"dato privado del correo"}')
+    consumidor._procesar(mensaje)
+    with conectar(*bd) as conexion:
+        [rechazado] = conexion.execute("SELECT * FROM evento_rechazado").fetchall()
+    assert rechazado["valor"] is None
+    assert rechazado["cabeceras"] == {"usuarioId": USUARIO_A}
+    assert "dato privado" not in str(rechazado)

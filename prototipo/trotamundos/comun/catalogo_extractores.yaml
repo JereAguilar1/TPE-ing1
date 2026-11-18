@@ -1,0 +1,10 @@
+# Configuración del único complemento del recorte del paso 9.
+- modulo: trotamundos.servicios.booking_extraction.complementos.reserva_simulada
+  manifiesto:
+    id: extractor-reserva-simulada
+    version: 1.0.0
+    apiContrato: '1.0'
+    remitentesQueReconoce: [reservas@aerolinea.example]
+    tiposDeSegmento: [vuelo]
+    umbrales: {alto: 0.90, bajo: 0.60}
+    corpus: tests/booking_extraction/corpus/reserva_simulada.json

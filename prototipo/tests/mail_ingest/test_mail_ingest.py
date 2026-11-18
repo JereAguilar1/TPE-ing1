@@ -160,7 +160,7 @@ def test_el_mismo_mensaje_por_aviso_y_por_reconciliacion_se_publica_una_vez(mail
 
 
 def test_los_filtros_deciden_antes_de_bajar_el_cuerpo(mail):
-    """RF-04: bloqueados > permitidos > catálogo (vacío hasta el paso 9)."""
+    """RF-04: bloqueados > permitidos > catálogo."""
     buzon_id = _activar(mail)
     proveedor = mail.adaptadores["oauth"]
     _permitir(mail, "*@miagencia.com", "reservas@aerolinea.com",
@@ -464,7 +464,8 @@ def test_el_usuario_administra_sus_filtros(mail, contratos):
     contratos.validar("openapi/mail-ingest-filtros.yaml#/components/schemas/FiltrosDeCorreo",
                       guardado.json())
     assert cliente.get("/filtros-de-correo", headers=_sesion()).json() == guardado.json()
-    assert cliente.get("/filtros-de-correo/catalogo", headers=_sesion()).json() == []
+    assert cliente.get("/filtros-de-correo/catalogo", headers=_sesion()).json() == [
+        {"patron": "reservas@aerolinea.example", "extractorId": "extractor-reserva-simulada"}]
 
 
 def test_los_filtros_piden_sesion_y_un_cuerpo_valido(mail):
@@ -482,3 +483,19 @@ def test_los_filtros_piden_sesion_y_un_cuerpo_valido(mail):
     assert invalido.json()["errores"][0]["campo"] == "permitidos[0]"
     assert cliente.put("/filtros-de-correo", headers={**_sesion(), **tipo},
                        content=json.dumps({"permitidos": []})).status_code == 400
+
+
+@pytest.mark.parametrize("bloqueado", [False, True])
+def test_catalogo_del_extractor_permite_descarga_salvo_bloqueo(mail, bloqueado):
+    buzon_id = _activar(mail)
+    remitente = "reservas@aerolinea.example"
+    if bloqueado:
+        _permitir(mail, bloqueados=(remitente,))
+    proveedor = mail.adaptadores["oauth"]
+    proveedor.entregar(str(buzon_id), _correo(remitente))
+    bajados = []
+    descargar = proveedor.descargar
+    proveedor.descargar = lambda b, t, m: bajados.append(m) or descargar(b, t, m)
+    mail.procesar_cola()
+    assert len(bajados) == (0 if bloqueado else 1)
+    assert len(_publicados(mail)) == (0 if bloqueado else 1)

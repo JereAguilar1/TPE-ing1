@@ -305,3 +305,36 @@ def test_en_el_asistente_solo_contexto_acciones_y_derivacion_hablan_con_otros_se
     con_http = sorted(a.stem for a in carpeta.rglob("*.py")
                       if "httpx" in _importaciones(PAQUETE, a))
     assert con_http == ["acciones", "contexto", "derivacion"]
+
+
+# --- `booking_extraction` (vista N2 §2, ADR-0006, ADR-0015) ---------------------------------
+
+DEPENDENCIAS_DE_BOOKING_EXTRACTION = {
+    "interfaz_de_extractor": set(),
+    "complementos": {"interfaz_de_extractor"},
+    "validador_canonico": set(),
+    "evaluador_de_confianza": set(),
+    "observabilidad_de_calidad": set(),
+    "registro_de_extractores": {"interfaz_de_extractor", "complementos", "validador_canonico",
+                               "evaluador_de_confianza", "observabilidad_de_calidad"},
+    "publicacion": set(),
+    "servicio": {"registro_de_extractores", "publicacion"},
+}
+
+
+def test_los_modulos_de_booking_extraction_respetan_la_vista_n2():
+    assert violaciones_internas(PAQUETE, "booking_extraction",
+                                DEPENDENCIAS_DE_BOOKING_EXTRACTION) == []
+
+
+def test_los_extractores_no_importan_otros_complementos_ni_clientes_de_red():
+    """R2/R3: cada extractor es puro, aislado y depende solo del puerto y de lo común."""
+    carpeta = PAQUETE / "servicios" / "booking_extraction" / "complementos"
+    prefijo = "trotamundos.servicios.booking_extraction.complementos"
+    encontradas = []
+    for archivo in carpeta.rglob("*.py"):
+        for nombre in _importaciones(PAQUETE, archivo):
+            if nombre == prefijo or nombre.startswith(prefijo + ".") or nombre.split(".")[0] in {
+                    "httpx", "requests", "aiohttp", "urllib", "socket", "http", "ftplib", "smtplib"}:
+                encontradas.append(f"{archivo.relative_to(carpeta)} importa {nombre}")
+    assert encontradas == []

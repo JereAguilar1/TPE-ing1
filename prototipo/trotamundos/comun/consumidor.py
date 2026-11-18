@@ -48,8 +48,10 @@ class ConsumidorConCarriles:
 
     def __init__(self, servidores: str, grupo: str, topicos_por_carril: Mapping[Carril, list[str]],
                  manejar: Callable[[Evento], Any], dsn: str, esquema: str, *,
-                 pausar_p3: Callable[[], bool] = lambda: False, reintento_s: float = 1.0):
+                 pausar_p3: Callable[[], bool] = lambda: False, reintento_s: float = 1.0,
+                 conservar_contenido_rechazado: bool = True):
         self._servidores, self._grupo = servidores, grupo
+        self._conservar_contenido_rechazado = conservar_contenido_rechazado
         self._topicos = {c: list(t) for c, t in topicos_por_carril.items() if t}
         self._manejar, self._dsn, self._esquema = manejar, dsn, esquema
         self._pausar_p3, self._reintento_s = pausar_p3, reintento_s
@@ -101,8 +103,9 @@ class ConsumidorConCarriles:
                         await asyncio.to_thread(self._procesar, mensaje)
                     except Exception:
                         # Error transitorio: no se avanza; el mensaje vuelve en la próxima vuelta.
-                        _registro_de_errores.exception("No se pudo procesar %s@%s",
-                                                       mensaje.topic, mensaje.offset)
+                        _registro_de_errores.error("No se pudo procesar %s@%s",
+                                                  mensaje.topic, mensaje.offset,
+                                                  exc_info=self._conservar_contenido_rechazado)
                         consumidor.seek(particion, mensaje.offset)
                         await asyncio.sleep(self._reintento_s)
                         break
@@ -128,13 +131,21 @@ class ConsumidorConCarriles:
     def _rechazar(self, mensaje: Any, cabeceras: list, motivo: str) -> None:
         legibles = {k: v.decode(errors="replace") for k, v in cabeceras}
         usuario = legibles.get("usuarioId")
+        valor = mensaje.value
+        if not self._conservar_contenido_rechazado:
+            # ADR-0035: un correo inválido tampoco se archiva ni aparece en el error.
+            legibles = {k: v for k, v in legibles.items()
+                        if k in {"idDeEvento", "usuarioId", "idDeCorrelacion", "idDeCausa"}
+                        and _es_uuid(v)}
+            motivo = "Evento rechazado: no cumple el contrato"
+            valor = None
         with transaccion(self._dsn, self._esquema) as conexion:
             conexion.execute(
                 """INSERT INTO evento_rechazado (consumidor, usuario_id, topico, particion,
                                                  desplazamiento, motivo, cabeceras, valor)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                 (self._grupo, usuario if _es_uuid(usuario) else None, mensaje.topic,
-                 mensaje.partition, mensaje.offset, motivo[:2000], Jsonb(legibles), mensaje.value))
+                 mensaje.partition, mensaje.offset, motivo[:2000], Jsonb(legibles), valor))
 
 
 def _es_uuid(texto: str | None) -> bool:

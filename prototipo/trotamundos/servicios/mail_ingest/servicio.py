@@ -27,6 +27,7 @@ from uuid import UUID
 import psycopg
 from fastapi import FastAPI
 
+from trotamundos.comun.catalogo_extractores import remitentes
 from trotamundos.comun.carriles import Carril, asegurar_topicos, carriles_posibles, topico
 from trotamundos.comun.config import Configuracion
 from trotamundos.comun.consumidor import DDL_RECHAZADOS, ConsumidorConCarriles
@@ -221,7 +222,8 @@ class MailIngest:
         for metadatos in novedades.mensajes:
             if deduplicador.ya_recibido(conexion, buzon_id, metadatos.id_de_mensaje):
                 continue
-            if not filtros.admite(lista, metadatos.remitente):
+            if not filtros.admite(lista, metadatos.remitente,
+                                  (e["patron"] for e in self.catalogo_de_remitentes())):
                 deduplicador.registrar(conexion, buzon_id, buzon.usuario_id,
                                        metadatos.id_de_mensaje, ahora, descartado="filtrado")
                 continue
@@ -276,8 +278,8 @@ class MailIngest:
             return filtros.de_usuario(conexion, usuario_id).a_dict()
 
     def catalogo_de_remitentes(self) -> list[dict[str, str]]:
-        """Los remitentes que algún extractor reconoce. Vacío hasta que haya extractores (paso 9)."""
-        return []
+        """Remitentes del manifiesto común, sin dependencias entre servicios (RF-04)."""
+        return remitentes()
 
     # --- trabajo periódico ---------------------------------------------------------------
 

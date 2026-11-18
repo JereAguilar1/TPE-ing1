@@ -1,0 +1,382 @@
+[
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC000",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC000\nAerolinea: AR\nNumero: 1400\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-01T13:00:00Z\nLlegada: 2026-12-01T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC000",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1400",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-01T13:00:00Z",
+      "llegada": "2026-12-01T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC001",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC001\nAerolinea: AR\nNumero: 1401\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-02T13:00:00Z\nLlegada: 2026-12-02T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC001",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1401",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-02T13:00:00Z",
+      "llegada": "2026-12-02T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC002",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC002\nAerolinea: AR\nNumero: 1402\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-03T13:00:00Z\nLlegada: 2026-12-03T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC002",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1402",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-03T13:00:00Z",
+      "llegada": "2026-12-03T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC003",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC003\nAerolinea: AR\nNumero: 1403\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-04T13:00:00Z\nLlegada: 2026-12-04T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC003",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1403",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-04T13:00:00Z",
+      "llegada": "2026-12-04T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC004",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC004\nAerolinea: AR\nNumero: 1404\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-05T13:00:00Z\nLlegada: 2026-12-05T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC004",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1404",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-05T13:00:00Z",
+      "llegada": "2026-12-05T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC005",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC005\nAerolinea: AR\nNumero: 1405\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-06T13:00:00Z\nLlegada: 2026-12-06T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC005",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1405",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-06T13:00:00Z",
+      "llegada": "2026-12-06T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC006",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC006\nAerolinea: AR\nNumero: 1406\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-07T13:00:00Z\nLlegada: 2026-12-07T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC006",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1406",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-07T13:00:00Z",
+      "llegada": "2026-12-07T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC007",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC007\nAerolinea: AR\nNumero: 1407\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-08T13:00:00Z\nLlegada: 2026-12-08T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC007",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1407",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-08T13:00:00Z",
+      "llegada": "2026-12-08T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC008",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC008\nAerolinea: AR\nNumero: 1408\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-09T13:00:00Z\nLlegada: 2026-12-09T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC008",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1408",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-09T13:00:00Z",
+      "llegada": "2026-12-09T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC009",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC009\nAerolinea: AR\nNumero: 1409\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-10T13:00:00Z\nLlegada: 2026-12-10T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC009",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1409",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-10T13:00:00Z",
+      "llegada": "2026-12-10T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC010",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC010\nAerolinea: AR\nNumero: 1410\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-11T13:00:00Z\nLlegada: 2026-12-11T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC010",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1410",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-11T13:00:00Z",
+      "llegada": "2026-12-11T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC011",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC011\nAerolinea: AR\nNumero: 1411\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-12T13:00:00Z\nLlegada: 2026-12-12T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC011",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1411",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-12T13:00:00Z",
+      "llegada": "2026-12-12T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC012",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC012\nAerolinea: AR\nNumero: 1412\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-13T13:00:00Z\nLlegada: 2026-12-13T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC012",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1412",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-13T13:00:00Z",
+      "llegada": "2026-12-13T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC013",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC013\nAerolinea: AR\nNumero: 1413\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-14T13:00:00Z\nLlegada: 2026-12-14T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC013",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1413",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-14T13:00:00Z",
+      "llegada": "2026-12-14T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC014",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC014\nAerolinea: AR\nNumero: 1414\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-15T13:00:00Z\nLlegada: 2026-12-15T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC014",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1414",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-15T13:00:00Z",
+      "llegada": "2026-12-15T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC015",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC015\nAerolinea: AR\nNumero: 1415\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-16T13:00:00Z\nLlegada: 2026-12-16T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC015",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1415",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-16T13:00:00Z",
+      "llegada": "2026-12-16T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC016",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC016\nAerolinea: AR\nNumero: 1416\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-17T13:00:00Z\nLlegada: 2026-12-17T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC016",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1416",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-17T13:00:00Z",
+      "llegada": "2026-12-17T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC017",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC017\nAerolinea: AR\nNumero: 1417\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-18T13:00:00Z\nLlegada: 2026-12-18T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC017",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1417",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-18T13:00:00Z",
+      "llegada": "2026-12-18T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC018",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC018\nAerolinea: AR\nNumero: 1418\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-19T13:00:00Z\nLlegada: 2026-12-19T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC018",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1418",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-19T13:00:00Z",
+      "llegada": "2026-12-19T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@aerolinea.example",
+      "asunto": "Tu reserva ABC019",
+      "recibidoEn": "2026-11-18T10:01:00Z",
+      "cuerpoTexto": "Reserva aérea simulada v1\nLocalizador: ABC019\nAerolinea: AR\nNumero: 1419\nOrigen: AEP\nDestino: MDZ\nSalida: 2026-12-20T13:00:00Z\nLlegada: 2026-12-20T15:00:00Z\nEmitido: 2026-11-18T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "ABC019",
+      "emisor": "aerolinea:AR",
+      "operador": "AR",
+      "numero": "1419",
+      "origen": "AEP",
+      "destino": "MDZ",
+      "salida": "2026-12-20T13:00:00Z",
+      "llegada": "2026-12-20T15:00:00Z",
+      "emitido": "2026-11-18T10:00:00Z"
+    }
+  }
+]

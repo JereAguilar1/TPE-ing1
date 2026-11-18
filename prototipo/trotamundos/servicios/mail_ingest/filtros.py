@@ -6,8 +6,7 @@ permitidos > catálogo. Un remitente que no figura en ninguna no es correo de vi
 Se evalúa sobre los metadatos, **antes** de descargar el cuerpo: así el sistema procesa menos
 datos personales.
 
-El catálogo está vacío hasta que existan extractores (paso 9): mientras tanto pasan solo los
-permitidos.
+El catálogo se deriva del manifiesto declarativo compartido con el registro de extractores.
 
 Un patrón es una dirección exacta (`reservas@miagencia.com`) o un dominio (`*@miagencia.com`). El
 dominio no incluye subdominios: `*@aerolinea.com` no cubre `avisos.aerolinea.com`.
