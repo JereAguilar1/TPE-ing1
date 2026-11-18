@@ -22,6 +22,7 @@ from trotamundos.comun.contratos import Contratos, ErrorDeContrato
 from trotamundos.comun.eventos import Causa, Evento
 from trotamundos.comun.modelo import Fuente, ObservacionCanonica
 from trotamundos.comun.persistencia import registrar_en_bandeja_de_entrada
+from trotamundos.comun.tipos_de_segmento import RegistroDeTipos
 from trotamundos.servicios.itinerary.fusion.eventos import eventos_del_cambio
 from trotamundos.servicios.itinerary.fusion.identidad import (
     RepositorioDeReservas,
@@ -36,7 +37,8 @@ FUENTE_POR_EVENTO = {"ReservaExtraida": Fuente.CORREO, "ReservaObservada": Fuent
 
 
 def procesar(conexion: psycopg.Connection, evento: Evento, repositorio: RepositorioDeReservas,
-             contratos: Contratos, ahora: datetime, region: str | None = None) -> list[Evento]:
+             contratos: Contratos, ahora: datetime, region: str | None = None,
+             registro: RegistroDeTipos | None = None) -> list[Evento]:
     """Aplica el evento y devuelve los eventos a publicar (ninguno si ya se había procesado)."""
     if evento.tipo not in FUENTE_POR_EVENTO:
         raise ErrorDeContrato(evento.tipo, [f"itinerary no consume {evento.tipo}"])
@@ -53,7 +55,7 @@ def procesar(conexion: psycopg.Connection, evento: Evento, repositorio: Reposito
     banda = evento.carga.get("banda")
     confianza = evento.carga["confianza"]["global"] if "confianza" in evento.carga else None
     resultado = ingerir_observacion(repositorio, UUID(evento.sobre["usuarioId"]), observacion,
-                                    ahora, banda=banda, confianza=confianza)
+                                    ahora, banda=banda, confianza=confianza, registro=registro)
     persistir(repositorio, resultado)
 
     causa = Causa.de_evento(evento, region)

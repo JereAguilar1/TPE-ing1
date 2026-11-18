@@ -30,6 +30,7 @@ from trotamundos.comun.modelo import (
     ObservacionCanonica,
     instante_desde_texto,
 )
+from trotamundos.comun.tipos_de_segmento import RegistroDeTipos
 from trotamundos.servicios.itinerary.fusion.consolidacion import Consolidacion, reconsolidar
 from trotamundos.servicios.itinerary.reservas import (
     Banda,
@@ -86,8 +87,10 @@ class ResultadoDeIngesta:
 
 
 def ingerir(repositorio: RepositorioDeReservas, usuario_id: UUID, registrada: ObservacionRegistrada,
-            ahora: datetime, nuevo_id: Callable[[], UUID] = uuid4) -> ResultadoDeIngesta:
-    """Resuelve la identidad de la observación, la agrega y reconsolida (UC-1, UC-2, UC-4)."""
+            ahora: datetime, nuevo_id: Callable[[], UUID] = uuid4,
+            registro: RegistroDeTipos | None = None) -> ResultadoDeIngesta:
+    """Resuelve la identidad de la observación, la agrega y reconsolida (UC-1, UC-2, UC-4).
+    Una reserva nueva valida contra `registro`, el del servicio (sin él, el de los contratos)."""
     coincidentes: dict[UUID, Reserva] = {}
     previa = repositorio.por_observacion(usuario_id, registrada.clave)
     if previa is not None:
@@ -101,7 +104,7 @@ def ingerir(repositorio: RepositorioDeReservas, usuario_id: UUID, registrada: Ob
     unificadas: tuple[Reserva, ...] = ()
     ajenos: set[Identificador] = set()
     if not coincidentes:
-        reserva, creada = Reserva(nuevo_id(), usuario_id, ahora), True
+        reserva, creada = Reserva(nuevo_id(), usuario_id, ahora, registro), True
     else:
         ordenadas = sorted(coincidentes.values(), key=lambda r: (r.creada_en, str(r.id)))
         # Una reserva descartada o dada de baja es, como una manual, una decisión del usuario:
@@ -136,12 +139,13 @@ def ingerir(repositorio: RepositorioDeReservas, usuario_id: UUID, registrada: Ob
 def ingerir_observacion(repositorio: RepositorioDeReservas, usuario_id: UUID,
                         observacion: ObservacionCanonica, ahora: datetime, *,
                         banda: str | None = None, confianza: float | None = None,
-                        nuevo_id: Callable[[], UUID] = uuid4) -> ResultadoDeIngesta:
+                        nuevo_id: Callable[[], UUID] = uuid4,
+                        registro: RegistroDeTipos | None = None) -> ResultadoDeIngesta:
     """`ingerir` para quien recibe la observación de afuera y no conoce el agregado (`ingesta`
     solo depende de `fusion`, vista N2). `banda` y `confianza` vienen con las del correo."""
     registrada = ObservacionRegistrada(observacion, banda=Banda(banda) if banda else None,
                                        confianza=confianza)
-    return ingerir(repositorio, usuario_id, registrada, ahora, nuevo_id)
+    return ingerir(repositorio, usuario_id, registrada, ahora, nuevo_id, registro)
 
 
 def persistir(repositorio: RepositorioDeReservas, resultado: ResultadoDeIngesta) -> None:

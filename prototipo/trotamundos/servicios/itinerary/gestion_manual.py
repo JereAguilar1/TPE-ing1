@@ -127,7 +127,8 @@ def crear(ctx: Contexto, cuerpo: Mapping[str, Any], clave: UUID) -> Resultado:
     observacion = _observacion_manual(ctx, f"alta/{clave}", cuerpo.get("identificadores", []),
                                       segmentos)
 
-    resultado = ingerir(ctx.repositorio, ctx.usuario_id, observacion, ctx.ahora, ctx.nuevo_id)
+    resultado = ingerir(ctx.repositorio, ctx.usuario_id, observacion, ctx.ahora, ctx.nuevo_id,
+                        ctx.registro)
     persistir(ctx.repositorio, resultado)
     eventos = eventos_del_cambio(
         resultado.reserva, resultado.consolidacion, Fuente.MANUAL, ctx.causa, ctx.ahora,

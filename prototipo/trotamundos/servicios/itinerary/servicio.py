@@ -227,7 +227,7 @@ class Itinerary:
         with self._transaccion(evento.sobre.get("usuarioId", "")) as conexion:
             eventos = ingesta.procesar(
                 conexion, evento, reservas.RepositorioDeReservasPostgres(conexion, self._registro),
-                self._contratos, self._reloj(), self._configuracion.region)
+                self._contratos, self._reloj(), self._configuracion.region, self._registro)
             self._publicar(conexion, evento.sobre["usuarioId"], eventos)
         if eventos:
             usuario = UUID(evento.sobre["usuarioId"])
