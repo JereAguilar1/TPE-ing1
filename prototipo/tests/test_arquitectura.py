@@ -338,3 +338,30 @@ def test_los_extractores_no_importan_otros_complementos_ni_clientes_de_red():
                     "httpx", "requests", "aiohttp", "urllib", "socket", "http", "ftplib", "smtplib"}:
                 encontradas.append(f"{archivo.relative_to(carpeta)} importa {nombre}")
     assert encontradas == []
+
+
+# --- `bff_web` (regla R4, vista de módulos N1; ADR-0005, ADR-0034) --------------------------
+
+DEPENDENCIAS_DE_BFF_WEB = {
+    "clientes": set(),
+    "api": set(),
+    "servicio": {"clientes", "api"},
+}
+
+
+def test_los_modulos_de_bff_web_respetan_sus_dependencias():
+    assert violaciones_internas(PAQUETE, "bff_web", DEPENDENCIAS_DE_BFF_WEB) == []
+
+
+def test_bff_web_no_tiene_persistencia_ni_logica_de_dominio():
+    """R4 y vista C&C N1: `bff-web` es sin estado y solo compone respuestas por HTTP."""
+    carpeta = PAQUETE / "servicios" / "bff_web"
+    prohibidas = {"psycopg", "aiokafka", "trotamundos.comun.persistencia",
+                  "trotamundos.comun.publicador", "trotamundos.comun.consumidor"}
+    encontradas = [
+        f"{archivo.relative_to(carpeta)} importa {nombre}"
+        for archivo in carpeta.rglob("*.py")
+        for nombre in _importaciones(PAQUETE, archivo)
+        if nombre in prohibidas or nombre.split(".")[0] in prohibidas
+    ]
+    assert encontradas == []
