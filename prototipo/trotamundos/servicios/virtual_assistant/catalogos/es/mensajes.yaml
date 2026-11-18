@@ -1,0 +1,109 @@
+# Lo que el asistente le dice al viajero, en español rioplatense (ADR-0032, ADR-0037). Recurso
+# estático: ningún texto para el viajero está en el código. Los marcadores entre llaves son
+# argumentos simples de ICU MessageFormat; las fechas y horas llegan ya formateadas en la zona del
+# lugar, con los nombres de días de este mismo catálogo.
+
+saludo: "¡Hola! Soy el asistente de Trotamundos. Puedo contarte cómo viene tu viaje, corregir un horario que te cambiaron y, si hace falta, pasarle tu caso a tu agencia."
+ayuda: "Probá con «¿cómo viene mi viaje?», «¿a qué hora sale mi vuelo?», «me pasaron el vuelo AR1402 al sábado a las 18:30», «¿tengo reservas por confirmar?» o «quiero hablar con mi agencia»."
+no_entendido: "No te entendí. ¿Me lo decís de otra forma? Por ejemplo: «¿a qué hora sale mi vuelo?»."
+no_entendido_otra_vez: "Sigo sin entenderte. Si querés, le paso tu consulta a tu agencia."
+itinerario_no_disponible: "Ahora no puedo leer tu itinerario. Probá de nuevo en un rato."
+servicio_no_disponible: "Ahora no puedo hacerlo. Probá de nuevo en un rato; no cambié nada."
+
+# Viajes y tramos
+sin_viajes: "No tenés viajes activos."
+elegi_viaje: "Tenés varios viajes: {viajes}. ¿De cuál hablamos? Elegilo y repetime el pedido."
+estado_del_viaje: "Tu viaje «{titulo}» ({estado}) va del {desde} al {hasta} y tiene {reservas, plural, one {# reserva} other {# reservas}}."
+estado_por_confirmar: "Además, tenés {cantidad, plural, one {# reserva} other {# reservas}} por confirmar."
+estado_conflictos: "Hay {cantidad, plural, one {# dato} other {# datos}} en conflicto entre lo que cargaste y lo que informó un proveedor."
+proximo_tramo: "Tu {tipo} {referencia} {comienza} el {fecha} a las {hora} (hora de {ciudad})."
+proximo_tramo_dia: "Tu {tipo} {referencia} es el {fecha} (vale todo el día, en {lugar})."
+disrupcion_ya_derivada: "Ya le pasé este caso a tu agencia; podés seguirlo desde Soporte."
+sin_proximo_tramo: "No tenés tramos próximos en este viaje."
+no_encuentro_viaje: "No encuentro ese viaje en tu itinerario."
+no_encuentro_reserva: "No encuentro esa reserva en tu viaje. ¿Me decís su código, como «AR1402»?"
+disrupcion: "Ojo: el proveedor {proveedor} informó un problema con esta reserva: {descripcion}"
+estados_de_viaje:
+  Planificado: planificado
+  EnCurso: en curso
+  Completado: completado
+  Archivado: archivado
+  Eliminado: eliminado
+  Cancelado: cancelado
+
+# Corrección del itinerario (ADR-0038)
+falta_fecha_u_hora: "¿A qué día y hora te lo cambiaron? Por ejemplo: «al sábado a las 18:30»."
+sin_cambio: "Tu {tipo} {referencia} ya figura el {fecha} a las {hora}. No hay nada para corregir."
+propuesta_corregir: "Cambio tu {tipo} {referencia} del {antes} al {despues} (hora de {ciudad}). ¿Confirmás?"
+corregida: "Listo, cambié tu {tipo} {referencia}: ahora figura el {despues}."
+reserva_cambio: "Tu reserva cambió mientras tanto. Te propongo el cambio de nuevo, con lo que figura ahora."
+reserva_ya_no_esta: "Ya no encuentro esa reserva en tu itinerario: no cambié nada."
+
+# Problemas menores (ADR-0038)
+sin_por_confirmar: "No tenés reservas por confirmar."
+elegi_por_confirmar: "Tenés {cantidad} reservas por confirmar: {reservas}. ¿Cuál? Decime su código."
+mostrar_por_confirmar: "Llegó por correo tu {tipo} {referencia} del {fecha}, y espera tu confirmación. ¿La confirmo o la descarto?"
+propuesta_confirmar_reserva: "Confirmo tu {tipo} {referencia} del {fecha} y la sumo a tu itinerario. ¿Confirmás?"
+propuesta_descartar_reserva: "Descarto tu {tipo} {referencia} del {fecha}: no va a aparecer en tu itinerario. ¿Confirmás?"
+reserva_confirmada: "Listo, confirmé tu {tipo} {referencia}."
+reserva_descartada: "Listo, descarté tu {tipo} {referencia}."
+ya_no_por_confirmar: "Esa reserva ya no estaba por confirmar: no cambié nada."
+sin_conflictos: "No tenés datos en conflicto."
+elegi_conflicto: "Tenés {cantidad} datos en conflicto, en {reservas}. ¿Cuál? Decime el código de la reserva."
+mostrar_conflicto: "En tu {tipo} {referencia} cargaste {mio}, pero {fuente} informa {otro}. ¿Mantengo el tuyo o acepto el que informa {fuente}?"
+propuesta_mantener: "Mantengo lo que cargaste ({mio}) en tu {tipo} {referencia}. ¿Confirmás?"
+propuesta_aceptar: "Acepto lo que informa {fuente} ({otro}) en tu {tipo} {referencia}. ¿Confirmás?"
+conflicto_resuelto: "Listo, resolví el conflicto de tu {tipo} {referencia}."
+conflicto_ya_resuelto: "Ese conflicto ya estaba resuelto: no cambié nada."
+fuentes:
+  correo: "el correo"
+  proveedor: "el proveedor"
+  manual: "vos"
+
+# Confirmaciones (ADR-0038)
+confirma_con_el_boton: "Para hacerlo necesito que confirmes la propuesta: {resumen}"
+nada_para_confirmar: "No tengo nada pendiente para confirmar."
+rechazada: "Listo, no hago nada."
+accion_inexistente: "Esa propuesta no existe, ya se hizo o venció. Pedímelo de nuevo."
+turno_confirmar: "Confirmo."
+turno_rechazar: "No, gracias."
+
+# Derivación a la agencia (ADR-0039)
+propuesta_derivar: "Le paso tu caso sobre «{titulo}» a tu agencia con este resumen: {sintesis} ¿Confirmás?"
+derivar_por_disrupcion: "Esto no se arregla corrigiendo el itinerario: te propongo pasarle el caso a tu agencia."
+derivar_cambio_ante_proveedor: "Eso lo tiene que gestionar tu agencia con el proveedor: yo no puedo cambiarlo."
+derivado: "Listo, tu caso quedó en manos de {agencia}. Podés seguirlo desde Soporte."
+derivado_pendiente: "Tu caso quedó abierto: {agencia} todavía no lo recibió y lo reintentamos solos. Podés seguirlo desde Soporte."
+sin_agencia: "No tenés una agencia preferida configurada. Elegila en tus preferencias y volvé a pedírmelo."
+viaje_ya_no_esta: "Ese viaje ya no está en tu itinerario: no le pasé nada a tu agencia."
+sin_viaje_para_derivar: "Para pasarle un caso a tu agencia tiene que ser sobre un viaje, y no tenés ninguno activo."
+elegi_viaje_para_derivar: "¿Sobre qué viaje es? Tenés: {viajes}. Elegilo y repetime el pedido."
+
+# Síntesis del caso para la agencia (≤ 2.000 caracteres, ADR-0039)
+sintesis:
+  cambioAnteProveedor: "El viajero pide gestionar con el proveedor: «{pedido}»."
+  pedirAgencia: "El viajero pidió hablar con su agencia: «{pedido}»."
+  noEntendido: "El asistente no pudo entender al viajero. Últimos mensajes: {pedido}."
+  disrupcion: "El proveedor {proveedor} informó: {descripcion}. El viajero preguntó: «{pedido}»."
+  reserva: " Reserva: {tipo} {referencia} del {fecha}."
+
+# Formato de fechas en la zona del lugar (ADR-0032)
+dias: [lunes, martes, miércoles, jueves, viernes, sábado, domingo]
+fecha: "{dia} {d}/{m}"
+fecha_y_hora: "{dia} {d}/{m} {hora}"
+# Cómo empieza cada tipo de tramo («tu vuelo sale», «tu hotel tiene el ingreso»)
+comienzo_de_tramo:
+  vuelo: sale
+  tren: sale
+  autobus: sale
+  hotel: tiene el ingreso
+  auto: se retira
+  otro: empieza
+tipos:
+  vuelo: vuelo
+  hotel: hotel
+  auto: auto
+  tren: tren
+  autobus: micro
+  otro: reserva
+separador_de_lista: ", "

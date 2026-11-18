@@ -1,0 +1,78 @@
+# Patrones de cada intención en español rioplatense (ADR-0037). Recurso estático: el intérprete por
+# reglas los lee y no hay otra copia en el código. Otro idioma es otro archivo como este.
+#
+# Cada patrón es una expresión regular (sin distinguir mayúsculas ni tildes: el intérprete compara
+# el texto sin tildes) con la confianza que aporta. Gana la intención con el patrón de mayor
+# confianza; ante un empate, la que aparece primero en este archivo. Por debajo de 0,6 el asistente
+# trata el mensaje como no entendido.
+
+intenciones:
+  confirmacion:
+    - { patron: '^\s*(si|dale|ok|okey|de acuerdo|confirmo|listo|perfecto)\s*[.!]*\s*$', confianza: 0.9 }
+  pedirAgencia:
+    - { patron: '\b(hablar|comunicarme|contactar(me)?)\b.*\b(agencia|persona|humano|alguien|operador)\b', confianza: 0.95 }
+    - { patron: '\b(quiero|necesito|pasame)\b.*\b(mi agencia|una persona|un humano|un operador)\b', confianza: 0.9 }
+    - { patron: '\bagencia\b', confianza: 0.6 }
+  cambioAnteProveedor:
+    - { patron: '\b(reprogram\w*|cancel\w*|reembols\w*|devolucion|devuelvan|reclam\w*)\b', confianza: 0.9 }
+  corregirHorario:
+    - { patron: '\b(me|lo|la|los|las)\s+(pasaron|cambiaron|movieron|adelantaron|atrasaron|corrieron)\b', confianza: 0.95 }
+    - { patron: '\b(ahora|en realidad)\s+(sale|llega|es|parte)\b', confianza: 0.9 }
+    - { patron: '\b(corregi|cambia|actualiza|modifica)\b.*\b(horario|hora|fecha|dia)\b', confianza: 0.9 }
+    - { patron: '\bcambio (el )?(horario|la hora|la fecha|el dia)\b', confianza: 0.85 }
+  resolverConflicto:
+    - { patron: '\bconflictos?\b', confianza: 0.9 }
+    - { patron: '\b(dos|distintos|diferentes)\s+(horarios|valores|datos)\b', confianza: 0.85 }
+    - { patron: '\b(mantene|deja|quedate con)\b.*\b(mio|mi (horario|dato|valor))\b', confianza: 0.85 }
+    - { patron: '\bacepta\b.*\b(de la|del)\b', confianza: 0.85 }
+  confirmarReserva:
+    - { patron: '\b(por confirmar|sin confirmar|pendientes? de confirmar)\b', confianza: 0.9 }
+    - { patron: '\b(confirma|descarta|confirmar|descartar|confirmala|descartala|borrala)\b.*\breserva\b', confianza: 0.9 }
+    - { patron: '\b(confirmala|descartala)\b', confianza: 0.85 }
+    - { patron: '\breservas? (pendientes?|nuevas?)\b', confianza: 0.8 }
+  proximoTramo:
+    - { patron: '\b(a que hora|cuando|que dia)\b.*\b(sale|salgo|llega|llego|parte|es|tengo|entro|embarco)\b', confianza: 0.9 }
+    - { patron: '\b(proximo|siguiente)\b', confianza: 0.85 }
+    - { patron: '\bque pasa con (mi|el|la)\b', confianza: 0.8 }
+  estadoDelViaje:
+    - { patron: '\b(estado|como (esta|viene|va))\b.*\b(viajes?|itinerario)\b', confianza: 0.9 }
+    - { patron: '\b(mis viajes|mi viaje|mi itinerario)\b', confianza: 0.8 }
+    - { patron: '\bviajes?\b', confianza: 0.5 }
+  saludo:
+    - { patron: '^\s*(hola|buen dia|buenos dias|buenas( tardes| noches)?|que tal)\b', confianza: 0.9 }
+  ayuda:
+    - { patron: '\b(ayuda|ayudame|que (podes|sabes) hacer|como funciona|que hago)\b', confianza: 0.9 }
+
+# Entidades que el intérprete extrae del texto (ADR-0037).
+entidades:
+  # Motivo del caso para un cambio ante el proveedor (ADR-0039); sin coincidencia, `otro`.
+  motivo:
+    reprogramacion: '\breprogram\w*'
+    cancelacion: '\bcancel\w*'
+  # Qué hacer con una reserva por confirmar («¿tengo reservas por confirmar?» no decide nada).
+  decision:
+    confirmar: '\b(confirma|confirmala|(?<!por )(?<!sin )confirmar|confirmo|aceptala|sumala)\b'
+    descartar: '\b(descarta|descartala|descartar|borrala|no es mia|no la quiero)\b'
+  # Cómo resolver un conflicto entre fuentes.
+  eleccion:
+    mantenerFijado: '\b(mantene|mantener|deja|dejar|quedate con)\b.*\b(mio|mi (horario|dato|valor)|el que puse|lo que cargue)\b'
+    aceptarFuente: '\b(acepta|aceptar|toma|tomar|usa|usar|quedate con)\b.*\b(de la|del|el de|lo de)\b'
+  # Palabras con que el viajero nombra cada tipo de tramo (claves del registro de tipos, ADR-0011).
+  tipos:
+    vuelo: '\b(vuelo|avion)\b'
+    hotel: '\b(hotel|alojamiento|hospedaje)\b'
+    auto: '\b(auto|alquiler)\b'
+    tren: '\btren\b'
+    autobus: '\b(micro|colectivo|bus|autobus)\b'
+  # Días y horas relativos, en la zona horaria del tramo.
+  dias_relativos:
+    hoy: 0
+    pasado manana: 2
+    manana: 1
+  # Franjas del día: se sacan del texto antes de buscar días relativos («a las 9 de la mañana» no
+  # es mañana) y suman horas a una hora de 1 a 11 («a las 9 de la noche» son las 21).
+  franjas_del_dia:
+    - { patron: '\b(de|por|a) la manana\b', suma: 0 }
+    - { patron: '\b(de|por|a) la (tarde|noche)\b', suma: 12 }
+  dias_de_la_semana: [lunes, martes, miercoles, jueves, viernes, sabado, domingo]
+  meses: [enero, febrero, marzo, abril, mayo, junio, julio, agosto, septiembre, octubre, noviembre, diciembre]
