@@ -57,12 +57,14 @@ class LectorDeItinerario(Protocol):
 
 
 class LectorDeItinerarioHttp:
-    def __init__(self, url_base: str, timeout_s: float = 5.0):
+    def __init__(self, url_base: str, timeout_s: float = 5.0,
+                 cliente: httpx.Client | None = None):
         self._url, self._timeout = url_base.rstrip("/"), timeout_s
+        self._http = cliente or httpx  # un cliente propio (o el de una prueba)
 
     def _get(self, usuario_id: UUID | str, ruta: str) -> httpx.Response:
         try:
-            respuesta = httpx.get(f"{self._url}{ruta}", headers={"X-Usuario-Id": str(usuario_id)},
+            respuesta = self._http.get(f"{self._url}{ruta}", headers={"X-Usuario-Id": str(usuario_id)},
                                   timeout=self._timeout)
         except httpx.HTTPError as error:
             raise ItinerarioNoDisponible(str(error)) from error

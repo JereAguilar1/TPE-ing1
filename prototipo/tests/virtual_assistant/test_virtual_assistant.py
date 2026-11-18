@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 from tests.virtual_assistant.datos import (
     AHORA,
+    MADRID,
     CONFLICTO,
     HOTEL,
     OTRO,
@@ -27,6 +28,9 @@ from tests.virtual_assistant.datos import (
     VUELO,
     ItinerarioEnMemoria,
     SoporteEnMemoria,
+    _extremo,
+    _lugar,
+    _reserva,
     sesion_http,
 )
 from trotamundos.comun.config import Configuracion
@@ -200,6 +204,19 @@ def test_cada_tipo_de_tramo_empieza_a_su_manera(asistente):
     sid = _sesion(asistente)
     assert _decir(asistente, sid, "¿cuándo es el hotel?")["mensajes"] == [
         "Tu hotel HTL778 tiene el ingreso el viernes 4/12 a las 14:00 (hora de Madrid)."]
+
+
+def test_un_tipo_que_el_catalogo_no_conoce_se_atiende_por_su_codigo(asistente):
+    """QA-15: con un tipo nuevo (solo su descriptor), el asistente lo encuentra por su código y lo
+    nombra «reserva». Para nombrarlo y reconocerlo por su nombre se agrega a sus catálogos, que son
+    recursos de presentación (ADR-0032)."""
+    madrid = _lugar("Puerto de Barcelona", "ES", MADRID)
+    barco = _reserva("00000000-0000-4000-8000-0000000000c4", "barco", "BAL220",
+                     _extremo("2026-12-07T10:00:00Z", madrid), _extremo("2026-12-07T20:00:00Z", madrid))
+    asistente.itinerario.datos["viajes"][0]["reservas"].append(barco)
+    sid = _sesion(asistente)
+    assert _decir(asistente, sid, "¿cuándo sale el BAL220?")["mensajes"] == [
+        "Tu reserva BAL220 empieza el lunes 7/12 a las 11:00 (hora de Madrid)."]
 
 
 def test_un_viaje_en_foco_que_ya_no_esta_deja_de_estar_en_foco(asistente):

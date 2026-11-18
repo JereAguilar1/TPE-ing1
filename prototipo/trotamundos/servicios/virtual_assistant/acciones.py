@@ -52,13 +52,15 @@ class EscritorDeItinerario(Protocol):
 
 
 class EscritorDeItinerarioHttp:
-    def __init__(self, url_base: str, timeout_s: float = 5.0):
+    def __init__(self, url_base: str, timeout_s: float = 5.0,
+                 cliente: httpx.Client | None = None):
         self._url, self._timeout = url_base.rstrip("/"), timeout_s
+        self._http = cliente or httpx  # un cliente propio (o el de una prueba)
 
     def _enviar(self, metodo: str, usuario_id: UUID | str, ruta: str,
                 cuerpo: Mapping[str, Any]) -> None:
         try:
-            respuesta = httpx.request(metodo, f"{self._url}{ruta}", json=dict(cuerpo),
+            respuesta = self._http.request(metodo, f"{self._url}{ruta}", json=dict(cuerpo),
                                       headers={"X-Usuario-Id": str(usuario_id)},
                                       timeout=self._timeout)
         except httpx.HTTPError as error:

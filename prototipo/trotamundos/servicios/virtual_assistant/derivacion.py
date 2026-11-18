@@ -53,14 +53,17 @@ class AbridorDeCasos(Protocol):
 
 
 class AbridorDeCasosHttp:
-    def __init__(self, url_base: str, timeout_s: float = 10.0):
+    def __init__(self, url_base: str, timeout_s: float = 10.0,
+                 cliente: httpx.Client | None = None):
         self._url, self._timeout = url_base.rstrip("/"), timeout_s
+        self._http = cliente or httpx  # un cliente propio (o el de una prueba)
 
     def abrir(self, authorization: str, clave: str, cuerpo: Mapping[str, Any]) -> dict[str, Any]:
         try:
-            respuesta = httpx.post(f"{self._url}/casos", json=dict(cuerpo), timeout=self._timeout,
-                                   headers={"Authorization": authorization, "Idempotency-Key": clave,
-                                            "Content-Type": _TIPO_DE_MEDIO})
+            respuesta = self._http.post(
+                f"{self._url}/casos", json=dict(cuerpo), timeout=self._timeout,
+                headers={"Authorization": authorization, "Idempotency-Key": clave,
+                         "Content-Type": _TIPO_DE_MEDIO})
         except httpx.HTTPError as error:
             raise SoporteNoDisponible(str(error)) from error
         if respuesta.status_code == 422:
