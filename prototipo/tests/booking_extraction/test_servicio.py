@@ -2,6 +2,7 @@
 
 import copy
 import dataclasses
+from datetime import datetime, timezone
 import json
 from uuid import uuid4
 
@@ -113,7 +114,8 @@ def test_reserva_extraida_llega_al_panel_segun_su_banda(extraccion, rotulo, esta
     extraccion.consumir(entrada)
     [salida] = filas(extraccion, 'SELECT * FROM bandeja_salida')
     # Esquema efímero compartido solo en esta prueba; en Compose son esquemas distintos.
-    itinerary = Itinerary(extraccion._configuracion, esquema=extraccion._esquema)
+    itinerary = Itinerary(extraccion._configuracion, esquema=extraccion._esquema,
+                          reloj=lambda: datetime(2026, 11, 18, tzinfo=timezone.utc))
     itinerary.crear_esquema()
     evento = Evento(salida['tipo'], salida['sobre'], salida['carga'])
     itinerary.consumir(evento)

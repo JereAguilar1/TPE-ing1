@@ -4,9 +4,10 @@ Ejecutar desde prototipo: .venv/bin/python -m tests.booking_extraction.humo_cont
 Crea un usuario y un buzón sintéticos únicos; no modifica datos existentes.
 """
 import asyncio
-import copy
 import json
 import time
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 from email.message import EmailMessage
 from pathlib import Path
 from uuid import uuid4
@@ -60,19 +61,30 @@ def main():
                                 (buzon,)).fetchone()
     esperar(activo)
     corpus = json.loads((Path(__file__).parent / 'corpus/reserva_simulada.json').read_text())
+    ahora = datetime.now(timezone.utc).replace(microsecond=0)
     inicio = time.monotonic()
     with httpx.Client(timeout=10) as cliente:
         for indice, rotulo in enumerate(('Localizador', 'Localizador tentativo',
                                          'Localizador dudoso', 'desconocido')):
-            datos = copy.deepcopy(corpus[indice]['mensaje'])
+            datos = corpus[indice]['mensaje']
             cuerpo = datos['cuerpoTexto'].replace('Localizador:', rotulo + ':')
+            # El panel solo muestra viajes activos. El corpus de referencia conserva sus fechas.
+            salida = ahora + timedelta(days=7 + indice)
+            fechas = {'Emitido': ahora, 'Salida': salida, 'Llegada': salida + timedelta(hours=2)}
+            lineas = []
+            for linea in cuerpo.splitlines():
+                campo = linea.partition(':')[0]
+                if campo in fechas:
+                    linea = f'{campo}: {fechas[campo].isoformat()}'
+                lineas.append(linea)
+            cuerpo = '\n'.join(lineas)
             if rotulo == 'desconocido':
                 cuerpo = 'Plantilla inédita: contenido sintético privado'
             correo = EmailMessage()
             correo['From'] = datos['remitente']
             correo['To'] = alias
             correo['Subject'] = datos['asunto']
-            correo['Date'] = 'Wed, 18 Nov 2026 10:00:00 +0000'
+            correo['Date'] = format_datetime(ahora)
             correo['Message-ID'] = f'<{uuid4()}@prueba.example>'
             correo['Authentication-Results'] = 'ingesta.trotamundos.app; dkim=pass; spf=pass'
             correo.set_content(cuerpo)

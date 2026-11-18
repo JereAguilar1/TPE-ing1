@@ -68,6 +68,7 @@ def test_falta_confianza_obligatoria():
     ('Llegada: 2026-12-01T15:00:00Z', 'Llegada: 2026-12-01T12:00:00Z'),
     ('Llegada: 2026-12-01T15:00:00Z', 'Llegada: 2026-12-01T13:00:00Z'),
     ('Salida: 2026-12-01T13:00:00Z', 'Salida: 2026-12-01T13:00:00'),
+    ('Salida: 2026-12-01T13:00:00Z', 'Salida: 0001-01-01T00:00:00+03:00'),
     ('Origen: AEP', 'Origen: XYZ'), ('Localizador: ABC000', 'Localizador: ?'),
     ('Numero: 1400', 'Numero: truncado'), ('Emitido: 2026-11-18T10:00:00Z', ''),
     ('Destino: MDZ', ''), ('Reserva aérea simulada v1', 'Plantilla inédita')])
