@@ -80,6 +80,13 @@ prototipo/
 │           ├── complementos/         # proveedor de correo simulado (con push e IMAP)
 │           ├── api.py                # webhooks y filtros (mail-ingest-*.yaml)
 │           └── servicio.py           # arma los módulos y define las transacciones
+│       ├── booking_extraction/     # extractor, bandas, calidad e inbox/outbox (paso 9)
+│       │   ├── complementos/        # único extractor de correo simulado
+│       │   ├── registro_de_extractores.py # carga por manifiesto y coordina la extracción
+│       │   ├── validador_canonico.py # estructura y descriptor del segmento
+│       │   ├── evaluador_de_confianza.py # mínimo de campos obligatorios y bandas
+│       │   ├── observabilidad_de_calidad.py # huellas y disyuntor local
+│       │   └── servicio.py         # inbox/outbox, broker y fábrica de Uvicorn
 │       └── support_liaison/         # casos de soporte derivados a la agencia (paso 12, UC-7)
 │           ├── casos.py              # el caso: instantánea, estados y reintento de derivación
 │           ├── preferencias.py       # copia local de la agencia preferida (PreferenciasActualizadas)
@@ -183,7 +190,7 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | Los proveedores de correo (OAuth con *push* e IMAP) se simulan con un complemento en `mail_ingest/complementos/`, en memoria. La demostración de punta a punta usa el reenvío, que recibe el mensaje crudo por HTTP | No hay proveedores reales en el prototipo. Acordado con el grupo, igual que `ProveedorOidcSimulado` en el paso 7 | ADR-0006; ADR-0036 |
 | La firma `X-Firma` de los avisos es un HMAC-SHA256 del cuerpo con `TROTAMUNDOS_SECRETO_WEBHOOK_CORREO` (de `.env`). Un aviso de una suscripción que no es de un buzón activo responde `202` y no hace nada | `comun.yaml` admite HMAC o JWS. Responder igual no revela qué suscripciones existen | ADR-0020; `mail-ingest-webhooks.yaml` |
 | Reconciliación con los intervalos «en reposo» de ADR-0024 (24 h con *push*, 6 h IMAP), escalonada por `buzon_id`; `MensajeDeViajeRecibido` va siempre por P2 | El ajuste por viaje en curso y el P1 del contrato necesitan saber de viajes, y `mail-ingest` no los consume. Acordado con el grupo | ADR-0004; ADR-0020; ADR-0024 |
-| El catálogo de remitentes reconocidos está vacío hasta el paso 9: pasan los remitentes permitidos por el usuario, y los bloqueados tienen prioridad | El catálogo sale de los manifiestos de los extractores, que llegan con `booking-extraction`. Acordado con el grupo; cómo llegan a `mail-ingest` se decide en el paso 9 | Iteración 2 §5.4; RF-04 |
+| El catálogo de remitentes se deriva de `comun/catalogo_extractores.yaml`, el mismo manifiesto que carga `booking-extraction`; `mail-ingest` lo lee sin importar el servicio | Catálogo y registro tienen una sola fuente declarativa; se conserva bloqueados > permitidos > catálogo antes de descargar el cuerpo | ADR-0006; vista N2; RF-04 |
 | El receptor de reenvío acepta un mensaje si su `Authentication-Results` del servidor propio (`ingesta.trotamundos.app`) dice `dkim=pass` y además `spf=pass` o `arc=pass`, y si quien reenvía (`Return-Path`, o `From` si no está) es el titular del buzón. Lo rechazado responde `403` y queda en `reenvio_rechazado` sin el contenido. El servidor de correo propio se identifica con `X-Servicio-Cliente: mta-entrante`, como el mTLS del paso 7 | Las cabeceras de autenticación que escribió otro servidor las puede poner cualquiera. El ARC es lo que sobrevive a un reenvío automático | ADR-0035; `mail-ingest-webhooks.yaml` |
 | En el reenvío solo cuentan los remitentes bloqueados: no hace falta que el remitente esté permitido ni en el catálogo | Reenviar ya es una elección explícita del usuario, y en un reenvío manual el remitente es él mismo. Acordado con el grupo | ADR-0035; RF-04 |
 | Los filtros se evalúan sobre los metadatos y solo se baja lo que pasa. Lo que no se publica (filtrado, bloqueado, ilegible o que no cumple el contrato) queda en `mensaje_recibido` con el motivo, y no frena a los mensajes que vienen detrás. Del mensaje pasan solo las cabeceras que lo identifican y fechan; los adjuntos no viajan | Nada se descarta en silencio. Los adjuntos piden una referencia a un almacenamiento cifrado que no está en el plan | Iteración 2 §5.4; vista de seguridad y datos |
@@ -219,6 +226,11 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | En `identity-access`, `POST /privacidad/exportaciones` guarda el paquete firmado (identidad, buzones y auditoría del servicio) en `exportacion_privacidad`, y `DELETE /privacidad/cuenta` ejecuta la fase 1 local (destrucción de `DEK_u`, secretos, buzones, exportaciones, identidad R1 y `mapa_seudonimo_usuario`) y publica `CuentaSuprimida` en `P3` (`SobreSinUsuario`) | La purga coordinada sobre `itinerary`/`sharing`/`preferences` y la fase 2 en `analytics-store` llegan con `event-pipeline` en el paso 14 | ADR-0030 (`QA-14`); `eventos-de-dominio.yaml` |
 | `registro_auditoria` de `identity-access` es una sola cadena `SHA-256`: cada escritura toma un candado de la base para encadenarse a la anterior, así que las escrituras auditadas del servicio se hacen de a una | Alcanza para el prototipo. Con la carga de QA-04 haría falta una cadena por partición (por ejemplo, por *bucket* de usuario), que es una decisión a tomar si se mide un cuello de botella | ADR-0030; QA-04 |
 | `identity-access` corre su trabajo periódico cada `TROTAMUNDOS_INTERVALO_TAREAS` segundos: purga la bandeja de entrada, las claves de idempotencia y los códigos de invitado vencidos | El mismo mecanismo que `itinerary` | ADR-0014; ADR-0028 |
+| Paso 9: un extractor puro de plantilla sintética `Reserva aérea simulada v1`, del remitente `reservas@aerolinea.example`; campos `Localizador`, `Aerolinea`, `Numero`, `Origen`, `Destino`, `Salida`, `Llegada`, `Emitido` | Plantilla determinista para el corpus sintético. Aeropuertos AEP/EZE/MDZ/MAD y localizador de seis caracteres alfanuméricos; la fecha de fuente viene de `Emitido`, no de la recepción | ADR-0006, ADR-0015; `plugins/extractor.yaml` |
+| Paso 9: confianza por campo 0,99 con rótulo exacto; `Localizador tentativo` 0,75 y `Localizador dudoso` 0,50; faltantes 0, sin completar valores | Permite demostrar las tres bandas con datos sintéticos. El anfitrión calcula el mínimo de todos los campos obligatorios y valida la estructura antes de puntuar. Los umbrales siguen siendo 0,90/0,60 | ADR-0015, ADR-0035; corpus en `tests/booking_extraction/corpus/` |
+| Paso 9: disyuntor local configurable por constructor (`Calidad`): ventana de 20 resultados, mínimo 20, más de 50 % de bandas bajas; queda en solo confirmación hasta reiniciar la réplica | El corpus degradado demuestra la apertura con estos parámetros iniciales. Si un remitente registrado cambia su plantilla, sus mensajes desconocidos también cuentan como banda baja. Contadores por banda y huella en memoria, sin correos ni datos personales; no se presenta como monitoreo de producción | ADR-0015, ADR-0035 |
+| Paso 9: `idDeFuente` es SHA-256 de la pareja buzón/mensaje serializada; deduplicación por evento y pareja buzón/mensaje, con retención de 14 días | La inbox, la marca de mensaje y las salidas se confirman juntas; un rollback también revierte los contadores locales. No se guarda el cuerpo en `booking-extraction`, ni en rechazos o logs del consumidor | ADR-0014, ADR-0035 |
+| Paso 9: huella de la estructura disponible en `MensajeNormalizado` (partes texto/HTML, etiquetas sin atributos ni texto, clases MIME y nombres de cabeceras normalizados); métricas solo por dominio y hash | El normalizador del paso 8 no entrega la jerarquía MIME original. La garantía de no persistir cuerpos corresponde al nuevo servicio: la outbox de `mail-ingest` y el broker conservan su retención existente | ADR-0035; `MensajeNormalizado` |
 
 ## Cómo correrlo
 
@@ -300,7 +312,7 @@ construido](#diseñado-y-no-construido).
 | [0003](../docs/03-adr/ADR-0003-separacion-planos.md) Plano operacional y analítico separados | ⏳ | Paso 14 |
 | [0004](../docs/03-adr/ADR-0004-obtencion-de-correo.md) Correo por *push* con reconciliación | 🟨 | Paso 8: suscripciones con renovación y detección de caídas, aviso firmado, reconciliación escalonada por `buzon_id` y los dos caminos convergiendo en una cola, con la misma entrega publicada una sola vez (probado). Los intervalos son los «en reposo» de ADR-0024: el ajuste por viaje queda fuera (ver decisiones). Cuotas y cortacircuitos, paso 10 |
 | [0005](../docs/03-adr/ADR-0005-capa-de-clientes-bff.md) Un BFF por tipo de cliente | ⏳ | Paso 11 |
-| [0006](../docs/03-adr/ADR-0006-capa-de-anticorrupcion.md) Capa de anticorrupción con complementos | 🟨 | Complementos de proveedor de correo (paso 8) y de agencia (paso 12), cada uno detrás de su interfaz. Extractores y adaptadores de proveedor de viaje, pasos 9 y 10 |
+| [0006](../docs/03-adr/ADR-0006-capa-de-anticorrupcion.md) Capa de anticorrupción con complementos | 🟨 | Complementos de proveedor de correo (paso 8) y de agencia (paso 12), cada uno detrás de su interfaz. Extractor puro por manifiesto y corpus (paso 9); adaptadores de proveedor de viaje, paso 10 |
 | [0007](../docs/03-adr/ADR-0007-identidad-y-comparticion.md) OIDC, delegación OAuth y designados | 🟨 | Sesiones OIDC y ciclo de vida de buzones en `identity-access` (paso 7). Designados y compartición, paso 13 |
 | [0008](../docs/03-adr/ADR-0008-alcance-disponibilidad.md) Alcance y medición de la disponibilidad | ➖ | Medir disponibilidad real no tiene sentido en una notebook; lo crítico se ejercita con QA-05 |
 | [0009](../docs/03-adr/ADR-0009-contratos-spec-driven.md) Contratos como artefactos de primera clase | 🟨 | Todo cuerpo, respuesta y evento se valida contra `contratos/` en ejecución, y la integración continua corre todas las pruebas en cada cambio. La detección de cambios incompatibles entre versiones, paso 17 |
@@ -309,9 +321,9 @@ construido](#diseñado-y-no-construido).
 | [0012](../docs/03-adr/ADR-0012-persistencia-del-plano-operacional.md) Persistencia relacional por `usuario_id` | ✅ | Las diez tablas de §5.8, con las unicidades impuestas por la base y la *outbox*. La compactación, ver ADR-0023 |
 | [0013](../docs/03-adr/ADR-0013-deduplicacion-y-conflictos.md) Identidad, precedencia y conflictos | ✅ | Paso 3: una prueba por regla, más pruebas de propiedades. La métrica «conflictos abiertos por usuario y por semana», paso 14 (desde `ConflictoDeFuentesDetectado`) |
 | [0014](../docs/03-adr/ADR-0014-idempotencia-de-la-ingesta.md) Bandeja de entrada y fusión determinista | ✅ | Pasos 3 a 6: bandeja de entrada, `Idempotency-Key`, entrega repetida sin doble efecto y reversión 10:00 → 10:30 → 10:00 (probados). La de `mail-ingest`, paso 8 |
-| [0015](../docs/03-adr/ADR-0015-politica-de-confianza-de-extraccion.md) Tres bandas de confianza | 🟨 | Del lado de `itinerary` está (`PorConfirmar`, la banda media no cambia lo confirmado). Los extractores y el corpus, paso 9 |
+| [0015](../docs/03-adr/ADR-0015-politica-de-confianza-de-extraccion.md) Tres bandas de confianza | 🟨 | Paso 9: extractor, validación estructural, tres bandas, corpus sintético y disyuntor por bandas bajas; `itinerary` conserva `PorConfirmar`. Modo sombra, correcciones y monitoreo completo quedan fuera del recorte |
 | [0016](../docs/03-adr/ADR-0016-modelo-dimensional-analitico.md) Esquema en estrella desde eventos | ⏳ | Paso 14 |
-| [0017](../docs/03-adr/ADR-0017-estrategia-de-pruebas-y-contratos.md) Pruebas derivadas de la especificación | 🟨 | Propiedades de la fusión y validación contra contratos, en la integración continua (`.github/workflows/pruebas.yml`). Conformidad de complementos y corpus, pasos 9 y 10; Schemathesis y compatibilidad, paso 17 |
+| [0017](../docs/03-adr/ADR-0017-estrategia-de-pruebas-y-contratos.md) Pruebas derivadas de la especificación | 🟨 | Propiedades de la fusión y validación contra contratos, en la integración continua (`.github/workflows/pruebas.yml`). Conformidad y corpus del extractor, paso 9; adaptadores, paso 10; Schemathesis y compatibilidad, paso 17 |
 | [0018](../docs/03-adr/ADR-0018-consistencia-datos-multirregion.md) Región primaria, testigo y lectura causal | 🟨 | `versionUsuario` y escrituras serializadas por usuario. Región primaria, testigo transregional síncrono para los comandos manuales y conmutación, paso 16 (QA-05) |
 | [0019](../docs/03-adr/ADR-0019-cache-camino-lectura-arranque-movil.md) Caché multinivel y arranque móvil | ⏳ | Paso 11 (el panel ya se lee en un acceso) |
 | [0020](../docs/03-adr/ADR-0020-contrapresion-y-sobrecarga.md) Contrapresión, carriles y degradación | 🟨 | Carriles P1/P2/P3 (paso 6). Plazo propagado, colas acotadas y modos de degradación, pasos 11 y 17 |
@@ -329,7 +341,7 @@ construido](#diseñado-y-no-construido).
 | [0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md) Internacionalización | 🟨 | Instantes en UTC con zona IANA aparte, en todo el modelo. Idioma y formateo, en los BFF (paso 11) |
 | [0033](../docs/03-adr/ADR-0033-capacidades-nativas-gps-y-degradacion.md) GPS en el móvil | ➖ | No hay cliente móvil nativo en el prototipo |
 | [0034](../docs/03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) Módulo avanzado y recorte del prototipo | 🟨 | El recorte guía este plan. La Opción B, diseñada en la [iteración 5](../docs/02-proceso-add/iteracion-5/README.md) (paso 18) y construida en `virtual-assistant` (paso 19) sin interfaces nuevas en el núcleo (CON-06); ADR-0040 precisa su punto sobre `CuentaSuprimida` |
-| [0035](../docs/03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) Buzones sin OAuth y formatos desconocidos | 🟨 | Alias de reenvío e `imapDelegado` con credencial delegada cifrada en `identity-access` (paso 7). Receptor de reenvío con DKIM/SPF/ARC y titular verificados, con rechazos auditados (paso 8). Formatos desconocidos, paso 9 |
+| [0035](../docs/03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) Buzones sin OAuth y formatos desconocidos | 🟨 | Alias de reenvío e `imapDelegado` con credencial delegada cifrada en `identity-access` (paso 7). Receptor de reenvío con DKIM/SPF/ARC y titular verificados, con rechazos auditados (paso 8). Paso 9: formato desconocido, banda baja o estructura inválida emiten `ExtraccionNoReconocida`, con huella sin contenido y sin reserva; aviso/formulario de usuario y telemetría externa quedan fuera del recorte |
 | [0036](../docs/03-adr/ADR-0036-tecnologia-del-prototipo.md) Tecnología del prototipo | ✅ | Python 3.12, FastAPI, PostgreSQL, Redpanda y Docker Compose. Schemathesis, paso 17 |
 | [0037](../docs/03-adr/ADR-0037-interpretacion-de-intenciones-del-asistente.md) Intérprete de intenciones intercambiable | 🟨 | Paso 19: puerto `InterpreteDeIntenciones` con reglas, umbral 0,6 y catálogos de patrones y mensajes en español. El adaptador de modelo de lenguaje con redacción de datos personales queda diseñado y no construido |
 | [0038](../docs/03-adr/ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md) Consultas y corrección confirmada | ✅ | Paso 19: consultas, corrección en dos pasos con vencimiento de 10 min y `409` releído, problemas menores y cambios ante el proveedor derivados |
@@ -358,7 +370,7 @@ implementa. La columna «Prioridad» ordena lo que falta según el recorte acord
 | 6 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | — | ✅ | Francisco Lozano |
 | 7 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | — | ✅ | Jeremias Aguilar |
 | 8 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | — | ✅ | Francisco Lozano |
-| 9 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | Sí o sí | ⬜ |  |
+| 9 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | Sí o sí | ✅ recorte | Juan Pardo |
 | 10 | `provider-sync`: adaptador simulado, cortacircuitos, disrupciones | QA-10, ADR-0024 | Si sobra (reducido) | ⬜ |  |
 | 11 | BFF y `api-gateway`: panel, límite de tasa, plazos | QA-02, ADR-0020 | Debería (reducido) | ⬜ |  |
 | 12 | `notification`, `support-liaison` y `preferences` mínimo | UC-5, UC-7, ADR-0034 | Sí o sí (reducido) | ✅ reducido: solo `support-liaison` | Francisco Lozano |
@@ -447,6 +459,10 @@ paso; el paso 21 la revisa entera. Las rutas son relativas a `prototipo/`.
 | `servicios/virtual_assistant/derivacion.py` | ADR-0039 (cuatro disparadores, síntesis, idempotencia por la acción, `422`); RF-B2; `support-liaison.yaml` | `tests/virtual_assistant/test_virtual_assistant.py` |
 | `servicios/virtual_assistant/sesiones.py`, `contexto.py`, `servicio.py`, `api.py` | ADR-0040 (sesión por `usuario_id`, `404` ajeno, retención, `DisrupcionDetectada` con bandeja de entrada); `virtual-assistant.yaml`; ADR-0014 | `tests/virtual_assistant/test_virtual_assistant.py`, `test_arranque_virtual_assistant.py` |
 | `contratos/tipos-de-segmento/tren.v1.yaml` (el único artefacto propio del tren); `comun/tipos_de_segmento.py`; `servicios/itinerary/` y `servicios/virtual_assistant/` sin cambios por el tipo (la corrección de la fusión del paso 15 no es por el tipo: ver «Decisiones de implementación») | QA-15 (≤ 2 elementos tocados, 0 servicios de dominio; datos históricos consultables con una versión nueva del tipo); ADR-0011; ADR-0027 | `tests/escenarios/test_qa15_nuevo_transporte.py`, `tests/test_arquitectura.py` (ningún módulo nombra un tipo) |
+| `servicios/booking_extraction/complementos/`, `interfaz_de_extractor.py`, `registro_de_extractores.py` | ADR-0006, ADR-0011, ADR-0017, ADR-0027; `plugins/extractor.yaml`; un extractor puro cargado por manifiesto | `tests/booking_extraction/test_extraccion.py`, `tests/test_arquitectura.py` |
+| `servicios/booking_extraction/validador_canonico.py`, `evaluador_de_confianza.py`, `observabilidad_de_calidad.py` | ADR-0015, ADR-0035; mínimo de confianza, bandas, disyuntor y huella sin contenido (QA-11) | `tests/booking_extraction/test_extraccion.py` (corpus y degradados) |
+| `servicios/booking_extraction/servicio.py`, `publicacion.py`; `comun/consumidor.py`; `docker-compose.yml` | ADR-0012, ADR-0014, ADR-0020, ADR-0035; AsyncAPI `MensajeDeViajeRecibido`, `ReservaExtraida`, `ExtraccionNoReconocida` | `tests/booking_extraction/test_servicio.py`, `test_arranque_booking_extraction.py`, `tests/test_consumidor.py`; humo `tests/booking_extraction/humo_contenedores.py` (QA-01/QA-11) |
+| `comun/catalogo_extractores.py`, `catalogo_extractores.yaml`; `servicios/mail_ingest/servicio.py` | RF-04, ADR-0006; catálogo del manifiesto, sin importar otro servicio | `tests/mail_ingest/test_mail_ingest.py` (catálogo y bloqueo antes de descargar) |
 
 ### Diseñado y no construido
 
@@ -456,11 +472,35 @@ apartado lo dice explícitamente para que no se lea como un faltante. Se complet
 | Qué | Dónde está diseñado | Por qué no se construye |
 |---|---|---|
 | Compartir itinerarios con designados y en redes sociales (paso 13) | [ADR-0028](../docs/03-adr/ADR-0028-autorizacion-comparticion-y-publicacion.md), `contratos/openapi/sharing.yaml` | No es un ASR ni lo necesita la Opción B (recorte de ADR-0034) |
-| Extractor de boletos de tren (guía de extensión de QA-15, paso 4) | [Guía de extensión](../docs/02-proceso-add/iteracion-4/guias-de-extension.md), [ADR-0006](../docs/03-adr/ADR-0006-capa-de-anticorrupcion.md) | Es un complemento de `booking-extraction` (paso 9). Si el paso 9 está antes del congelamiento, se suma como un complemento más, sin tocar el servicio |
+| Extractor de boletos de tren (guía de extensión de QA-15, paso 4) | [Guía de extensión](../docs/02-proceso-add/iteracion-4/guias-de-extension.md), [ADR-0006](../docs/03-adr/ADR-0006-capa-de-anticorrupcion.md) | El recorte del paso 9 construye un único extractor simulado de vuelo; un segundo extractor queda para completar el contenido, sin tocar el dominio |
 | Adaptador de proveedor ferroviario (guía de extensión de QA-15, paso 3) | [Guía de extensión](../docs/02-proceso-add/iteracion-4/guias-de-extension.md), [ADR-0006](../docs/03-adr/ADR-0006-capa-de-anticorrupcion.md) | `provider-sync` es el paso 10 («si sobra»). La prueba de QA-15 inyecta el `ReservaObservada` que publicaría |
 | Ícono y etiquetas del tren en los clientes (guía de extensión de QA-15, paso 2) y aviso por `camposRelevantes` (andén) | [Guía de extensión](../docs/02-proceso-add/iteracion-4/guias-de-extension.md), [ADR-0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md) | No hay clientes ni `notification` en el prototipo; `GET /tipos-de-segmento` ya entrega la `presentacion` y los `camposRelevantes` del descriptor |
 | Adaptador de modelo de lenguaje del asistente, con redacción de datos personales y vuelta a las reglas | [ADR-0037](../docs/03-adr/ADR-0037-interpretacion-de-intenciones-del-asistente.md), [vista de módulos del asistente](../docs/04-vistas/vista-modulos-asistente.md) (`complementos/`) | Lo decidió así ADR-0037: el prototipo es determinista y no necesita secretos ni costo por mensaje. Es un complemento detrás del mismo puerto |
 | Catálogos del asistente en otros idiomas | [ADR-0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md), ADR-0037 | El prototipo trae solo español (ADR-0037); otro idioma es otro par de archivos en `catalogos/` |
 | Degradación del asistente ante `Disrupción masiva` | [ADR-0040](../docs/03-adr/ADR-0040-sesion-conversacional-y-privacidad.md) §6, [ADR-0020](../docs/03-adr/ADR-0020-contrapresion-y-sobrecarga.md) | Los modos de degradación de ADR-0020 son de los pasos 11 y 17; cuando estén, el asistente se suma como carga de prioridad 2/3 |
 | Multirregión y conmutación ante la pérdida de una región (paso 16) | [ADR-0002](../docs/03-adr/ADR-0002-despliegue-multirregion.md), [ADR-0018](../docs/03-adr/ADR-0018-consistencia-datos-multirregion.md), [vista de despliegue N2](../docs/04-vistas/vista-despliegue-nivel-2.md) | Es el paso más caro del plan. ASR-3 (QA-05) queda demostrado solo en el diseño |
+| Modo sombra, métricas de correcciones de banda alta, panel/alarma y exportación OpenTelemetry de calidad | ADR-0015, ADR-0035 | El paso 9 recortado demuestra un extractor, bandas y degradación con corpus; conserva contadores y huellas locales, sin agregar una plataforma de observabilidad |
+| Aviso al viajero y formulario de carga asistida para `ExtraccionNoReconocida` | ADR-0035; `notification` y clientes | El paso 9 publica el evento seguro con borrador cuando hay candidatos válidos estructuralmente; `notification` no entra en el recorte del paso 12 y no se construye un cliente extra |
 
+### Verificación del paso 9
+
+Desde `prototipo/`, con la infraestructura arriba:
+
+```sh
+TROTAMUNDOS_EXIGIR_INFRA=1 make pruebas
+make servicios-arriba
+.venv/bin/python -m tests.booking_extraction.humo_contenedores
+```
+
+El humo atraviesa el receptor de reenvío de `mail-ingest`, Redpanda, `booking-extraction` y
+el panel de `itinerary`: alta confirmada, media por confirmar, baja y desconocida sin reservas,
+y repetición sin duplicados. Crea un usuario y un buzón sintéticos únicos (imprime su UUID),
+sin alterar datos existentes. El tiempo observado es evidencia local de QA-01, no una medición
+p99 de producción ni el escenario de carga del paso 17. El corpus de 20 correos es sintético:
+no demuestra cobertura sobre los veinte remitentes reales más frecuentes.
+
+Después del humo se bajan solo los servicios, preservando base, broker y esquemas:
+
+```sh
+docker compose rm -sf itinerary-escritura itinerary-lectura identity-access mail-ingest support-liaison virtual-assistant booking-extraction
+```
