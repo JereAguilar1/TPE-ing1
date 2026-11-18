@@ -89,7 +89,7 @@ prototipo/
 │           ├── complementos/         # agencia simulada
 │           ├── api.py                # POST /casos y sus lecturas (support-liaison.yaml)
 │           └── servicio.py           # arma los módulos y define las transacciones
-│       └── virtual_assistant/       # asistente virtual de la Opción B (paso 19, ADR-0037 a 0040)
+│       ├── virtual_assistant/       # asistente virtual de la Opción B (paso 19, ADR-0037 a 0040)
 │           ├── catalogos/es/         # patrones de cada intención y mensajes (recurso, sin código)
 │           ├── catalogo.py           # lee los catálogos y formatea mensajes y fechas
 │           ├── interprete.py         # puerto InterpreteDeIntenciones y su implementación por reglas
@@ -100,6 +100,10 @@ prototipo/
 │           ├── sesiones.py           # sesiones, turnos, acción pendiente y retención de 30 días
 │           ├── api.py                # virtual-assistant.yaml
 │           └── servicio.py           # arma los módulos y define las transacciones
+│       └── bff_web/                 # BFF para app-web (paso 11, ADR-0005, ADR-0019, ADR-0027, ADR-0034)
+│           ├── clientes.py           # adaptadores HTTP a itinerary-lectura, itinerary-escritura y virtual-assistant
+│           ├── api.py                # bff-web.yaml: ETag/304, Cache-Control, v1+json y X-Version-Usuario
+│           └── servicio.py           # arma el elemento sin estado propio
 ├── tests/
 ├── Dockerfile              # una imagen para todos los servicios (se construye desde la raíz)
 ├── docker-compose.yml      # PostgreSQL, broker y servicios
@@ -117,6 +121,7 @@ prototipo/
 | Ningún módulo menciona un tipo de segmento concreto (`vuelo`, `tren`…). Solo pueden hacerlo los complementos (adaptadores y extractores), que van en carpetas `complementos/` | I4, vista de módulos N2; ADR-0011 |
 | Dentro de `itinerary`, cada módulo importa solo los módulos que la vista N2 le permite (`reservas` no conoce a `fusion` ni a `viajes`; `ingesta` solo conoce a `fusion`; `api` solo a `gestion_manual` y `proyeccion_panel`; `proyeccion_panel` y `publicacion` no importan dominio). La excepción declarada es `servicio`, el punto de armado, que ningún módulo importa. Un módulo que no está en la tabla hace fallar la prueba | I1, I3, I5, vista de módulos N2 |
 | Dentro de `virtual_assistant`, cada módulo importa solo lo que permite la vista de módulos del asistente, y solo `contexto`, `acciones` y `derivacion` hablan con otros servicios. Solo `interprete` usa los patrones, los módulos que le responden al viajero no tienen frases en el código y cada clave de mensaje usada existe en el catálogo | ADR-0037; vista de módulos del asistente |
+| Dentro de `bff_web`, ningún módulo tiene persistencia propia ni lógica de dominio: solo compone respuestas de `itinerary-lectura`, `itinerary-escritura` y `virtual-assistant` por HTTP | R4, vista de módulos N1; ADR-0005, ADR-0034 |
 
 ### Decisiones de implementación
 
@@ -206,7 +211,8 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | Si el viajero tiene varios viajes y no dijo de cuál habla, el asistente le pregunta y le pide que repita el pedido eligiendo el viaje (`viajeId` del mensaje o el nombre del viaje); no guarda el pedido a medias | Mantiene la sesión en lo que fija ADR-0040 (viaje en foco, acción pendiente y contador) | ADR-0039; ADR-0040 |
 | La proyección de disrupciones del asistente se purga con la ventana de la bandeja de entrada (14 días) | ADR-0040 dice que se purga con la bandeja de entrada | ADR-0040; ADR-0014 |
 | El asistente responde siempre en español: sin `preferences` no conoce el idioma del viajero, y ADR-0040 dice que no consume `PreferenciasActualizadas` hasta que haga falta el idioma | El prototipo trae solo el catálogo en español (ADR-0037) | ADR-0037; ADR-0040 |
-| El asistente todavía no tiene ruta pública en `bff-web` (paso 11): las pruebas y la demostración lo llaman directo, con la sesión del viajero | El contrato lo expone solo a los BFF, que no están construidos | ADR-0005; `virtual-assistant.yaml` |
+| `bff-web.yaml` 1.1.0 suma las tres rutas públicas del asistente (`/asistente/sesiones*`), la revalidación condicional (`If-None-Match` → `304`, `Cache-Control: private, no-cache`) en las lecturas de viajes y los errores `400`/`401` de las operaciones con sesión; `itinerary` devuelve `X-Version-Usuario` también en las respuestas `204` | El contrato del asistente (`virtual-assistant.yaml`) se expone a través del BFF (ADR-0005, ADR-0034), y `bff-web.yaml` declara `X-Version-Usuario` en todas las mutaciones de itinerario | ADR-0005; ADR-0018; ADR-0019; ADR-0027 (cambio compatible); ADR-0034 |
+| `bff-web` calcula el `ETag` de `GET /panel` y `GET /viajes/{id}` como un *hash* `SHA-256` determinista del JSON canónico de la respuesta y responde `304 Not Modified` si coincide con `If-None-Match` | Cualquier cambio en `versionUsuario`, en una reserva, un conflicto o un viaje cambia el `ETag` de inmediato sin estados intermedios en el BFF | ADR-0019 (`ETag` y `Cache-Control: private, no-cache`) |
 | Al crear una reserva nueva, la fusión de `itinerary` usa el registro de tipos del servicio (el alta manual y la ingesta lo pasan), en lugar del registro por omisión | La prueba de QA-15 con un tipo que el código no conoce mostró que el registro inyectado se perdía. En producción no cambia nada, porque los dos se leen de la misma carpeta de contratos | ADR-0011; QA-15 |
 | Los catálogos del asistente (`patrones.yaml` y `mensajes.yaml`) cuentan como recursos de presentación de un tipo, igual que las etiquetas de los clientes (elemento 2 de la [guía de extensión](../docs/02-proceso-add/iteracion-4/guias-de-extension.md)). Un tipo que no está en ellos se encuentra por su código y se nombra «reserva»; para reconocerlo por su nombre («mi barco») se agrega ahí | El asistente es posterior a la guía de la iteración 4. Así QA-15 sigue en ≤ 2 elementos tocados y 0 servicios de dominio | QA-15; ADR-0032; ADR-0037 |
 | Un tipo de segmento nuevo se incorpora con un despliegue: cada servicio lee los descriptores de `contratos/` una vez, al arrancar | QA-15 plantea la incorporación «para el siguiente *release*»; recargar descriptores en caliente no es un requisito | QA-15; ADR-0011 |
@@ -268,6 +274,7 @@ Servicios que levanta `make servicios-arriba`:
 | `mail-ingest` | 18104 | Avisos de los proveedores (`/webhooks/correo`), reenvío verificado (`/webhooks/correo/reenvio`) y filtros del usuario ([`mail-ingest-webhooks.yaml`](../contratos/openapi/mail-ingest-webhooks.yaml), [`mail-ingest-filtros.yaml`](../contratos/openapi/mail-ingest-filtros.yaml)). Consume `EstadoDeBuzonCambiado`, pide los tokens a `identity-access` y publica `MensajeDeViajeRecibido` |
 | `support-liaison` | 18105 | Casos de soporte derivados a la agencia preferida ([`support-liaison.yaml`](../contratos/openapi/support-liaison.yaml)). Toma la instantánea del viaje de `itinerary-lectura`, consume `PreferenciasActualizadas` y publica `CasoDerivado` |
 | `virtual-assistant` | 18106 | Asistente virtual de la Opción B ([`virtual-assistant.yaml`](../contratos/openapi/virtual-assistant.yaml)). Lee de `itinerary-lectura`, corrige en `itinerary-escritura` y deriva en `support-liaison`, siempre con la sesión del viajero; consume `DisrupcionDetectada` |
+| `bff-web` | 18108 | Operaciones públicas para `app-web` ([`bff-web.yaml`](../contratos/openapi/bff-web.yaml)): panel y viajes con `ETag`/`304` y `Cache-Control`, comandos con `X-Version-Usuario`, catálogo público de tipos y conversaciones con `virtual-assistant` |
 
 Variables de entorno opcionales: `TROTAMUNDOS_CONTRATOS`, `TROTAMUNDOS_DSN`, `TROTAMUNDOS_BROKER`,
 `TROTAMUNDOS_REGION`, `TROTAMUNDOS_INTERVALO_TAREAS` (segundos entre corridas del trabajo
@@ -276,7 +283,8 @@ usan para no mezclarse). Con `TROTAMUNDOS_BROKER` vacío, un servicio no publica
 `mail-ingest` usa además `TROTAMUNDOS_URL_IDENTITY_ACCESS` (por omisión, `http://localhost:18103`), y
 `support-liaison`, `TROTAMUNDOS_URL_ITINERARY_LECTURA` (por omisión, `http://localhost:18102`).
 `virtual-assistant` usa esa misma, `TROTAMUNDOS_URL_ITINERARY_ESCRITURA` (`http://localhost:18101`) y
-`TROTAMUNDOS_URL_SUPPORT_LIAISON` (`http://localhost:18105`).
+`TROTAMUNDOS_URL_SUPPORT_LIAISON` (`http://localhost:18105`). `bff-web` usa las dos de `itinerary` y
+`TROTAMUNDOS_URL_VIRTUAL_ASSISTANT` (`http://localhost:18106`).
 `TROTAMUNDOS_MODO` elige el modo de despliegue de `itinerary`: `completo` (por omisión), `lectura` o
 `escritura`.
 
@@ -299,7 +307,7 @@ construido](#diseñado-y-no-construido).
 | [0002](../docs/03-adr/ADR-0002-despliegue-multirregion.md) Activo-activo en tres regiones | ⏳ | Paso 16, como multirregión simulada: dos regiones con región primaria por usuario (ver ADR-0018). Las tres regiones reales ➖ |
 | [0003](../docs/03-adr/ADR-0003-separacion-planos.md) Plano operacional y analítico separados | ⏳ | Paso 14 |
 | [0004](../docs/03-adr/ADR-0004-obtencion-de-correo.md) Correo por *push* con reconciliación | 🟨 | Paso 8: suscripciones con renovación y detección de caídas, aviso firmado, reconciliación escalonada por `buzon_id` y los dos caminos convergiendo en una cola, con la misma entrega publicada una sola vez (probado). Los intervalos son los «en reposo» de ADR-0024: el ajuste por viaje queda fuera (ver decisiones). Cuotas y cortacircuitos, paso 10 |
-| [0005](../docs/03-adr/ADR-0005-capa-de-clientes-bff.md) Un BFF por tipo de cliente | ⏳ | Paso 11 |
+| [0005](../docs/03-adr/ADR-0005-capa-de-clientes-bff.md) Un BFF por tipo de cliente | 🟨 | Paso 11: `bff-web` sin lógica de dominio (regla R4 probada), componiendo `itinerary-lectura`, `itinerary-escritura` y `virtual-assistant` en una sola ida y vuelta para el panel. `bff-mobile` queda fuera del recorte |
 | [0006](../docs/03-adr/ADR-0006-capa-de-anticorrupcion.md) Capa de anticorrupción con complementos | 🟨 | Complementos de proveedor de correo (paso 8) y de agencia (paso 12), cada uno detrás de su interfaz. Extractores y adaptadores de proveedor de viaje, pasos 9 y 10 |
 | [0007](../docs/03-adr/ADR-0007-identidad-y-comparticion.md) OIDC, delegación OAuth y designados | 🟨 | Sesiones OIDC y ciclo de vida de buzones en `identity-access` (paso 7). Designados y compartición, paso 13 |
 | [0008](../docs/03-adr/ADR-0008-alcance-disponibilidad.md) Alcance y medición de la disponibilidad | ➖ | Medir disponibilidad real no tiene sentido en una notebook; lo crítico se ejercita con QA-05 |
@@ -313,20 +321,20 @@ construido](#diseñado-y-no-construido).
 | [0016](../docs/03-adr/ADR-0016-modelo-dimensional-analitico.md) Esquema en estrella desde eventos | ⏳ | Paso 14 |
 | [0017](../docs/03-adr/ADR-0017-estrategia-de-pruebas-y-contratos.md) Pruebas derivadas de la especificación | 🟨 | Propiedades de la fusión y validación contra contratos, en la integración continua (`.github/workflows/pruebas.yml`). Conformidad de complementos y corpus, pasos 9 y 10; Schemathesis y compatibilidad, paso 17 |
 | [0018](../docs/03-adr/ADR-0018-consistencia-datos-multirregion.md) Región primaria, testigo y lectura causal | 🟨 | `versionUsuario` y escrituras serializadas por usuario. Región primaria, testigo transregional síncrono para los comandos manuales y conmutación, paso 16 (QA-05) |
-| [0019](../docs/03-adr/ADR-0019-cache-camino-lectura-arranque-movil.md) Caché multinivel y arranque móvil | ⏳ | Paso 11 (el panel ya se lee en un acceso) |
-| [0020](../docs/03-adr/ADR-0020-contrapresion-y-sobrecarga.md) Contrapresión, carriles y degradación | 🟨 | Carriles P1/P2/P3 (paso 6). Plazo propagado, colas acotadas y modos de degradación, pasos 11 y 17 |
+| [0019](../docs/03-adr/ADR-0019-cache-camino-lectura-arranque-movil.md) Caché multinivel y arranque móvil | 🟨 | El panel se lee en un acceso (`proyeccion_panel`) y `bff-web` aplica `Cache-Control: private, no-cache` con `ETag` / `304 Not Modified` en datos del usuario y `Cache-Control: public, max-age=300, stale-while-revalidate=3600` en `GET /tipos-de-segmento` (paso 11). El clúster regional en memoria y `bff-mobile` quedan fuera del recorte |
+| [0020](../docs/03-adr/ADR-0020-contrapresion-y-sobrecarga.md) Contrapresión, carriles y degradación | 🟨 | Carriles P1/P2/P3 (paso 6). Plazo propagado y límite de tasa quedan en «Para completar el 100 %» (recorte del paso 11); modos de degradación, paso 17 |
 | [0021](../docs/03-adr/ADR-0021-estrategia-autoescalado.md) Autoescalado y lectura/escritura separadas | 🟨 | `itinerary-lectura` e `itinerary-escritura` como modos del mismo código (`TROTAMUNDOS_MODO`). El autoescalado es de la plataforma de producción ➖ |
 | [0022](../docs/03-adr/ADR-0022-despliegue-progresivo-y-reversion.md) Entrega canaria y *expand/contract* | ➖ | Requiere varias regiones y tráfico real |
 | [0023](../docs/03-adr/ADR-0023-particionamiento-y-crecimiento.md) Particionamiento, compactación y archivo frío | 🟨 | La clave de partición `usuario_id` está en toda tabla y en el *broker*. Los 64 *buckets*, la compactación y el archivo frío ➖ (volumen de producción); la consolidación ya es indiferente a la compactación (probado) |
 | [0024](../docs/03-adr/ADR-0024-cortacircuitos-reintentos-y-cuotas.md) Cortacircuitos, cola persistente y cuotas | 🟨 | Espera de `5 s × 2^n` con tope de 15 min en la cola de `mail-ingest` (paso 8) y en la derivación a la agencia durante 24 h (paso 12). Cortacircuitos, mamparos y cuotas, paso 10 |
 | [0025](../docs/03-adr/ADR-0025-observabilidad-sli-slo-presupuesto-error.md) Observabilidad y presupuesto de error | 🟨 | `traceparent` e `idDeCorrelacion` se propagan en HTTP y eventos. OpenTelemetry y SLO ➖: no están en el plan |
 | [0026](../docs/03-adr/ADR-0026-modelo-costo-y-camino-escalonado.md) Modelo de costo | ➖ | Es una decisión de operación, no de código |
-| [0027](../docs/03-adr/ADR-0027-versionado-y-evolucion-de-contratos.md) Evolución compatible de contratos | 🟨 | Los contratos evolucionan con SemVer y cambios compatibles (`itinerary.yaml` 1.1.0, `identity-access.yaml` 1.2.0, `mail-ingest-filtros.yaml` 1.1.0, `support-liaison.yaml` 1.1.0, `virtual-assistant.yaml` 1.0.0, AsyncAPI 1.5.0). El tipo de medio versionado de la API pública, paso 11 |
-| [0028](../docs/03-adr/ADR-0028-autorizacion-comparticion-y-publicacion.md) ABAC, vales firmados y designados | 🟨 | El mismo 404 para «no existe» y «no es tuyo»; motor ABAC, vale JWS de 60 s y OTP de invitados en `identity-access` (paso 7). Verificación en `itinerary`, `sharing` y publicación, pasos 11 y 13 |
+| [0027](../docs/03-adr/ADR-0027-versionado-y-evolucion-de-contratos.md) Evolución compatible de contratos | 🟨 | Los contratos evolucionan con SemVer y cambios compatibles (`itinerary.yaml` 1.1.0, `bff-web.yaml` 1.1.0, `identity-access.yaml` 1.2.0, `mail-ingest-filtros.yaml` 1.1.0, `support-liaison.yaml` 1.1.0, `virtual-assistant.yaml` 1.0.0, AsyncAPI 1.5.0), y la API pública sirve `application/vnd.trotamundos.v1+json` (paso 11) |
+| [0028](../docs/03-adr/ADR-0028-autorizacion-comparticion-y-publicacion.md) ABAC, vales firmados y designados | 🟨 | El mismo 404 para «no existe» y «no es tuyo» (incluso en `bff-web`, paso 11); motor ABAC, vale JWS de 60 s y OTP de invitados en `identity-access` (paso 7). Verificación del vale interno en `itinerary` y `sharing`, fuera del recorte (paso 13) |
 | [0029](../docs/03-adr/ADR-0029-cifrado-custodia-y-rotacion-de-claves.md) Cifrado por sobres y custodia | ✅ | Paso 7 (`QA-13`): `KEK_region`/`DEK_u` con `AES-256-GCM`, regla `R5-estricto` probada, rotación sin corte, tokens efímeros ≤ 15 min, detector de anomalías de 60 s y revocación regional en bloque |
 | [0030](../docs/03-adr/ADR-0030-auditoria-y-supresion-datos-personales.md) Auditoría y supresión de datos | 🟨 | Los errores no filtran datos internos; bitácora encadenada `SHA-256`, exportación y fase 1 local con `CuentaSuprimida` en `identity-access` (paso 7). Purga coordinada y plano analítico, paso 14 |
 | [0031](../docs/03-adr/ADR-0031-residencia-de-datos-por-region.md) Residencia de datos por región | ➖ | La multirregión del paso 16 se simula en una sola jurisdicción; las clases de residencia no aplican |
-| [0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md) Internacionalización | 🟨 | Instantes en UTC con zona IANA aparte, en todo el modelo. Idioma y formateo, en los BFF (paso 11) |
+| [0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md) Internacionalización | 🟨 | Instantes en UTC con zona IANA aparte y dominio/BFF neutrales al idioma (`bff-web` paso 11, catálogos externalizados del asistente en paso 19). El formateo local en `app-web`, paso 20 |
 | [0033](../docs/03-adr/ADR-0033-capacidades-nativas-gps-y-degradacion.md) GPS en el móvil | ➖ | No hay cliente móvil nativo en el prototipo |
 | [0034](../docs/03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) Módulo avanzado y recorte del prototipo | 🟨 | El recorte guía este plan. La Opción B, diseñada en la [iteración 5](../docs/02-proceso-add/iteracion-5/README.md) (paso 18) y construida en `virtual-assistant` (paso 19) sin interfaces nuevas en el núcleo (CON-06); ADR-0040 precisa su punto sobre `CuentaSuprimida` |
 | [0035](../docs/03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) Buzones sin OAuth y formatos desconocidos | 🟨 | Alias de reenvío e `imapDelegado` con credencial delegada cifrada en `identity-access` (paso 7). Receptor de reenvío con DKIM/SPF/ARC y titular verificados, con rechazos auditados (paso 8). Formatos desconocidos, paso 9 |
@@ -360,7 +368,7 @@ implementa. La columna «Prioridad» ordena lo que falta según el recorte acord
 | 8 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | — | ✅ | Francisco Lozano |
 | 9 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | Sí o sí | ⬜ |  |
 | 10 | `provider-sync`: adaptador simulado, cortacircuitos, disrupciones | QA-10, ADR-0024 | Si sobra (reducido) | ⬜ |  |
-| 11 | BFF y `api-gateway`: panel, límite de tasa, plazos | QA-02, ADR-0020 | Debería (reducido) | ⬜ |  |
+| 11 | BFF y `api-gateway`: panel, límite de tasa, plazos | QA-02, ADR-0020 | Debería (reducido) | ✅ reducido: solo `bff-web` | Ivo Iriarte |
 | 12 | `notification`, `support-liaison` y `preferences` mínimo | UC-5, UC-7, ADR-0034 | Sí o sí (reducido) | ✅ reducido: solo `support-liaison` | Francisco Lozano |
 | 13 | `sharing`: compartición y `ResumenPublicable` | QA-12, ADR-0028 | Completar al 100 % | ⬜ |  |
 | 14 | `event-pipeline` y plano analítico | QA-09, ADR-0016 | Si sobra (reducido) | ⬜ |  |
@@ -447,6 +455,7 @@ paso; el paso 21 la revisa entera. Las rutas son relativas a `prototipo/`.
 | `servicios/virtual_assistant/derivacion.py` | ADR-0039 (cuatro disparadores, síntesis, idempotencia por la acción, `422`); RF-B2; `support-liaison.yaml` | `tests/virtual_assistant/test_virtual_assistant.py` |
 | `servicios/virtual_assistant/sesiones.py`, `contexto.py`, `servicio.py`, `api.py` | ADR-0040 (sesión por `usuario_id`, `404` ajeno, retención, `DisrupcionDetectada` con bandeja de entrada); `virtual-assistant.yaml`; ADR-0014 | `tests/virtual_assistant/test_virtual_assistant.py`, `test_arranque_virtual_assistant.py` |
 | `contratos/tipos-de-segmento/tren.v1.yaml` (el único artefacto propio del tren); `comun/tipos_de_segmento.py`; `servicios/itinerary/` y `servicios/virtual_assistant/` sin cambios por el tipo (la corrección de la fusión del paso 15 no es por el tipo: ver «Decisiones de implementación») | QA-15 (≤ 2 elementos tocados, 0 servicios de dominio; datos históricos consultables con una versión nueva del tipo); ADR-0011; ADR-0027 | `tests/escenarios/test_qa15_nuevo_transporte.py`, `tests/test_arquitectura.py` (ningún módulo nombra un tipo) |
+| `servicios/bff_web/clientes.py`, `api.py`, `servicio.py` | `bff-web.yaml` 1.1.0; ADR-0005 (composición sin lógica de dominio, regla R4); ADR-0018 (`X-Min-Version`, `X-Version-Usuario`); ADR-0019 (`ETag`, `304 Not Modified`, `Cache-Control` privado y público); ADR-0027 (`application/vnd.trotamundos.v1+json`); ADR-0028 (`404` opaco); ADR-0034 (asistente expuesto por el BFF) | `tests/bff_web/test_bff_web.py`, `test_arranque_bff_web.py`, `tests/test_arquitectura.py` |
 
 ### Diseñado y no construido
 
@@ -463,4 +472,5 @@ apartado lo dice explícitamente para que no se lea como un faltante. Se complet
 | Catálogos del asistente en otros idiomas | [ADR-0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md), ADR-0037 | El prototipo trae solo español (ADR-0037); otro idioma es otro par de archivos en `catalogos/` |
 | Degradación del asistente ante `Disrupción masiva` | [ADR-0040](../docs/03-adr/ADR-0040-sesion-conversacional-y-privacidad.md) §6, [ADR-0020](../docs/03-adr/ADR-0020-contrapresion-y-sobrecarga.md) | Los modos de degradación de ADR-0020 son de los pasos 11 y 17; cuando estén, el asistente se suma como carga de prioridad 2/3 |
 | Multirregión y conmutación ante la pérdida de una región (paso 16) | [ADR-0002](../docs/03-adr/ADR-0002-despliegue-multirregion.md), [ADR-0018](../docs/03-adr/ADR-0018-consistencia-datos-multirregion.md), [vista de despliegue N2](../docs/04-vistas/vista-despliegue-nivel-2.md) | Es el paso más caro del plan. ASR-3 (QA-05) queda demostrado solo en el diseño |
+| `bff-mobile`, `api-gateway`, límite de tasa (cubeta de fichas 60 req/min) y presupuesto de plazo propagado (`X-Deadline-Ms`) (paso 11) | [ADR-0005](../docs/03-adr/ADR-0005-capa-de-clientes-bff.md), [ADR-0019](../docs/03-adr/ADR-0019-cache-camino-lectura-arranque-movil.md), [ADR-0020](../docs/03-adr/ADR-0020-contrapresion-y-sobrecarga.md), `contratos/openapi/bff-mobile.yaml`, `contratos/openapi/api-gateway.yaml` | Recorte del paso 11: para la demostración web y la Opción B alcanza con `bff-web` (ver «Para completar el 100 %») |
 

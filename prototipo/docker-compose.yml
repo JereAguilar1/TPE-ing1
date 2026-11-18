@@ -218,3 +218,31 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  bff-web:
+    # Composición para app-web: panel, viajes, reservas, catálogo y asistente virtual (paso 11,
+    # ADR-0005, ADR-0019, ADR-0027, ADR-0034). Sin estado ni base propios.
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.bff_web.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TROTAMUNDOS_URL_ITINERARY_LECTURA: http://itinerary-lectura:8000
+      TROTAMUNDOS_URL_ITINERARY_ESCRITURA: http://itinerary-escritura:8000
+      TROTAMUNDOS_URL_VIRTUAL_ASSISTANT: http://virtual-assistant:8000
+      # De .env (make infra-arriba): la sesión la emite identity-access con el mismo secreto.
+      TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
+    ports:
+      - "18108:8000"
+    depends_on:
+      itinerary-lectura:
+        condition: service_healthy
+      itinerary-escritura:
+        condition: service_healthy
+      virtual-assistant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/tipos-de-segmento')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
