@@ -126,3 +126,13 @@ def test_identidad_de_fuente_estable_y_distinta_entre_buzones():
     assert motor.procesar(entrada)[0][1]['observacion'] == primero
     entrada['buzonId'] = str(uuid4())
     assert motor.procesar(entrada)[0][1]['observacion']['idDeFuente'] != primero['idDeFuente']
+
+
+def test_cambio_de_plantilla_del_remitente_abre_el_disyuntor():
+    motor = MotorExtraccion()
+    entrada = carga()
+    entrada['mensaje']['cuerpoTexto'] = 'Nueva plantilla aún no reconocida'
+    for _ in range(20):
+        [(tipo, salida)] = motor.procesar(entrada)
+        assert (tipo, salida['motivo']) == ('ExtraccionNoReconocida', 'formatoDesconocido')
+    assert motor.procesar(carga())[0][1]['banda'] == 'media'
