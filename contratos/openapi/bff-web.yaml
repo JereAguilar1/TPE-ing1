@@ -1,16 +1,23 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — bff-web
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Operaciones que el BFF expone a `app-web` a través de `api-gateway` (RF-09).
-    Componen datos de `itinerary` y de la copia local de `preferences`; no contienen lógica de
-    dominio (regla R4 de la vista de módulos N1, ADR-0005).
+    Componen datos de `itinerary`, de la copia local de `preferences` y del asistente virtual
+    (Opción B, ADR-0034); no contienen lógica de dominio (regla R4 de la vista de módulos N1,
+    ADR-0005).
 
     Representación: `application/vnd.trotamundos.v1+json`. Un cambio incompatible publica `v2` en
     la misma ruta y anuncia el retiro de `v1` con `Deprecation` y `Sunset` (ADR-0027).
 
-    Trazabilidad: iteración 2, §5.7 («bff-web y bff-mobile — operaciones expuestas»); UC-3, UC-4.
+    Trazabilidad: iteración 2, §5.7 («bff-web y bff-mobile — operaciones expuestas»); UC-3, UC-4;
+    iteración 5, §5.4 (`virtual-assistant`).
+
+    - `1.1.0`: expone las rutas públicas del asistente virtual (`/asistente/sesiones*`, ADR-0005,
+      ADR-0034), la revalidación condicional por `ETag` (`304`) y `Cache-Control: private, no-cache`
+      en las lecturas de viajes (ADR-0019), y declara los errores `400` y `401` de las operaciones
+      autenticadas (cambio compatible, ADR-0027).
 servers:
   - url: https://api.trotamundos.app
 security:
@@ -20,6 +27,7 @@ tags:
   - name: reservas
   - name: viajes
   - name: catalogo
+  - name: conversacion
 paths:
   /panel:
     get:
@@ -70,6 +78,9 @@ paths:
       responses:
         '200':
           description: Página de viajes.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: 'private, no-cache' }
           content:
             application/vnd.trotamundos.v1+json:
               schema:
@@ -80,6 +91,7 @@ paths:
                     type: array
                     items: { $ref: 'comun.yaml#/components/schemas/ViajeResumen' }
                   siguienteCursor: { type: [string, 'null'] }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
         '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
 
   /viajes/{id}:
@@ -91,14 +103,21 @@ paths:
       summary: Detalle del viaje
       parameters:
         - $ref: 'comun.yaml#/components/parameters/MinVersion'
+        - name: If-None-Match
+          in: header
+          required: false
+          schema: { type: string }
       responses:
         '200':
           description: Viaje con sus reservas y segmentos.
           headers:
             ETag: { $ref: 'comun.yaml#/components/headers/ETag' }
+            Cache-Control:
+              schema: { type: string, const: 'private, no-cache' }
           content:
             application/vnd.trotamundos.v1+json:
               schema: { $ref: 'comun.yaml#/components/schemas/Viaje' }
+        '304': { description: Sin cambios desde el `ETag` enviado. }
         '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
     delete:
@@ -110,6 +129,7 @@ paths:
           description: Eliminado.
           headers:
             X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
 
   /viajes/{id}/archivo:
@@ -124,6 +144,7 @@ paths:
           description: Archivado.
           headers:
             X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
         '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
 
@@ -140,6 +161,7 @@ paths:
           description: Movida.
           headers:
             X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
 
   /reservas:
@@ -187,6 +209,7 @@ paths:
             application/vnd.trotamundos.v1+json:
               schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
         '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
         '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
     delete:
@@ -198,6 +221,7 @@ paths:
           description: Eliminada.
           headers:
             X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
 
   /reservas/{id}/confirmacion:
@@ -225,6 +249,8 @@ paths:
           content:
             application/vnd.trotamundos.v1+json:
               schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
         '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
 
@@ -254,6 +280,8 @@ paths:
           content:
             application/vnd.trotamundos.v1+json:
               schema: { $ref: 'comun.yaml#/components/schemas/ResultadoComandoReserva' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
         '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
 
@@ -275,6 +303,77 @@ paths:
               schema:
                 type: array
                 items: { $ref: 'comun.yaml#/components/schemas/DescriptorTipoDeSegmento' }
+
+  /asistente/sesiones:
+    post:
+      tags: [conversacion]
+      operationId: abrirSesion
+      summary: Abre una conversación con el asistente virtual; la respuesta trae su saludo (RF-B1, ADR-0034)
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/vnd.trotamundos.v1+json:
+            schema:
+              type: object
+              properties:
+                viajeId:
+                  $ref: 'comun.yaml#/components/schemas/Id'
+                  description: El viaje que el viajero está mirando, si abre el chat desde él.
+      responses:
+        '201':
+          description: Sesión abierta.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: 'virtual-assistant.yaml#/components/schemas/Sesion' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /asistente/sesiones/{sid}:
+    parameters:
+      - { name: sid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    get:
+      tags: [conversacion]
+      operationId: verSesion
+      summary: La conversación con el asistente y todos sus turnos (ADR-0040)
+      responses:
+        '200':
+          description: Sesión con su historial.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: 'private, no-cache' }
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: 'virtual-assistant.yaml#/components/schemas/Sesion' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /asistente/sesiones/{sid}/mensajes:
+    parameters:
+      - { name: sid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    post:
+      tags: [conversacion]
+      operationId: enviarMensaje
+      summary: El viajero escribe (o confirma una acción propuesta) y el asistente responde (RF-B1, RF-B2)
+      parameters:
+        - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/vnd.trotamundos.v1+json:
+            schema: { $ref: 'virtual-assistant.yaml#/components/schemas/MensajeDelViajero' }
+      responses:
+        '200':
+          description: Respuesta del asistente a ese turno.
+          content:
+            application/vnd.trotamundos.v1+json:
+              schema: { $ref: 'virtual-assistant.yaml#/components/schemas/Respuesta' }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+        '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+        '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
 components:
   securitySchemes:
     oidc:

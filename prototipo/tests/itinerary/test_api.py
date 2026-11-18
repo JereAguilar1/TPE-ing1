@@ -42,7 +42,7 @@ class ItinerarioFalso:
         return self._responder("editar", *args, **kwargs)
 
     def eliminar_reserva(self, *args, **kwargs):
-        self._responder("eliminar", *args, **kwargs)
+        return self._responder("eliminar", *args, **kwargs)
 
     def confirmar_reserva(self, *args, **kwargs):
         return self._responder("confirmar", *args, **kwargs)
@@ -177,6 +177,7 @@ def test_leer_una_reserva(cliente, contratos):
 def test_la_baja_responde_204_sin_cuerpo(cliente, falso):
     respuesta = cliente.delete(f"/reservas/{RESERVA}", headers=_cabeceras())
     assert (respuesta.status_code, respuesta.content) == (204, b"")
+    assert respuesta.headers["x-version-usuario"] == "3"
     assert falso.llamadas[0][0] == "eliminar"
 
 

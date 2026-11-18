@@ -340,10 +340,14 @@ def test_recorrido_http_de_viajes_y_panel(itinerary, alta, contratos):
         assert foto.json()["tomadaEn"] and foto.json()["viaje"]["id"] == creada["viajeId"]
 
         mover = cliente.put(f"{viaje}/reservas/{creada['reserva']['id']}", headers=cabeceras)
-        assert mover.status_code == 204
-        assert cliente.post(f"{viaje}/archivo", headers=cabeceras).status_code == 204
+        assert mover.status_code == 204 and int(mover.headers["x-version-usuario"]) >= 1
+        archivo = cliente.post(f"{viaje}/archivo", headers=cabeceras)
+        assert archivo.status_code == 204 and int(archivo.headers["x-version-usuario"]) > int(
+            mover.headers["x-version-usuario"])
         assert cliente.post(f"{viaje}/archivo", headers=cabeceras).status_code == 409
-        assert cliente.delete(viaje, headers=cabeceras).status_code == 204
+        borrado = cliente.delete(viaje, headers=cabeceras)
+        assert borrado.status_code == 204 and int(borrado.headers["x-version-usuario"]) > int(
+            archivo.headers["x-version-usuario"])
         assert cliente.get(viaje, headers=cabeceras).status_code == 404
         assert cliente.get("/viajes", params={"estado": "Inventado"}, headers=cabeceras).status_code == 400
         assert cliente.get("/viajes", params={"cursor": "x"}, headers=cabeceras).status_code == 400

@@ -158,9 +158,10 @@ class Itinerary:
                                         lambda ctx: gestion_manual.editar(ctx, reserva_id, cuerpo))
 
     def eliminar_reserva(self, usuario_id: UUID, reserva_id: UUID, *,
-                         traceparent: str | None = None) -> None:
-        self._comando_de_reserva(usuario_id, traceparent,
-                                 lambda ctx: gestion_manual.dar_de_baja(ctx, reserva_id))
+                         traceparent: str | None = None) -> int:
+        return self._comando_de_reserva(
+            usuario_id, traceparent, lambda ctx: gestion_manual.dar_de_baja(ctx, reserva_id)
+        )["versionUsuario"]
 
     def confirmar_reserva(self, usuario_id: UUID, reserva_id: UUID, cuerpo: Mapping[str, Any], *,
                           traceparent: str | None = None) -> dict[str, Any]:
@@ -176,19 +177,20 @@ class Itinerary:
     # --- comandos sobre viajes: una transacción, solo viajes -----------------------------
 
     def mover_reserva(self, usuario_id: UUID, viaje_id: UUID, reserva_id: UUID, *,
-                      traceparent: str | None = None) -> None:
-        self._comando_de_viaje(usuario_id, traceparent,
-                               lambda sesion: gestion_manual.mover_reserva(sesion, reserva_id, viaje_id))
+                      traceparent: str | None = None) -> int:
+        return self._comando_de_viaje(
+            usuario_id, traceparent,
+            lambda sesion: gestion_manual.mover_reserva(sesion, reserva_id, viaje_id))
 
     def archivar_viaje(self, usuario_id: UUID, viaje_id: UUID, *,
-                       traceparent: str | None = None) -> None:
-        self._comando_de_viaje(usuario_id, traceparent,
-                               lambda sesion: gestion_manual.archivar_viaje(sesion, viaje_id))
+                       traceparent: str | None = None) -> int:
+        return self._comando_de_viaje(
+            usuario_id, traceparent, lambda sesion: gestion_manual.archivar_viaje(sesion, viaje_id))
 
     def eliminar_viaje(self, usuario_id: UUID, viaje_id: UUID, *,
-                       traceparent: str | None = None) -> None:
-        self._comando_de_viaje(usuario_id, traceparent,
-                               lambda sesion: gestion_manual.eliminar_viaje(sesion, viaje_id))
+                       traceparent: str | None = None) -> int:
+        return self._comando_de_viaje(
+            usuario_id, traceparent, lambda sesion: gestion_manual.eliminar_viaje(sesion, viaje_id))
 
     # --- lecturas (proyeccion_panel) -----------------------------------------------------
 
@@ -417,14 +419,14 @@ class Itinerary:
         return _con_viaje(resultado.cuerpo(version), viaje_id)
 
     def _comando_de_viaje(self, usuario_id: UUID, traceparent: str | None,
-                          ejecutar: Callable[[viajes.Sesion], list[Evento]]) -> None:
+                          ejecutar: Callable[[viajes.Sesion], list[Evento]]) -> int:
         with self._transaccion(usuario_id) as conexion:
             # Primero lo pendiente: la reserva que se mueve puede estar todavía en la cola.
             self._reaccionar_viajes(conexion, usuario_id, traceparent)
             repositorio = repositorio_de_viajes.RepositorioDeViajesPostgres(conexion, self._registro)
             sesion = self._sesion(repositorio, usuario_id,
                                   Causa(region=self._configuracion.region, traceparent=traceparent))
-            self._publicar(conexion, usuario_id, ejecutar(sesion))
+            return self._publicar(conexion, usuario_id, ejecutar(sesion))
 
     def _reaccionar_viajes(self, conexion: psycopg.Connection, usuario_id: UUID,
                            traceparent: str | None, reserva_id: UUID | None = None,

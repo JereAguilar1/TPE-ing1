@@ -89,7 +89,10 @@ paths:
       tags: [comando]
       operationId: eliminarViaje
       responses:
-        '204': { description: Eliminado. }
+        '204':
+          description: Eliminado.
+          headers:
+            X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
 
   /viajes/{id}/instantanea:
@@ -121,7 +124,10 @@ paths:
       tags: [comando]
       operationId: archivarViaje
       responses:
-        '204': { description: Archivado; se publica `ViajeArchivado`. }
+        '204':
+          description: Archivado; se publica `ViajeArchivado`.
+          headers:
+            X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
         '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
 
@@ -134,7 +140,10 @@ paths:
       tags: [comando]
       operationId: moverReserva
       responses:
-        '204': { description: Movida y fijada. }
+        '204':
+          description: Movida y fijada.
+          headers:
+            X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
 
   /reservas:
@@ -192,7 +201,10 @@ paths:
       tags: [comando]
       operationId: eliminarReserva
       responses:
-        '204': { description: Eliminada. }
+        '204':
+          description: Eliminada.
+          headers:
+            X-Version-Usuario: { $ref: 'comun.yaml#/components/headers/VersionUsuario' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
 
   /reservas/{id}/confirmacion:

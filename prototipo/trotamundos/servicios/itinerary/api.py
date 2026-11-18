@@ -48,7 +48,7 @@ class Itinerario(Protocol):
                        traceparent: str | None = None) -> dict[str, Any]: ...
 
     def eliminar_reserva(self, usuario_id: UUID, reserva_id: UUID, *,
-                         traceparent: str | None = None) -> None: ...
+                         traceparent: str | None = None) -> int | None: ...
 
     def confirmar_reserva(self, usuario_id: UUID, reserva_id: UUID, cuerpo: Mapping[str, Any], *,
                           traceparent: str | None = None) -> dict[str, Any]: ...
@@ -58,13 +58,13 @@ class Itinerario(Protocol):
                            traceparent: str | None = None) -> dict[str, Any]: ...
 
     def mover_reserva(self, usuario_id: UUID, viaje_id: UUID, reserva_id: UUID, *,
-                      traceparent: str | None = None) -> None: ...
+                      traceparent: str | None = None) -> int | None: ...
 
     def archivar_viaje(self, usuario_id: UUID, viaje_id: UUID, *,
-                       traceparent: str | None = None) -> None: ...
+                       traceparent: str | None = None) -> int | None: ...
 
     def eliminar_viaje(self, usuario_id: UUID, viaje_id: UUID, *,
-                       traceparent: str | None = None) -> None: ...
+                       traceparent: str | None = None) -> int | None: ...
 
     def leer_panel(self, usuario_id: UUID) -> dict[str, Any]: ...
 
@@ -124,8 +124,8 @@ def crear_app(itinerario: Itinerario, contratos: Contratos,
     @app.delete("/reservas/{id}", status_code=204)
     def eliminar_reserva(id: UUID, usuario_id: UUID = Header(alias="X-Usuario-Id"),
                          traceparent: str | None = Header(default=None)) -> Response:
-        _ejecutar(lambda: itinerario.eliminar_reserva(usuario_id, id, traceparent=traceparent))
-        return Response(status_code=204)
+        return _respuesta_204(_ejecutar(lambda: itinerario.eliminar_reserva(
+            usuario_id, id, traceparent=traceparent)))
 
     @app.post("/reservas/{id}/confirmacion")
     def confirmar_reserva(id: UUID, cuerpo: dict[str, Any] = Body(...),
@@ -175,8 +175,8 @@ def crear_app(itinerario: Itinerario, contratos: Contratos,
     @app.delete("/viajes/{id}", status_code=204)
     def eliminar_viaje(id: UUID, usuario_id: UUID = Header(alias="X-Usuario-Id"),
                        traceparent: str | None = Header(default=None)) -> Response:
-        _ejecutar(lambda: itinerario.eliminar_viaje(usuario_id, id, traceparent=traceparent))
-        return Response(status_code=204)
+        return _respuesta_204(_ejecutar(lambda: itinerario.eliminar_viaje(
+            usuario_id, id, traceparent=traceparent)))
 
     @app.get("/viajes/{id}/instantanea")
     def leer_instantanea(id: UUID, usuario_id: UUID = Header(alias="X-Usuario-Id")) -> JSONResponse:
@@ -185,14 +185,14 @@ def crear_app(itinerario: Itinerario, contratos: Contratos,
     @app.post("/viajes/{id}/archivo", status_code=204)
     def archivar_viaje(id: UUID, usuario_id: UUID = Header(alias="X-Usuario-Id"),
                        traceparent: str | None = Header(default=None)) -> Response:
-        _ejecutar(lambda: itinerario.archivar_viaje(usuario_id, id, traceparent=traceparent))
-        return Response(status_code=204)
+        return _respuesta_204(_ejecutar(lambda: itinerario.archivar_viaje(
+            usuario_id, id, traceparent=traceparent)))
 
     @app.put("/viajes/{vid}/reservas/{rid}", status_code=204)
     def mover_reserva(vid: UUID, rid: UUID, usuario_id: UUID = Header(alias="X-Usuario-Id"),
                       traceparent: str | None = Header(default=None)) -> Response:
-        _ejecutar(lambda: itinerario.mover_reserva(usuario_id, vid, rid, traceparent=traceparent))
-        return Response(status_code=204)
+        return _respuesta_204(_ejecutar(lambda: itinerario.mover_reserva(
+            usuario_id, vid, rid, traceparent=traceparent)))
 
     @app.get("/tipos-de-segmento")
     def leer_tipos_de_segmento() -> JSONResponse:
@@ -225,6 +225,12 @@ def _o_404(recurso: T | None) -> T:
     if recurso is None:
         raise no_encontrado()
     return recurso
+
+
+def _respuesta_204(resultado: Any) -> Response:
+    version = resultado.get("versionUsuario") if isinstance(resultado, Mapping) else resultado
+    cabeceras = {"X-Version-Usuario": str(version)} if version is not None else {}
+    return Response(status_code=204, headers=cabeceras)
 
 
 def _ejecutar(comando: Callable[[], T]) -> T:
