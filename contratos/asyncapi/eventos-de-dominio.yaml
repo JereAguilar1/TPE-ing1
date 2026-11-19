@@ -1,7 +1,7 @@
 asyncapi: 3.0.0
 info:
   title: Trotamundos — eventos de dominio
-  version: 1.5.0
+  version: 1.5.1
   description: |
     Catálogo de eventos publicados en el *broker* (ADR-0001, ADR-0009).
 
@@ -13,6 +13,8 @@ info:
     - `1.3.0`: `ViajeArmado` se publica al crearse el viaje y en cada cambio de miembros, período,
       título o estado, y agrega el campo opcional `version` para que los consumidores ordenen las
       actualizaciones (como `ReservaCancelada`). Cambio compatible (ADR-0027).
+    - `1.5.1`: `provider-sync` consume `ReservaActualizada` y `ReservaCancelada` para mantener el
+      índice de `seguimiento` (iteración 2 §5.5).
 
     Reglas comunes:
     - **Entrega al menos una vez.** Todo consumidor aplica una bandeja de entrada por
@@ -129,12 +131,12 @@ operations:
     action: send
     channel: { $ref: '#/channels/reservaActualizada' }
     x-productor: itinerary
-    x-consumidores: [notification, event-pipeline]
+    x-consumidores: [notification, event-pipeline, provider-sync]
   publicarReservaCancelada:
     action: send
     channel: { $ref: '#/channels/reservaCancelada' }
     x-productor: itinerary
-    x-consumidores: [notification, event-pipeline, support-liaison]
+    x-consumidores: [notification, event-pipeline, support-liaison, provider-sync]
   publicarConflictoDeFuentesDetectado:
     action: send
     channel: { $ref: '#/channels/conflictoDeFuentesDetectado' }
