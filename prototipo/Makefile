@@ -17,7 +17,8 @@ pruebas:
 # .env viejo le falta alguno, se agrega sin tocar los que ya tiene: cambiar la semilla del KMS o la
 # clave de las sesiones dejaría ilegibles los buzones guardados e inválidas las sesiones abiertas.
 SECRETOS_LOCALES = POSTGRES_PASSWORD TROTAMUNDOS_KMS_SECRETO TROTAMUNDOS_JWT_SECRETO \
-                   TROTAMUNDOS_VALE_SECRETO TROTAMUNDOS_SECRETO_WEBHOOK_CORREO
+                   TROTAMUNDOS_VALE_SECRETO TROTAMUNDOS_SECRETO_WEBHOOK_CORREO \
+                   TROTAMUNDOS_SECRETO_WEBHOOK_PROVEEDOR
 
 .env: FORZAR
 	@python3 -c "import pathlib, secrets, sys; \

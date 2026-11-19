@@ -246,3 +246,28 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  provider-sync:
+    # Sincronización con proveedores de viaje como complementos (paso 10, ADR-0006, QA-10):
+    # seguimiento desde ReservaActualizada/ReservaCancelada, webhooks, sondeo y publicación de
+    # ReservaObservada y DisrupcionDetectada.
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.provider_sync.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TROTAMUNDOS_DSN: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres:5432/trotamundos
+      TROTAMUNDOS_BROKER: broker:9092
+      TROTAMUNDOS_REGION: AM
+      TROTAMUNDOS_SECRETO_WEBHOOK_PROVEEDOR: ${TROTAMUNDOS_SECRETO_WEBHOOK_PROVEEDOR}
+    ports:
+      - "18109:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
