@@ -57,6 +57,22 @@ jobs:
       - name: Construir la imagen y levantar todos los servicios (docker-compose.yml)
         run: make servicios-arriba
 
+      # Escenarios de QA-01 y QA-04 de punta a punta contra los contenedores (paso 17, ADR-0017):
+      # sin los contenedores sanos, fallan en lugar de saltearse.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: prototipo/pyproject.toml
+
+      - name: Instalar dependencias
+        run: make instalar PYTHON=python
+
+      - name: Escenarios QA-01 (frescura) y QA-04 (ráfaga) contra los contenedores
+        env:
+          TROTAMUNDOS_EXIGIR_CONTENEDORES: "1"
+        run: .venv/bin/python -m pytest -q -s tests/escenarios/test_qa01_frescura.py tests/escenarios/test_qa04_rafaga.py
+
       - name: Estado y registros de los contenedores (si algo falló)
         if: failure()
         run: |
