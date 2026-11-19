@@ -409,3 +409,32 @@ def test_los_adaptadores_no_importan_otros_complementos():
                 encontradas.append(f"{archivo.relative_to(carpeta)} importa {nombre}")
     assert encontradas == []
 
+
+# --- `event_pipeline` (regla R6, vista de módulos N1; ADR-0003, ADR-0016, QA-09) ------------
+
+DEPENDENCIAS_DE_EVENT_PIPELINE = {
+    "aterrizaje": set(),
+    "modelo_dimensional": {"aterrizaje"},
+    "servicio": {"aterrizaje", "modelo_dimensional"},
+}
+
+
+def test_los_modulos_de_event_pipeline_respetan_sus_dependencias():
+    assert violaciones_internas(PAQUETE, "event_pipeline",
+                                DEPENDENCIAS_DE_EVENT_PIPELINE) == []
+
+
+def test_event_pipeline_cumple_regla_r6_aislamiento_del_plano_operacional():
+    """R6 (vista de módulos N1; ADR-0003, QA-09): el plano analítico solo consume eventos; no
+    hace llamadas HTTP ni publica eventos hacia el plano operacional."""
+    carpeta = PAQUETE / "servicios" / "event_pipeline"
+    prohibidas = {"httpx", "requests", "aiohttp", "urllib", "trotamundos.comun.publicador"}
+    encontradas = [
+        f"{archivo.relative_to(carpeta)} importa {nombre}"
+        for archivo in carpeta.rglob("*.py")
+        for nombre in _importaciones(PAQUETE, archivo)
+        if nombre in prohibidas or nombre.split(".")[0] in prohibidas
+    ]
+    assert encontradas == []
+
+
