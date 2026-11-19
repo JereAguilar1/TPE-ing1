@@ -294,3 +294,24 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  app-web:
+    # Interfaz web mínima (paso 20, RF-09): el panel y el chat del asistente. nginx sirve la página
+    # como el borde (CDN) y enruta /api/bff a bff-web y el inicio de sesión a identity-access, desde
+    # el mismo origen (app_web/nginx.conf). Abrir http://localhost:18111.
+    image: nginx:1.27.3-alpine
+    volumes:
+      - ./app_web/publico:/usr/share/nginx/html:ro
+      - ./app_web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "18111:80"
+    depends_on:
+      bff-web:
+        condition: service_healthy
+      identity-access:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trotamundos</title>
+  <link rel="stylesheet" href="estilos.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <!-- Interfaz web mínima del prototipo (paso 20, RF-09). Los textos salen de locales/es-AR.json
+       (ADR-0032) y cada tramo se presenta con el descriptor de su tipo (GET /tipos-de-segmento). -->
+  <header class="barra">
+    <div>
+      <h1 data-texto="titulo"></h1>
+      <p class="sutil" data-texto="subtitulo"></p>
+    </div>
+    <div id="cuenta" hidden>
+      <span id="correo-actual" class="sutil"></span>
+      <button id="salir" class="secundario" data-texto="salir"></button>
+    </div>
+  </header>
+
+  <main>
+    <section id="ingreso" class="tarjeta ingreso" hidden>
+      <h2 data-texto="ingresar.titulo"></h2>
+      <form id="form-ingreso">
+        <label for="correo" data-texto="ingresar.correo"></label>
+        <input id="correo" type="email" required autocomplete="email" placeholder="ana@ejemplo.com">
+        <button type="submit" data-texto="ingresar.boton"></button>
+      </form>
+      <p class="sutil" data-texto="ingresar.aclaracion"></p>
+      <p id="error-ingreso" class="error" hidden></p>
+    </section>
+
+    <div id="aplicacion" class="columnas" hidden>
+      <section class="tarjeta" aria-labelledby="titulo-panel">
+        <div class="encabezado">
+          <h2 id="titulo-panel" data-texto="panel.titulo"></h2>
+          <div>
+            <span id="actualizado" class="sutil"></span>
+            <button id="actualizar" class="secundario" data-texto="panel.actualizar"></button>
+          </div>
+        </div>
+        <p id="error-panel" class="error" hidden></p>
+        <div id="viajes"></div>
+        <div id="por-confirmar"></div>
+      </section>
+
+      <section class="tarjeta chat" aria-labelledby="titulo-chat">
+        <h2 id="titulo-chat" data-texto="asistente.titulo"></h2>
+        <div id="mensajes" class="mensajes" aria-live="polite"></div>
+        <div id="sugerencias" class="sugerencias"></div>
+        <form id="form-chat" class="entrada">
+          <input id="texto" autocomplete="off" maxlength="1000">
+          <button type="submit" data-texto="asistente.enviar"></button>
+        </form>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

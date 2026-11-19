@@ -1,0 +1,196 @@
+/* Interfaz web mínima del prototipo (paso 20). Sin frameworks ni compilación; se adapta al
+   celular (una columna) y al modo oscuro del sistema. */
+
+:root {
+  --fondo: #f4f6f8;
+  --tarjeta: #ffffff;
+  --texto: #1d2733;
+  --sutil: #5d6b7a;
+  --borde: #dde3e9;
+  --acento: #1d5fa8;
+  --acento-texto: #ffffff;
+  --viajero: #e3eefb;
+  --asistente: #f1f3f5;
+  --aviso: #fff4d6;
+  --error: #b42318;
+  --ok: #157f3d;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #12171d;
+    --tarjeta: #1b222b;
+    --texto: #e6ebf0;
+    --sutil: #98a5b3;
+    --borde: #2d3742;
+    --acento: #5b9be0;
+    --acento-texto: #0d1218;
+    --viajero: #1f3550;
+    --asistente: #232c36;
+    --aviso: #3a3216;
+    --error: #ff8a80;
+    --ok: #6fd28f;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--fondo);
+  color: var(--texto);
+}
+
+h1, h2, h3 { margin: 0; line-height: 1.2; }
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 1rem; }
+
+.barra {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--tarjeta);
+  border-bottom: 1px solid var(--borde);
+}
+.barra p { margin: 2px 0 0; }
+#cuenta:not([hidden]) { display: flex; align-items: center; gap: 8px; }
+
+main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+.columnas {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.tarjeta {
+  background: var(--tarjeta);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.ingreso { max-width: 420px; margin: 40px auto; }
+.ingreso form { display: grid; gap: 8px; margin: 16px 0 8px; }
+
+.encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.sutil { color: var(--sutil); font-size: 0.875rem; }
+.error { color: var(--error); }
+
+input {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: var(--fondo);
+  color: var(--texto);
+  min-width: 0;
+}
+
+button {
+  font: inherit;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--acento);
+  color: var(--acento-texto);
+  cursor: pointer;
+}
+button.secundario {
+  background: transparent;
+  color: var(--acento);
+  border: 1px solid var(--borde);
+  padding: 6px 12px;
+}
+button:disabled { opacity: 0.5; cursor: default; }
+
+/* --- panel ------------------------------------------------------------------------------ */
+
+.viaje { border-top: 1px solid var(--borde); padding: 14px 0; }
+.viaje:first-child { border-top: none; padding-top: 0; }
+.viaje-encabezado { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+
+.etiqueta {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--borde);
+  color: var(--sutil);
+}
+.etiqueta.aviso { background: var(--aviso); color: var(--texto); border-color: transparent; }
+
+.tramos { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.tramo {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--fondo);
+}
+.tramo .icono { font-size: 1.4rem; line-height: 1.2; }
+.tramo .titulo { font-weight: 600; }
+.tramo .cancelado { text-decoration: line-through; }
+.tramo .filas { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+
+.seccion-por-confirmar { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--borde); }
+
+/* --- chat ------------------------------------------------------------------------------- */
+
+.chat { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 16px; }
+
+.mensajes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.burbuja {
+  max-width: 88%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.burbuja.viajero { align-self: flex-end; background: var(--viajero); border-bottom-right-radius: 4px; }
+.burbuja.asistente { align-self: flex-start; background: var(--asistente); border-bottom-left-radius: 4px; }
+.burbuja.realizada { border-left: 3px solid var(--ok); }
+
+.propuesta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.sugerencias { display: flex; flex-wrap: wrap; gap: 6px; }
+.sugerencias button { font-size: 0.85rem; }
+
+.entrada { display: flex; gap: 8px; }
+.entrada input { flex: 1; }
+
+/* --- celular ---------------------------------------------------------------------------- */
+
+@media (max-width: 820px) {
+  main { padding: 16px; }
+  .barra { padding: 12px 16px; flex-wrap: wrap; }
+  #cuenta:not([hidden]) { width: 100%; justify-content: space-between; }
+  #correo-actual { overflow-wrap: anywhere; }
+  .columnas { grid-template-columns: minmax(0, 1fr); }
+  .chat { position: static; }
+  .mensajes { height: 340px; }
+}

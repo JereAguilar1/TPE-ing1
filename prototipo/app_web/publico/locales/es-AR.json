@@ -1,0 +1,74 @@
+{
+  "titulo": "Trotamundos",
+  "subtitulo": "Todos tus viajes en un solo lugar",
+  "ingresar": {
+    "titulo": "Ingresá a tu panel",
+    "correo": "Tu correo",
+    "boton": "Ingresar",
+    "aclaracion": "Prototipo: el inicio de sesión OIDC está simulado por identity-access.",
+    "error": "No pudimos iniciar la sesión. Revisá el correo e intentá de nuevo."
+  },
+  "salir": "Salir",
+  "panel": {
+    "titulo": "Mis viajes",
+    "actualizar": "Actualizar",
+    "actualizado": "Actualizado {hora}",
+    "sinViajes": "Todavía no tenés viajes. Reenviá una confirmación a tu alias o cargala a mano.",
+    "porConfirmar": "Por confirmar",
+    "porConfirmarAyuda": "Llegaron por correo con datos dudosos: confirmalas o descartalas desde el asistente.",
+    "conflictos": "{cantidad, plural, one {# dato en conflicto} other {# datos en conflicto}}",
+    "reservas": "{cantidad, plural, one {# reserva} other {# reservas}}",
+    "desdeHasta": "{desde} – {hasta}",
+    "horaLocal": "hora de {ciudad}",
+    "todoElDia": "todo el día",
+    "error": "No pudimos leer tu panel. Probá de nuevo en un rato."
+  },
+  "estadosDeViaje": {
+    "Planificado": "Planificado",
+    "EnCurso": "En curso",
+    "Completado": "Completado",
+    "Archivado": "Archivado",
+    "Eliminado": "Eliminado",
+    "Cancelado": "Cancelado"
+  },
+  "estadosDeTramo": {
+    "confirmado": "",
+    "cancelado": "Cancelado"
+  },
+  "asistente": {
+    "titulo": "Asistente",
+    "placeholder": "Escribí tu consulta…",
+    "enviar": "Enviar",
+    "confirmar": "Confirmar",
+    "rechazar": "No, gracias",
+    "confirmo": "Confirmo.",
+    "rechazo": "No, gracias.",
+    "vence": "La propuesta vence a las {hora}.",
+    "realizada": "Hecho",
+    "error": "El asistente no respondió. Probá de nuevo.",
+    "sugerencias": ["¿Cómo viene mi viaje?", "¿A qué hora sale mi vuelo?", "¿Tengo reservas por confirmar?", "Quiero hablar con mi agencia"]
+  },
+  "iconos": {
+    "vuelo": "✈️",
+    "tren": "🚆",
+    "autobus": "🚌",
+    "hotel": "🏨",
+    "auto": "🚗",
+    "otro": "📌"
+  },
+  "campos": {
+    "terminal": "Terminal",
+    "puerta": "Puerta",
+    "asiento": "Asiento",
+    "clase": "Clase",
+    "coche": "Coche",
+    "anden": "Andén",
+    "linea": "Línea",
+    "tipoDeHabitacion": "Habitación",
+    "huespedes": "Huéspedes",
+    "regimen": "Régimen",
+    "categoria": "Categoría",
+    "kilometraje": "Kilometraje",
+    "cobertura": "Cobertura"
+  }
+}
