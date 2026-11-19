@@ -27,6 +27,12 @@ _AEROPUERTOS: dict[str, tuple[str, str, str]] = {
     "COR": ("Ingeniero Ambrosio Taravella", "AR", "America/Argentina/Cordoba"),
     "MAD": ("Adolfo Suárez Madrid-Barajas", "ES", "Europe/Madrid"),
 }
+# Coordenadas de cada aeropuerto: con ellas `itinerary` reconoce la misma ciudad que un hotel o un
+# traslado de otra fuente, que no traen código IATA (criterio de «misma ciudad», iteración 2 §5.1).
+_COORDENADAS: dict[str, tuple[float, float]] = {
+    "EZE": (-34.8222, -58.5358), "AEP": (-34.5592, -58.4156), "MDZ": (-32.8317, -68.7929),
+    "BRC": (-41.1512, -71.1578), "COR": (-31.3236, -64.2080), "MAD": (40.4983, -3.5676),
+}
 
 _ESTADOS_SEGMENTO = {"OK": "confirmado", "HK": "confirmado", "TK": "confirmado",
                      "UN": "cancelado", "HX": "cancelado", "XX": "cancelado"}
@@ -58,6 +64,7 @@ def _extremo(codigo: Any, instante: Any) -> dict[str, Any]:
             "esquemaDeCodigo": "IATA",
             "pais": pais,
             "zonaHoraria": zona,
+            "coordenadas": dict(zip(("lat", "lon"), _COORDENADAS[codigo])),
         },
     }
 
