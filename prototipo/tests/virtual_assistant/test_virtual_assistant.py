@@ -10,7 +10,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from datetime import datetime, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -137,6 +137,9 @@ def test_una_sesion_de_otro_usuario_responde_404(asistente):
     assert _enviar(asistente, sid, {"texto": "hola"}, usuario=OTRO).status_code == 404
     propia = asistente.cliente.get(f"/asistente/sesiones/{sid}", headers=sesion_http())
     assert propia.status_code == 200
+    # un id que ni siquiera es un UUID tampoco existe: 404, como declara el contrato
+    invalida = asistente.cliente.get("/asistente/sesiones/no-es-un-id", headers=sesion_http())
+    assert invalida.status_code == 404
 
 
 def test_sin_sesion_oidc_responde_401_y_un_cuerpo_invalido_400(asistente):
@@ -157,6 +160,30 @@ def test_la_sesion_guarda_los_turnos(asistente):
     assert [(t["autor"], t.get("intencion")) for t in sesion["turnos"]] == [
         ("asistente", "saludo"), ("viajero", "proximoTramo"), ("asistente", "proximoTramo")]
     assert sesion["viajeId"] == VIAJE
+
+
+def test_dos_mensajes_a_la_vez_no_se_pisan_el_estado(asistente):
+    """Mientras se atiende un saludo, otro mensaje de la misma sesión propone una corrección: al
+    terminar, el saludo no borra esa propuesta (cada turno escribe solo lo que cambió)."""
+    sid = _sesion(asistente)
+    original, otra = asistente._dialogo.atender, {}
+
+    def con_otro_mensaje_en_el_medio(*argumentos, **nombrados):
+        if not otra:  # el otro mensaje entra directo al servicio (no por HTTP, que está ocupado)
+            otra["propuesta"] = None  # marca antes de llamar: el otro mensaje pasa por acá también
+            otra["propuesta"] = asistente.enviar_mensaje(
+                USUARIO, sesion_http()["Authorization"], UUID(sid), uuid4(),
+                {"texto": "me pasaron el vuelo AR1402 al sábado a las 18:30"})["accionPropuesta"]
+        return original(*argumentos, **nombrados)
+
+    asistente._dialogo.atender = con_otro_mensaje_en_el_medio
+    try:
+        _decir(asistente, sid, "hola")
+    finally:
+        asistente._dialogo.atender = original
+    sesion = asistente.cliente.get(f"/asistente/sesiones/{sid}", headers=sesion_http()).json()
+    assert sesion["accionPendiente"]["id"] == otra["propuesta"]["id"]
+    assert _confirmar(asistente, sid, otra["propuesta"]["id"]).status_code == 200
 
 
 def test_el_mismo_mensaje_reintentado_no_duplica_turnos(asistente):
@@ -237,6 +264,19 @@ def test_si_itinerary_no_responde_lo_dice_y_no_adivina(asistente):
     assert _decir(asistente, sid, "hola")["intencion"] == "saludo"
 
 
+def test_preguntar_por_el_caso_no_abre_otro(asistente):
+    sid = _sesion(asistente)
+    respuesta = _decir(asistente, sid, "¿Mi agencia ya recibió el caso?")
+    assert "accionPropuesta" not in respuesta
+    assert respuesta["mensajes"][0].startswith("Una vez que le paso un caso a tu agencia")
+
+
+def test_preguntar_si_se_cancelo_es_una_consulta(asistente):
+    sid = _sesion(asistente)
+    respuesta = _decir(asistente, sid, "¿Se canceló mi vuelo?")
+    assert respuesta["intencion"] == "proximoTramo" and "accionPropuesta" not in respuesta
+
+
 def test_saludo_ayuda_y_un_si_sin_nada_pendiente(asistente):
     sid = _sesion(asistente)
     assert _decir(asistente, sid, "hola")["intencion"] == "saludo"
@@ -261,6 +301,16 @@ def test_sin_confirmacion_no_se_cambia_el_itinerario(asistente):
     assert asistente.itinerario.escrituras == []
     _decir(asistente, sid, "¿cómo viene mi viaje?")  # otro turno no la ejecuta
     assert asistente.itinerario.escrituras == []
+
+
+def test_la_propuesta_pendiente_no_guarda_una_copia_del_itinerario(asistente):
+    """ADR-0040: la sesión guarda qué tramo, a qué hora y la versión vista, no los tramos."""
+    sid = _sesion(asistente)
+    _proponer_correccion(asistente, sid)
+    (fila,) = _filas(asistente, "SELECT accion FROM sesion")
+    guardado = json.dumps(fila["accion"])
+    assert "segmentos" not in guardado and "edicion" not in guardado
+    assert fila["accion"]["datos"]["version"] == 3
 
 
 def test_corregir_con_confirmacion_corre_inicio_y_fin(asistente):

@@ -4,6 +4,7 @@
 # lugar, con los nombres de días de este mismo catálogo.
 
 saludo: "¡Hola! Soy el asistente de Trotamundos. Puedo contarte cómo viene tu viaje, corregir un horario que te cambiaron y, si hace falta, pasarle tu caso a tu agencia."
+seguimiento_del_caso: "Una vez que le paso un caso a tu agencia, lo seguís desde Soporte: ahí ves si ya lo recibió y en qué estado está. Si pasó algo nuevo, contámelo y vemos si hace falta otro caso."
 ayuda: "Probá con «¿cómo viene mi viaje?», «¿a qué hora sale mi vuelo?», «me pasaron el vuelo AR1402 al sábado a las 18:30», «¿tengo reservas por confirmar?» o «quiero hablar con mi agencia»."
 no_entendido: "No te entendí. ¿Me lo decís de otra forma? Por ejemplo: «¿a qué hora sale mi vuelo?»."
 no_entendido_otra_vez: "Sigo sin entenderte. Si querés, le paso tu consulta a tu agencia."

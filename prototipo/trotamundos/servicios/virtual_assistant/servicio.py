@@ -202,8 +202,17 @@ class VirtualAssistant:
                 contexto.marcar_derivada(conexion, usuario_id, reclamada["datos"]["idDeCausa"],
                                          realizada["casoId"])
             nuevo = resultado.estado
-            sesiones.actualizar(conexion, usuario_id, sesion_id, viaje_id=nuevo.viaje_id,
-                                no_entendidos=nuevo.no_entendidos, accion=nuevo.accion, ahora=ahora)
+            # Solo se escribe lo que cambió este turno: si otro mensaje de la misma sesión se
+            # atendió mientras tanto (propuso algo o cambió el viaje en foco), no se pisa.
+            actual = sesiones.obtener(conexion, usuario_id, sesion_id)
+            if actual is None:  # la sesión venció mientras tanto
+                raise no_encontrado()
+            accion_al_empezar = None if reclamada is not None else estado.accion
+            accion = nuevo.accion if nuevo.accion != accion_al_empezar else actual["accion"]
+            viaje_id = (nuevo.viaje_id if nuevo.viaje_id != estado.viaje_id
+                        else (str(actual["viaje_id"]) if actual["viaje_id"] else None))
+            sesiones.actualizar(conexion, usuario_id, sesion_id, viaje_id=viaje_id,
+                                no_entendidos=nuevo.no_entendidos, accion=accion, ahora=ahora)
             guardar_respuesta(conexion, usuario_id, clave,
                               RespuestaGuardada(MENSAJE, huella, 200, respuesta))
         return respuesta

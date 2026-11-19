@@ -203,7 +203,11 @@ class Dialogo:
                             ahora: datetime) -> _Salida:
         datos, tipo = accion["datos"], accion["tipo"]
         try:
+            if tipo == acciones.CORREGIR:
+                datos = {**datos, "edicion": self._edicion_vigente(usuario, datos)}
             acciones.ejecutar(self._escritor, usuario, tipo, datos)
+        except ItinerarioNoDisponible:
+            return _Salida([self._m.texto("servicio_no_disponible")], restaurar=True)
         except acciones.EscrituraNoDisponible:
             return _Salida([self._m.texto("servicio_no_disponible")], restaurar=True)
         except acciones.ReservaInexistente:
@@ -217,6 +221,22 @@ class Dialogo:
         textos = {acciones.CORREGIR: "corregida", acciones.CONFIRMAR: "reserva_confirmada",
                   acciones.DESCARTAR: "reserva_descartada", acciones.RESOLVER: "conflicto_resuelto"}
         return _Salida([self._m.texto(textos[tipo], **datos["textos"])], realizada=realizada)
+
+    def _edicion_vigente(self, usuario: str, datos: Mapping[str, Any]) -> dict[str, Any]:
+        """La edición de una corrección confirmada, armada recién ahora con la reserva leída de
+        `itinerary`: la propuesta guarda solo qué tramo, a qué hora y la `version` que vio el
+        viajero, no una copia del itinerario (ADR-0040). Si la reserva cambió desde entonces, es el
+        mismo caso que un `409` (ADR-0038)."""
+        viaje = self._lector.viaje(usuario, datos["viajeId"])
+        reserva = next((r for r in (viaje or {}).get("reservas", [])
+                        if r["id"] == datos["reservaId"]), None)
+        if reserva is None or acciones.segmento_de(reserva, datos["segmentoId"]) is None:
+            raise acciones.ReservaInexistente(datos["reservaId"])
+        edicion = acciones.edicion_corregida(reserva, datos["segmentoId"],
+                                             _instante(datos["inicio"]))
+        if reserva["version"] != datos["version"] or edicion is None:
+            raise acciones.ReservaCambiada(datos["reservaId"])
+        return edicion
 
     def _volver_a_proponer(self, usuario: str, accion: Mapping[str, Any],
                            ahora: datetime) -> _Salida:
@@ -276,6 +296,8 @@ class Dialogo:
 
     def _segun_intencion(self, ctx: _Contexto, i: Interpretacion, texto: str,
                          no_entendidos: int) -> _Salida:
+        if i.intencion == "ayuda" and i.entidades.get("tema") == "caso":
+            return _Salida([self._m.texto("seguimiento_del_caso")])
         if i.intencion in ("saludo", "ayuda"):
             return _Salida([self._m.texto(i.intencion)])
         if i.intencion == CONFIRMACION:
@@ -442,7 +464,7 @@ class Dialogo:
                                           fecha=self._m.fecha(antes, zona),
                                           hora=self._m.hora(antes, zona))], viaje_id=viaje_id)
         datos = {"reservaId": reserva["id"], "viajeId": viaje_id, "segmentoId": segmento["id"],
-                 "inicio": inicio.isoformat(), "edicion": edicion, "textos": textos}
+                 "inicio": inicio.isoformat(), "version": reserva["version"], "textos": textos}
         return self._proponer(acciones.CORREGIR, self._m.texto("propuesta_corregir", **textos),
                               datos, ahora, reserva_id=reserva["id"], viaje_id=viaje_id)
 

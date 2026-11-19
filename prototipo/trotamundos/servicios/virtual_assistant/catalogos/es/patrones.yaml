@@ -14,6 +14,8 @@ intenciones:
     - { patron: '\b(quiero|necesito|pasame)\b.*\b(mi agencia|una persona|un humano|un operador)\b', confianza: 0.9 }
     - { patron: '\bagencia\b', confianza: 0.6 }
   cambioAnteProveedor:
+    # Un pedido explícito gana a la pregunta «¿se canceló?» (que es una consulta de estado).
+    - { patron: '\b(quiero|necesito|pido|pedir|solicito|solicitar|podes|pueden|me pueden)\b.*\b(reprogram\w*|cancel\w*|reembols\w*|devolucion|devuelvan|reclam\w*)', confianza: 0.97 }
     - { patron: '\b(reprogram\w*|cancel\w*|reembols\w*|devolucion|devuelvan|reclam\w*)\b', confianza: 0.9 }
   corregirHorario:
     - { patron: '\b(me|lo|la|los|las)\s+(pasaron|cambiaron|movieron|adelantaron|atrasaron|corrieron)\b', confianza: 0.95 }
@@ -31,6 +33,8 @@ intenciones:
     - { patron: '\b(confirmala|descartala)\b', confianza: 0.85 }
     - { patron: '\breservas? (pendientes?|nuevas?)\b', confianza: 0.8 }
   proximoTramo:
+    # «¿se canceló mi vuelo?» pregunta por el estado de una reserva: no pide gestionar nada.
+    - { patron: '\bse (cancelo|suspendio|demoro|atraso|reprogramo|adelanto)\b', confianza: 0.95 }
     - { patron: '\b(a que hora|cuando|que dia)\b.*\b(sale|salgo|llega|llego|parte|es|tengo|entro|embarco)\b', confianza: 0.9 }
     - { patron: '\b(proximo|siguiente)\b', confianza: 0.85 }
     - { patron: '\bque pasa con (mi|el|la)\b', confianza: 0.8 }
@@ -41,6 +45,8 @@ intenciones:
   saludo:
     - { patron: '^\s*(hola|buen dia|buenos dias|buenas( tardes| noches)?|que tal)\b', confianza: 0.9 }
   ayuda:
+    # El seguimiento de un caso ya derivado es de support-liaison: el asistente indica dónde verlo.
+    - { patron: '\b(mi caso|el caso|estado del caso|mi reclamo)\b', confianza: 0.95 }
     - { patron: '\b(ayuda|ayudame|que (podes|sabes) hacer|como funciona|que hago)\b', confianza: 0.9 }
 
 # Entidades que el intérprete extrae del texto (ADR-0037).
@@ -58,6 +64,9 @@ entidades:
     mantenerFijado: '\b(mantene|mantener|deja|dejar|quedate con)\b.*\b(mio|mi (horario|dato|valor)|el que puse|lo que cargue)\b'
     aceptarFuente: '\b(acepta|aceptar|toma|tomar|usa|usar|quedate con)\b.*\b(de la|del|el de|lo de)\b'
   # Palabras con que el viajero nombra cada tipo de tramo (claves del registro de tipos, ADR-0011).
+  # Sobre qué pide ayuda el viajero.
+  tema:
+    caso: '\b(caso|reclamo)\b'
   tipos:
     vuelo: '\b(vuelo|avion)\b'
     hotel: '\b(hotel|alojamiento|hospedaje)\b'

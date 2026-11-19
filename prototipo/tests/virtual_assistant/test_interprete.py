@@ -51,6 +51,10 @@ def contexto() -> ContextoDelViajero:
     ("necesito un reembolso", "cambioAnteProveedor"),
     ("quiero hablar con mi agencia", "pedirAgencia"),
     ("pasame con una persona", "pedirAgencia"),
+    ("¿Se canceló mi vuelo?", "proximoTramo"),  # una consulta, no un pedido ante el proveedor
+    ("se canceló mi vuelo, quiero un reembolso", "cambioAnteProveedor"),
+    ("¿Mi agencia ya recibió el caso?", "ayuda"),  # el seguimiento del caso, no otra derivación
+    ("quiero hablar con mi agencia sobre mi caso", "pedirAgencia"),
     ("Sí", "confirmacion"),
     ("dale!", "confirmacion"),
 ])

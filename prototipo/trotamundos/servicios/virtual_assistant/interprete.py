@@ -116,7 +116,7 @@ class InterpretePorReglas:
         entidades = datos["entidades"]
         self._grupos = {nombre: [(valor, re.compile(patron)) for valor, patron
                                  in entidades[nombre].items()]
-                        for nombre in ("motivo", "decision", "eleccion", "tipos")}
+                        for nombre in ("motivo", "decision", "eleccion", "tema", "tipos")}
         # Los relativos más largos primero: «pasado mañana» antes que «mañana».
         self._relativos = sorted(entidades["dias_relativos"].items(), key=lambda r: -len(r[0]))
         self._dias = entidades["dias_de_la_semana"]
@@ -131,7 +131,7 @@ class InterpretePorReglas:
         intencion, confianza = self._intencion(normal)
         if intencion == NO_ENTENDIDO:
             return Interpretacion(NO_ENTENDIDO, 0.0)
-        entidades = {nombre: valor for nombre in ("motivo", "decision", "eleccion")
+        entidades = {nombre: valor for nombre in ("motivo", "decision", "eleccion", "tema")
                      if (valor := self._primero(nombre, normal)) is not None}
         tipo = self._primero("tipos", normal)
         reserva, segmento, por_referencia = self._reserva(texto, contexto, tipo)
