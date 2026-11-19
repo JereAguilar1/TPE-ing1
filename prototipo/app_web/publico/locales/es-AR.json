@@ -37,6 +37,7 @@
   },
   "asistente": {
     "titulo": "Asistente",
+    "etiqueta": "Tu consulta al asistente",
     "placeholder": "Escribí tu consulta…",
     "enviar": "Enviar",
     "confirmar": "Confirmar",

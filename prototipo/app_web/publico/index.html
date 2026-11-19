@@ -12,34 +12,34 @@
        (ADR-0032) y cada tramo se presenta con el descriptor de su tipo (GET /tipos-de-segmento). -->
   <header class="barra">
     <div>
-      <h1 data-texto="titulo"></h1>
-      <p class="sutil" data-texto="subtitulo"></p>
+      <h1 data-texto="titulo">Trotamundos</h1>
+      <p class="sutil" data-texto="subtitulo">Todos tus viajes en un solo lugar</p>
     </div>
     <div id="cuenta" hidden>
       <span id="correo-actual" class="sutil"></span>
-      <button id="salir" class="secundario" data-texto="salir"></button>
+      <button id="salir" class="secundario" data-texto="salir">Salir</button>
     </div>
   </header>
 
   <main>
     <section id="ingreso" class="tarjeta ingreso" hidden>
-      <h2 data-texto="ingresar.titulo"></h2>
+      <h2 data-texto="ingresar.titulo">Ingresá a tu panel</h2>
       <form id="form-ingreso">
-        <label for="correo" data-texto="ingresar.correo"></label>
+        <label for="correo" data-texto="ingresar.correo">Tu correo</label>
         <input id="correo" type="email" required autocomplete="email" placeholder="ana@ejemplo.com">
-        <button type="submit" data-texto="ingresar.boton"></button>
+        <button type="submit" data-texto="ingresar.boton">Ingresar</button>
       </form>
-      <p class="sutil" data-texto="ingresar.aclaracion"></p>
+      <p class="sutil" data-texto="ingresar.aclaracion">Prototipo: el inicio de sesión OIDC está simulado por identity-access.</p>
       <p id="error-ingreso" class="error" hidden></p>
     </section>
 
     <div id="aplicacion" class="columnas" hidden>
       <section class="tarjeta" aria-labelledby="titulo-panel">
         <div class="encabezado">
-          <h2 id="titulo-panel" data-texto="panel.titulo"></h2>
+          <h2 id="titulo-panel" data-texto="panel.titulo">Mis viajes</h2>
           <div>
             <span id="actualizado" class="sutil"></span>
-            <button id="actualizar" class="secundario" data-texto="panel.actualizar"></button>
+            <button id="actualizar" class="secundario" data-texto="panel.actualizar">Actualizar</button>
           </div>
         </div>
         <p id="error-panel" class="error" hidden></p>
@@ -48,12 +48,13 @@
       </section>
 
       <section class="tarjeta chat" aria-labelledby="titulo-chat">
-        <h2 id="titulo-chat" data-texto="asistente.titulo"></h2>
+        <h2 id="titulo-chat" data-texto="asistente.titulo">Asistente</h2>
         <div id="mensajes" class="mensajes" aria-live="polite"></div>
         <div id="sugerencias" class="sugerencias"></div>
         <form id="form-chat" class="entrada">
+          <label for="texto" class="solo-lectores" data-texto="asistente.etiqueta">Tu consulta al asistente</label>
           <input id="texto" autocomplete="off" maxlength="1000">
-          <button type="submit" data-texto="asistente.enviar"></button>
+          <button type="submit" data-texto="asistente.enviar">Enviar</button>
         </form>
       </section>
     </div>

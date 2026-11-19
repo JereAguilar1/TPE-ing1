@@ -55,11 +55,34 @@ function uuid() {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
+// Lo único que se guarda en el navegador son valores que entregó el servidor, y solo si tienen su
+// formato: el token de sesión (JWT) y el id de la sesión del asistente (UUID). Lo que escribe el
+// viajero (su correo) no se guarda.
+const FORMATOS = {
+  token: /^[\w-]+\.[\w-]+\.[\w-]+$/,
+  sesionAsistente: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+};
+const valido = (clave, valor) => typeof valor === "string" && FORMATOS[clave].test(valor);
+
 const guardado = {
-  leer(clave) { try { return sessionStorage.getItem(clave); } catch { return null; } },
-  escribir(clave, valor) { try { sessionStorage.setItem(clave, valor); } catch { /* sin almacenamiento */ } },
+  leer(clave) {
+    try {
+      const valor = sessionStorage.getItem(clave);
+      return valido(clave, valor) ? valor : null;
+    } catch { return null; }
+  },
+  escribir(clave, valor) {
+    if (!valido(clave, valor)) return;
+    try { sessionStorage.setItem(clave, valor); } catch { /* sin almacenamiento */ }
+  },
   borrar() { try { sessionStorage.clear(); } catch { /* sin almacenamiento */ } },
 };
+
+/** Un id para una ruta de la API: solo si es un UUID, y codificado. */
+function idDeRuta(id) {
+  if (!valido("sesionAsistente", id)) throw new Error("id inválido");
+  return encodeURIComponent(id);
+}
 
 /** Fecha y hora en la zona horaria del lugar (ADR-0032). */
 function fechaLocal(instante, zona, conHora = true) {
@@ -118,7 +141,6 @@ async function ingresar(evento) {
     estado.token = sesion.tokenAcceso;
     estado.correo = correo;
     guardado.escribir("token", estado.token);
-    guardado.escribir("correo", correo);
     await entrar();
   } catch {
     $("error-ingreso").textContent = t("ingresar.error");
@@ -140,11 +162,11 @@ async function entrar() {
   $("ingreso").hidden = true;
   $("aplicacion").hidden = false;
   $("cuenta").hidden = false;
-  $("correo-actual").textContent = estado.correo;
+  $("correo-actual").textContent = estado.correo || "";
   await actualizarPanel();
   await abrirAsistente();
   clearInterval(estado.temporizador);
-  estado.temporizador = setInterval(actualizarPanel, ACTUALIZAR_CADA_MS);
+  estado.temporizador = setInterval(() => { void actualizarPanel(); }, ACTUALIZAR_CADA_MS);
 }
 
 // --- panel -----------------------------------------------------------------------------------
@@ -272,7 +294,7 @@ async function abrirAsistente() {
   const guardada = guardado.leer("sesionAsistente");
   if (guardada) {
     try {
-      const { datos } = await llamar("GET", `/asistente/sesiones/${guardada}`);
+      const { datos } = await llamar("GET", `/asistente/sesiones/${idDeRuta(guardada)}`);
       estado.sesionAsistente = guardada;
       $("mensajes").replaceChildren();
       for (const turno of datos.turnos) burbuja(turno.autor, turno.texto);
@@ -298,8 +320,8 @@ function mostrarPropuesta(propuesta) {
   const vence = hora(new Date(propuesta.venceEn));
   const decidir = (decision) => {
     confirmar.disabled = rechazar.disabled = true;
-    enviar({ confirmacion: { accionId: propuesta.id, decision } },
-           t(decision === "confirmar" ? "asistente.confirmo" : "asistente.rechazo"));
+    void enviar({ confirmacion: { accionId: propuesta.id, decision } },
+                t(decision === "confirmar" ? "asistente.confirmo" : "asistente.rechazo"));
   };
   confirmar.addEventListener("click", () => decidir("confirmar"));
   rechazar.addEventListener("click", () => decidir("rechazar"));
@@ -311,7 +333,7 @@ function mostrarPropuesta(propuesta) {
 async function enviar(cuerpo, textoDelViajero) {
   burbuja("viajero", textoDelViajero);
   try {
-    const { datos } = await llamar("POST", `/asistente/sesiones/${estado.sesionAsistente}/mensajes`,
+    const { datos } = await llamar("POST", `/asistente/sesiones/${idDeRuta(estado.sesionAsistente)}/mensajes`,
                                    { cuerpo, clave: uuid() });
     datos.mensajes.forEach((texto, i) => burbuja(
       "asistente", texto, datos.accionRealizada && i === 0 ? "realizada" : ""));
@@ -342,18 +364,17 @@ async function iniciar() {
   $("texto").placeholder = t("asistente.placeholder");
   for (const sugerencia of t("asistente.sugerencias")) {
     const boton = elemento("button", "secundario", sugerencia);
-    boton.addEventListener("click", () => enviar({ texto: sugerencia }, sugerencia));
+    boton.addEventListener("click", () => { void enviar({ texto: sugerencia }, sugerencia); });
     $("sugerencias").append(boton);
   }
-  $("form-ingreso").addEventListener("submit", ingresar);
-  $("form-chat").addEventListener("submit", enviarTexto);
+  $("form-ingreso").addEventListener("submit", (evento) => { void ingresar(evento); });
+  $("form-chat").addEventListener("submit", (evento) => { void enviarTexto(evento); });
   $("salir").addEventListener("click", salir);
-  $("actualizar").addEventListener("click", () => { estado.etagPanel = null; actualizarPanel(); });
+  $("actualizar").addEventListener("click", () => { estado.etagPanel = null; void actualizarPanel(); });
 
   await cargarTipos().catch(() => { /* sin catálogo, los tramos se ven con la presentación genérica */ });
   estado.token = guardado.leer("token");
-  estado.correo = guardado.leer("correo");
   if (estado.token) await entrar(); else $("ingreso").hidden = false;
 }
 
-iniciar();
+iniciar().catch(() => { $("ingreso").hidden = false; });

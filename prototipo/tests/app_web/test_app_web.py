@@ -65,6 +65,30 @@ def test_cada_texto_de_la_pagina_esta_en_el_catalogo():
     assert claves and sorted(c for c in claves if not _clave_existe(c)) == []
 
 
+def _valor(clave: str):
+    nodo = TEXTOS
+    for parte in clave.split("."):
+        nodo = nodo[parte]
+    return nodo
+
+
+def test_el_html_trae_el_mismo_texto_que_el_catalogo():
+    """El HTML ya trae cada texto, para los lectores de pantalla y antes de que corra el
+    JavaScript (accesibilidad); tiene que ser el mismo que el del catálogo, que lo reemplaza."""
+    elementos = re.findall(r'data-texto="([\w.]+)"[^>]*>([^<]*)<', HTML)
+    assert elementos and [(c, t) for c, t in elementos if t != _valor(c)] == []
+    assert 'for="texto"' in HTML and 'for="correo"' in HTML  # cada campo con su etiqueta
+
+
+def test_todo_id_en_una_ruta_de_la_api_se_valida_y_se_codifica():
+    """Ningún valor leído del almacenamiento o del servidor arma una URL sin pasar por `idDeRuta`
+    (UUID y `encodeURIComponent`): no se puede forzar otra ruta de la API."""
+    rutas = re.findall(r'llamar\("\w+", `([^`]+)`', JS)
+    variables = [v for ruta in rutas for v in re.findall(r"\$\{([^}]+)\}", ruta)]
+    assert variables and all(v.startswith("idDeRuta(") for v in variables)
+    assert 'sessionStorage.setItem(clave, valor)' in JS and "if (!valido(clave, valor)) return;" in JS
+
+
 def test_el_catalogo_tiene_icono_y_etiquetas_para_cada_tipo_registrado():
     """Un tipo nuevo se ve con su ícono y sus filas agregando entradas al catálogo, sin tocar el
     código de la página (QA-15, elemento 2 de la guía de extensión: recursos de presentación)."""
