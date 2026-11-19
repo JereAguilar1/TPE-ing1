@@ -74,6 +74,10 @@ def instalar_manejadores(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validacion(request: Request, error: RequestValidationError) -> JSONResponse:
+        if error.errors() and all(e["loc"][:1] == ("path",) for e in error.errors()):
+            # Un id de la ruta con formato inválido no puede existir: el mismo `404` que «no existe
+            # o no es tuyo» (ADR-0028), que es lo que declaran los contratos para esas rutas.
+            return await _problema(request, no_encontrado())
         problema = Problema(
             400,
             "Solicitud inválida",

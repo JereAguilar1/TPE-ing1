@@ -31,6 +31,10 @@ def cliente() -> TestClient:
     def numero(n: int):
         return {"n": n}
 
+    @app.get("/lista")
+    def lista(limite: int = 10):
+        return {"limite": limite}
+
     return TestClient(app)
 
 
@@ -39,7 +43,8 @@ def cliente() -> TestClient:
     [
         ("get", "/limitado", 429),
         ("get", "/ajeno", 404),
-        ("get", "/numero/no-es-numero", 400),  # el contrato usa 400, no el 422 de FastAPI
+        ("get", "/lista?limite=no-es-numero", 400),  # el contrato usa 400, no el 422 de FastAPI
+        ("get", "/numero/no-es-numero", 404),  # un id de la ruta inválido no existe (ADR-0028)
         ("get", "/ruta-inexistente", 404),
         ("post", "/numero/1", 405),
     ],
