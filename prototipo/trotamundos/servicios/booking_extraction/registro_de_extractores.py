@@ -1,4 +1,5 @@
 """Carga por configuración y composición del camino de extracción (vista N2 §2)."""
+from fnmatch import fnmatchcase
 import importlib
 import re
 from zoneinfo import ZoneInfoNotFoundError
@@ -70,6 +71,12 @@ class MotorExtraccion:
                 'extractor': {'id': extractor_id, 'version': manifiesto['version']},
                 'banda': banda, 'confianza': confianza, 'observacion': observacion,
             }) for observacion in salida['observaciones']]
+        # Si cambió la plantilla de un remitente conocido, también se degradó su extractor.
+        remitente = mensaje['remitente'].casefold()
+        for manifiesto, _ in self.extractores:
+            if any(fnmatchcase(remitente, patron.casefold())
+                   for patron in manifiesto['remitentesQueReconoce']):
+                self.calidad.registrar(manifiesto['id'], 'baja')
         return self._desconocida(carga, 'formatoDesconocido')
 
     def _desconocida(self, carga, motivo, candidato=None):

@@ -94,7 +94,7 @@ class ExtractorSimulado:
                               'detalle': {'aerolinea': campos['Aerolinea'],
                                           'numeroDeVuelo': campos['Numero']}}],
             }
-        except (ValueError, KeyError) as error:
+        except (ValueError, KeyError, OverflowError) as error:
             raise MensajeCorrupto('Campos estructurales inválidos') from error
         por_campo = _puntajes(observacion, 'observaciones[0]', 0.99)
         por_campo['observaciones[0].identificadores[0].codigo'] = confianza_localizador
