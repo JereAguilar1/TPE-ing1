@@ -36,7 +36,7 @@ BFF_WEB = "http://localhost:18108"
 PROVIDER_SYNC = "http://localhost:18109"
 PUERTOS = {"itinerary-escritura": 18101, "itinerary-lectura": 18102, "identity-access": 18103,
            "mail-ingest": 18104, "booking-extraction": 18107, "bff-web": 18108,
-           "provider-sync": 18109}
+           "provider-sync": 18109, "app-web": 18111}
 ADAPTADOR = "adaptador-aerolinea-simulada"
 REMITENTE = "reservas@aerolinea.example"  # lo reconoce el extractor de ejemplo del paso 9
 SONDEO_S = 0.05
@@ -127,12 +127,13 @@ class Viajero:
                                                   "WHERE buzon_id = %s", buzon["id"])["usuario_id"])
         return self
 
-    def reenviar_confirmacion(self, localizador: str, salida: datetime) -> httpx.Response:
+    def reenviar_confirmacion(self, localizador: str, salida: datetime, origen: str = "AEP",
+                              destino: str = "MDZ") -> httpx.Response:
         """El viajero reenvía a su alias la confirmación de la aerolínea."""
         emitido = ahora().replace(microsecond=0)
         cuerpo = "\n".join([
             "Reserva aérea simulada v1", f"Localizador: {localizador}", "Aerolinea: AR",
-            "Numero: 1402", "Origen: AEP", "Destino: MDZ", f"Salida: {texto_utc(salida)}",
+            "Numero: 1402", f"Origen: {origen}", f"Destino: {destino}", f"Salida: {texto_utc(salida)}",
             f"Llegada: {texto_utc(salida + timedelta(hours=2))}", f"Emitido: {texto_utc(emitido)}"])
         correo = EmailMessage()
         correo["Return-Path"] = f"<{self.correo}>"  # quien reenvía es el titular del buzón
