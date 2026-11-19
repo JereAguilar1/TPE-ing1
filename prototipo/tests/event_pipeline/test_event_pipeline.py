@@ -340,15 +340,13 @@ def test_qa09_aislamiento_entre_consultas_analiticas_y_lectura_del_panel(dsn, co
             assert con_an.execute("SELECT to_regclass('panel_usuario') AS t").fetchone()["t"] is None
 
         # Ejecutamos lecturas operacionales del panel en paralelo con consultas y reconstrucciones analíticas.
-        errores_operacionales: list[Exception] = []
-
-        def tarea_operacional() -> None:
-            try:
-                for _ in range(20):
-                    panel = itinerary.leer_panel(USUARIO_1)
-                    assert "viajesActivos" in panel
-            except Exception as exc:
-                errores_operacionales.append(exc)
+        def tarea_operacional() -> int:
+            leidos = 0
+            for _ in range(20):
+                panel = itinerary.leer_panel(USUARIO_1)
+                assert "viajesActivos" in panel
+                leidos += 1
+            return leidos
 
         def tarea_analitica() -> None:
             for _ in range(10):
@@ -357,15 +355,12 @@ def test_qa09_aislamiento_entre_consultas_analiticas_y_lectura_del_panel(dsn, co
             pipeline.reconstruir()
 
         with ThreadPoolExecutor(max_workers=4) as pool:
-            futuros = [
-                pool.submit(tarea_operacional),
-                pool.submit(tarea_operacional),
-                pool.submit(tarea_analitica),
-            ]
-            for f in futuros:
-                f.result()
-
-        assert errores_operacionales == []
+            f_op1 = pool.submit(tarea_operacional)
+            f_op2 = pool.submit(tarea_operacional)
+            f_an = pool.submit(tarea_analitica)
+            assert f_op1.result() == 20
+            assert f_op2.result() == 20
+            f_an.result()
     finally:
         with psycopg.connect(dsn, autocommit=True) as conexion:
             for nombre in (esquema_op, esquema_an):
