@@ -365,3 +365,47 @@ def test_bff_web_no_tiene_persistencia_ni_logica_de_dominio():
         if nombre in prohibidas or nombre.split(".")[0] in prohibidas
     ]
     assert encontradas == []
+
+
+# --- `provider_sync` (iteración 2 §5.5; vista de adaptadores §1; ADR-0006, QA-10) -----------
+
+DEPENDENCIAS_DE_PROVIDER_SYNC = {
+    "interfaz_de_adaptador": set(),
+    "complementos": {"interfaz_de_adaptador"},
+    "registro_de_adaptadores": {"interfaz_de_adaptador", "complementos"},
+    "seguimiento": set(),
+    "receptor_de_notificaciones": set(),
+    "programador": {"interfaz_de_adaptador", "registro_de_adaptadores"},
+    "detector_de_disrupciones": {"seguimiento", "registro_de_adaptadores"},
+    "publicacion": set(),
+    "api": set(),
+    "servicio": {
+        "interfaz_de_adaptador",
+        "complementos",
+        "registro_de_adaptadores",
+        "seguimiento",
+        "receptor_de_notificaciones",
+        "programador",
+        "detector_de_disrupciones",
+        "publicacion",
+        "api",
+    },
+}
+
+
+def test_los_modulos_de_provider_sync_respetan_la_vista_de_adaptadores():
+    assert violaciones_internas(PAQUETE, "provider_sync",
+                                DEPENDENCIAS_DE_PROVIDER_SYNC) == []
+
+
+def test_los_adaptadores_no_importan_otros_complementos():
+    """R2/R3: ningún adaptador de proveedor puede importar a otro complemento."""
+    carpeta = PAQUETE / "servicios" / "provider_sync" / "complementos"
+    prefijo = "trotamundos.servicios.provider_sync.complementos"
+    encontradas = []
+    for archivo in carpeta.rglob("*.py"):
+        for nombre in _importaciones(PAQUETE, archivo):
+            if nombre == prefijo or nombre.startswith(prefijo + "."):
+                encontradas.append(f"{archivo.relative_to(carpeta)} importa {nombre}")
+    assert encontradas == []
+

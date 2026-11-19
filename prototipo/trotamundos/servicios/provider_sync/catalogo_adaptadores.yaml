@@ -1,0 +1,17 @@
+# Configuración declarativa del complemento adaptador del recorte del paso 10 (ADR-0006, QA-10).
+- modulo: trotamundos.servicios.provider_sync.complementos.aerolinea_simulada
+  emisores: [aerolinea:AR]
+  credencial:
+    tipo: apiKey
+    valor: credencial-ndc-simulada
+  manifiesto:
+    id: adaptador-aerolinea-simulada
+    version: 1.0.0
+    apiContrato: '1.0'
+    estandar: IATA NDC
+    tiposDeSegmento: [vuelo]
+    capacidades:
+      push: true
+      sondeo: true
+      cancelaciones: true
+      cuotaPorMinuto: 60

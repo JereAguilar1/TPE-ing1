@@ -1,0 +1,152 @@
+[
+  {
+    "nombre": "confirmacion_y_cambio_de_puerta",
+    "tipoContenido": "application/json",
+    "notificacion": {
+      "notificationId": "notif-puerta-01",
+      "timestamp": "2026-11-18T12:00:00Z",
+      "orders": [
+        {
+          "orderId": "ABC123",
+          "owner": "AR",
+          "orderStatus": "ACTIVE",
+          "flights": [
+            {
+              "flightNumber": "1402",
+              "operatorName": "Aerolíneas Argentinas",
+              "departure": {
+                "airport": "AEP",
+                "time": "2026-12-01T10:00:00-03:00"
+              },
+              "arrival": {
+                "airport": "MDZ",
+                "time": "2026-12-01T12:00:00-03:00"
+              },
+              "statusCode": "HK",
+              "terminal": "A",
+              "gate": "14",
+              "seat": "12A",
+              "cabin": "economica"
+            }
+          ]
+        }
+      ]
+    },
+    "esperado": {
+      "referencia": "ABC123",
+      "cancelada": false,
+      "versionDeFuente": "2026-11-18T12:00:00Z",
+      "emisor": "aerolinea:AR",
+      "inicio": "2026-12-01T13:00:00Z",
+      "fin": "2026-12-01T15:00:00Z",
+      "puerta": "14",
+      "disrupcion": null
+    }
+  },
+  {
+    "nombre": "reprogramacion_de_horario",
+    "tipoContenido": "application/json",
+    "notificacion": {
+      "notificationId": "notif-reprog-02",
+      "timestamp": "2026-11-18T15:30:00Z",
+      "orders": [
+        {
+          "orderId": "ABC123",
+          "owner": "AR",
+          "orderStatus": "ACTIVE",
+          "flights": [
+            {
+              "flightNumber": "1402",
+              "operatorName": "Aerolíneas Argentinas",
+              "departure": {
+                "airport": "AEP",
+                "time": "2026-12-01T15:30:00Z"
+              },
+              "arrival": {
+                "airport": "MDZ",
+                "time": "2026-12-01T17:30:00Z"
+              },
+              "statusCode": "TK",
+              "gate": "18"
+            }
+          ]
+        }
+      ]
+    },
+    "esperado": {
+      "referencia": "ABC123",
+      "cancelada": false,
+      "versionDeFuente": "2026-11-18T15:30:00Z",
+      "emisor": "aerolinea:AR",
+      "inicio": "2026-12-01T15:30:00Z",
+      "fin": "2026-12-01T17:30:00Z",
+      "puerta": "18",
+      "disrupcion": null
+    }
+  },
+  {
+    "nombre": "cancelacion_con_disrupcion_masiva",
+    "tipoContenido": "application/json",
+    "notificacion": {
+      "notificationId": "notif-canc-03",
+      "timestamp": "2026-11-18T18:00:00Z",
+      "disruption": {
+        "disruptionId": "DISR-AR1402-METEO",
+        "severity": "alta",
+        "reason": "Vuelo AR1402 cancelado por cierre meteorológico en destino",
+        "affectedOrders": ["ABC123", "XYZ789"]
+      },
+      "orders": [
+        {
+          "orderId": "ABC123",
+          "owner": "AR",
+          "orderStatus": "CANCELLED",
+          "flights": [
+            {
+              "flightNumber": "1402",
+              "operatorName": "Aerolíneas Argentinas",
+              "departure": {
+                "airport": "AEP",
+                "time": "2026-12-01T13:00:00Z"
+              },
+              "arrival": {
+                "airport": "MDZ",
+                "time": "2026-12-01T15:00:00Z"
+              },
+              "statusCode": "HX"
+            }
+          ]
+        }
+      ]
+    },
+    "esperado": {
+      "referencia": "ABC123",
+      "cancelada": true,
+      "versionDeFuente": "2026-11-18T18:00:00Z",
+      "emisor": "aerolinea:AR",
+      "inicio": "2026-12-01T13:00:00Z",
+      "fin": "2026-12-01T15:00:00Z",
+      "puerta": null,
+      "disrupcion": {
+        "id": "DISR-AR1402-METEO",
+        "severidad": "alta",
+        "referenciasAfectadas": ["ABC123", "XYZ789"]
+      }
+    }
+  },
+  {
+    "nombre": "notificacion_xml_ndc",
+    "tipoContenido": "application/xml",
+    "notificacion": "<OrderChangeNotif><NotificationID>notif-xml-04</NotificationID><Timestamp>2026-11-18T19:00:00Z</Timestamp><OrderID>BRC555</OrderID><OwnerCode>AR</OwnerCode><OrderStatus>ACTIVE</OrderStatus><FlightSegment><FlightNumber>1680</FlightNumber><DepartureAirport>AEP</DepartureAirport><DepartureTime>2026-12-05T11:00:00Z</DepartureTime><ArrivalAirport>BRC</ArrivalAirport><ArrivalTime>2026-12-05T13:20:00Z</ArrivalTime><ActionCode>HK</ActionCode><Gate>9</Gate></FlightSegment></OrderChangeNotif>",
+    "esperado": {
+      "referencia": "BRC555",
+      "cancelada": false,
+      "versionDeFuente": "2026-11-18T19:00:00Z",
+      "emisor": "aerolinea:AR",
+      "inicio": "2026-12-05T11:00:00Z",
+      "fin": "2026-12-05T13:20:00Z",
+      "puerta": "9",
+      "disrupcion": null
+    }
+  }
+]
