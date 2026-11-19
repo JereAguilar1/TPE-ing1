@@ -309,6 +309,21 @@ def test_sondeo_programado_y_baja_por_reserva_cancelada(provider_sync):
     assert filas(provider_sync, "SELECT * FROM reserva_seguida") == []
 
 
+def test_unificacion_de_reservas_limpia_la_reserva_absorbida_de_seguimiento(provider_sync):
+    provider_sync.consumir(_evento_reserva_actualizada(USUARIO_1, RESERVA_1, "ABC123"))
+    provider_sync.consumir(_evento_reserva_actualizada(USUARIO_1, RESERVA_2, "ABC123"))
+    assert len(filas(provider_sync, "SELECT * FROM reserva_seguida")) == 2
+
+    unificada = _evento_reserva_actualizada(USUARIO_1, RESERVA_1, "ABC123")
+    unificada.carga["creada"] = False
+    unificada.carga["unificadaCon"] = [str(RESERVA_2)]
+    provider_sync.consumir(unificada)
+
+    seguidas = filas(provider_sync, "SELECT * FROM reserva_seguida")
+    assert len(seguidas) == 1
+    assert str(seguidas[0]["reserva_id"]) == str(RESERVA_1)
+
+
 def test_recorrido_uc2_y_uc5_con_itinerary_y_virtual_assistant(provider_sync, contratos):
     """Recorrido entre servicios: `itinerary` -> `provider-sync` -> `itinerary` y `virtual-assistant`."""
     itinerary = Itinerary(

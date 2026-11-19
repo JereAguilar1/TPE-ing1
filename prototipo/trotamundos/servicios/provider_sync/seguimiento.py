@@ -98,9 +98,12 @@ def baja_reserva(conexion: psycopg.Connection, usuario_id: UUID | str,
 def actualizar_desde_reserva(conexion: psycopg.Connection, usuario_id: UUID | str,
                              reserva: Mapping[str, Any],
                              adaptadores_para_emisor: Callable[[str], Iterable[str]],
-                             ahora: datetime | None = None) -> None:
+                             ahora: datetime | None = None, *,
+                             unificada_con: Iterable[UUID | str] = ()) -> None:
     reserva_id = str(reserva["id"])
     baja_reserva(conexion, usuario_id, reserva_id)
+    for absorbida_id in unificada_con:
+        baja_reserva(conexion, usuario_id, absorbida_id)
     if reserva.get("estado") not in _ESTADOS_ACTIVOS:
         return
 

@@ -121,8 +121,12 @@ class ProviderSync:
                 return
             if evento.tipo == "ReservaActualizada":
                 seguimiento.actualizar_desde_reserva(
-                    conexion, usuario_id, evento.carga["reserva"],
-                    self.registro.adaptadores_para_emisor, ahora,
+                    conexion,
+                    usuario_id,
+                    evento.carga["reserva"],
+                    self.registro.adaptadores_para_emisor,
+                    ahora,
+                    unificada_con=evento.carga.get("unificadaCon") or (),
                 )
             elif evento.tipo == "ReservaCancelada":
                 seguimiento.baja_reserva(conexion, usuario_id, evento.carga["reservaId"])
@@ -198,6 +202,7 @@ class ProviderSync:
             causa_id = causas_por_ref.get(referencia)
 
             for seguida in seguimiento.resolver(conexion, adaptador_id, referencia):
+                bloquear_usuario(conexion, seguida.usuario_id)
                 nueva = conexion.execute(
                     """
                     INSERT INTO observacion_emitida (adaptador_id, usuario_id, id_de_fuente, emitida_en)

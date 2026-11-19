@@ -156,8 +156,8 @@ def _traducir_tramo(aerolinea: str, indice: int, tramo: Mapping[str, Any]) -> di
 
     extremo_inicio = _extremo(salida.get("airport"), salida.get("time"))
     extremo_fin = _extremo(llegada.get("airport"), llegada.get("time"))
-    if extremo_fin["instante"] < extremo_inicio["instante"]:
-        raise CargaInvalida("El instante de llegada es anterior al de salida")
+    if extremo_fin["instante"] <= extremo_inicio["instante"]:
+        raise CargaInvalida("El instante de llegada debe ser posterior al de salida")
 
     return {
         "tipo": "vuelo",
@@ -289,11 +289,12 @@ class AdaptadorAerolineaSimulada:
         if disrupcion_bruta is not None and not isinstance(disrupcion_bruta, Mapping):
             raise CargaInvalida("El bloque disruption debe ser un objeto")
 
+        traducidas: list[tuple[str, dict[str, Any]]] = [
+            _traducir_orden(orden, id_evento=notificacion_id, emitido=emitido)
+            for orden in ordenes
+        ]
         salida: list[dict[str, Any]] = []
-        for orden in ordenes:
-            referencia, observacion = _traducir_orden(
-                orden, id_evento=notificacion_id, emitido=emitido
-            )
+        for referencia, observacion in traducidas:
             if disrupcion_bruta is not None:
                 self._guardar_disrupcion(observacion["idDeFuente"], referencia, disrupcion_bruta)
             self._ordenes[referencia] = copy.deepcopy(observacion)

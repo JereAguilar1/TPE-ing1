@@ -11,6 +11,7 @@ from typing import Any
 
 import psycopg
 
+from trotamundos.comun.contratos import ErrorDeContrato
 from trotamundos.servicios.provider_sync.interfaz_de_adaptador import ErrorDeAdaptador
 from trotamundos.servicios.provider_sync.registro_de_adaptadores import RegistroDeAdaptadores
 
@@ -60,7 +61,7 @@ def sondear_todos(conexion: psycopg.Connection, registro: RegistroDeAdaptadores,
     for adaptador in registro.adaptadores_con_sondeo():
         try:
             cambios = sondear_adaptador(conexion, registro, adaptador.id, ahora)
-        except ErrorDeAdaptador:
+        except (ErrorDeAdaptador, ErrorDeContrato):
             continue
         resultados.append((adaptador.id, cambios))
     return resultados
