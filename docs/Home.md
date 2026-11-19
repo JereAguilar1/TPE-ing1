@@ -90,6 +90,11 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 | [ADR-0034](03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) | Punto de extensión del módulo avanzado nº 14 (Opción A y B) y recorte del prototipo por ASRs | 4 |
 | [ADR-0035](03-adr/ADR-0035-buzones-sin-oauth-y-formatos-desconocidos.md) | Ingesta sin OAuth mediante reenvío verificado / credenciales delegadas y flujo asistido ante formato desconocido | 4 |
 | [ADR-0036](03-adr/ADR-0036-tecnologia-del-prototipo.md) | Prototipo en Python 3.12 + FastAPI, PostgreSQL y broker compatible con Kafka | 2da entrega |
+| [ADR-0037](03-adr/ADR-0037-interpretacion-de-intenciones-del-asistente.md) | El asistente entiende por intenciones detrás de un intérprete intercambiable: reglas en el prototipo y modelo de lenguaje enchufable | 5 |
+| [ADR-0038](03-adr/ADR-0038-alcance-y-confirmacion-de-las-acciones-del-asistente.md) | Consultas, corrección del itinerario y problemas menores solo con confirmación explícita; los cambios ante el proveedor no | 5 |
+| [ADR-0039](03-adr/ADR-0039-politica-de-derivacion-a-la-agencia.md) | Derivación a la agencia ante cuatro situaciones, con confirmación y un caso idempotente por `support-liaison` | 5 |
+| [ADR-0040](03-adr/ADR-0040-sesion-conversacional-y-privacidad.md) | Sesión conversacional particionada por usuario, retención acotada, supresión de fase 1 y disrupciones por `DisrupcionDetectada` (precisa ADR-0034) | 5 |
+| [ADR-0041](03-adr/ADR-0041-alias-de-reenvio-generado-por-identity-access.md) | El alias de reenvío lo genera `identity-access` y `mail-ingest` lo recibe por `EstadoDeBuzonCambiado` (precisa ADR-0035) | 5 |
 
 ## 4. Vistas arquitectónicas
 
