@@ -465,7 +465,8 @@ def test_el_usuario_administra_sus_filtros(mail, contratos):
                       guardado.json())
     assert cliente.get("/filtros-de-correo", headers=_sesion()).json() == guardado.json()
     assert cliente.get("/filtros-de-correo/catalogo", headers=_sesion()).json() == [
-        {"patron": "reservas@aerolinea.example", "extractorId": "extractor-reserva-simulada"}]
+        {"patron": "reservas@aerolinea.example", "extractorId": "extractor-reserva-simulada"},
+        {"patron": "boletos@ferrocarril.example", "extractorId": "extractor-boleto-tren-simulado"}]
 
 
 def test_los_filtros_piden_sesion_y_un_cuerpo_valido(mail):

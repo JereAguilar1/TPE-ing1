@@ -1,0 +1,421 @@
+[
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T00AX0",
+      "recibidoEn": "2026-11-22T13:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T00AX0\nOperador: TA\nTren: 202\nOrigen: RET\nDestino: MDQ\nSalida: 2026-12-02T13:00:00Z\nLlegada: 2026-12-02T17:30:00Z\nCoche: 1\nAsiento: 10A\nEmitido: 2026-11-22T13:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T00AX0",
+      "emisor": "ferrocarril:TA",
+      "operador": "TA",
+      "tren": "202",
+      "origen": "RET",
+      "destino": "MDQ",
+      "emitido": "2026-11-22T13:00:00Z",
+      "salida": "2026-12-02T13:00:00Z",
+      "llegada": "2026-12-02T17:30:00Z",
+      "precision": "instante",
+      "coche": "1",
+      "asiento": "10A"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T01BX1",
+      "recibidoEn": "2026-11-22T12:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T01BX1\nOperador: TA\nTren: 331\nOrigen: CON\nDestino: MDQ\nSalida: 2026-12-03T14:00:00Z\nLlegada: 2026-12-03T18:30:00Z\nAnden: 2\nEmitido: 2026-11-22T12:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T01BX1",
+      "emisor": "ferrocarril:TA",
+      "operador": "TA",
+      "tren": "331",
+      "origen": "CON",
+      "destino": "MDQ",
+      "emitido": "2026-11-22T12:00:00Z",
+      "salida": "2026-12-03T14:00:00Z",
+      "llegada": "2026-12-03T18:30:00Z",
+      "precision": "instante",
+      "anden": "2"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T02CX2",
+      "recibidoEn": "2026-11-22T11:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T02CX2\nOperador: TA\nTren: 118\nOrigen: RET\nDestino: ROS\nSalida: 2026-12-04T15:00:00Z\nLlegada: 2026-12-04T19:30:00Z\nEmitido: 2026-11-22T11:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T02CX2",
+      "emisor": "ferrocarril:TA",
+      "operador": "TA",
+      "tren": "118",
+      "origen": "RET",
+      "destino": "ROS",
+      "emitido": "2026-11-22T11:00:00Z",
+      "salida": "2026-12-04T15:00:00Z",
+      "llegada": "2026-12-04T19:30:00Z",
+      "precision": "instante"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T03DX3",
+      "recibidoEn": "2026-11-22T10:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T03DX3\nOperador: RF\nTren: 03071\nOrigen: ATO\nDestino: BCN\nSalida: 2026-12-05T16:00:00Z\nLlegada: 2026-12-05T20:30:00Z\nCoche: 4\nAsiento: 13A\nEmitido: 2026-11-22T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T03DX3",
+      "emisor": "ferrocarril:RF",
+      "operador": "RF",
+      "tren": "03071",
+      "origen": "ATO",
+      "destino": "BCN",
+      "emitido": "2026-11-22T10:00:00Z",
+      "salida": "2026-12-05T16:00:00Z",
+      "llegada": "2026-12-05T20:30:00Z",
+      "precision": "instante",
+      "coche": "4",
+      "asiento": "13A"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T04AX4",
+      "recibidoEn": "2026-11-22T09:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T04AX4\nOperador: RF\nTren: 03142\nOrigen: BCN\nDestino: ATO\nFecha: 2026-12-06\nEmitido: 2026-11-22T09:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T04AX4",
+      "emisor": "ferrocarril:RF",
+      "operador": "RF",
+      "tren": "03142",
+      "origen": "BCN",
+      "destino": "ATO",
+      "emitido": "2026-11-22T09:00:00Z",
+      "salida": "2026-12-06T00:00:00Z",
+      "llegada": "2026-12-06T00:00:00Z",
+      "precision": "dia"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T05BX5",
+      "recibidoEn": "2026-11-22T08:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T05BX5\nOperador: TA\nTren: 202\nOrigen: RET\nDestino: MDQ\nSalida: 2026-12-07T18:00:00Z\nLlegada: 2026-12-07T22:30:00Z\nAnden: 6\nEmitido: 2026-11-22T08:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T05BX5",
+      "emisor": "ferrocarril:TA",
+      "operador": "TA",
+      "tren": "202",
+      "origen": "RET",
+      "destino": "MDQ",
+      "emitido": "2026-11-22T08:00:00Z",
+      "salida": "2026-12-07T18:00:00Z",
+      "llegada": "2026-12-07T22:30:00Z",
+      "precision": "instante",
+      "anden": "6"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T06CX6",
+      "recibidoEn": "2026-11-22T07:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T06CX6\nOperador: TA\nTren: 331\nOrigen: CON\nDestino: MDQ\nSalida: 2026-12-08T13:00:00Z\nLlegada: 2026-12-08T17:30:00Z\nCoche: 7\nAsiento: 16A\nEmitido: 2026-11-22T07:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T06CX6",
+      "emisor": "ferrocarril:TA",
+      "operador": "TA",
+      "tren": "331",
+      "origen": "CON",
+      "destino": "MDQ",
+      "emitido": "2026-11-22T07:00:00Z",
+      "salida": "2026-12-08T13:00:00Z",
+      "llegada": "2026-12-08T17:30:00Z",
+      "precision": "instante",
+      "coche": "7",
+      "asiento": "16A"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T07DX7",
+      "recibidoEn": "2026-11-22T06:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T07DX7\nOperador: TA\nTren: 118\nOrigen: RET\nDestino: ROS\nSalida: 2026-12-09T14:00:00Z\nLlegada: 2026-12-09T18:30:00Z\nEmitido: 2026-11-22T06:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T07DX7",
+      "emisor": "ferrocarril:TA",
+      "operador": "TA",
+      "tren": "118",
+      "origen": "RET",
+      "destino": "ROS",
+      "emitido": "2026-11-22T06:00:00Z",
+      "salida": "2026-12-09T14:00:00Z",
+      "llegada": "2026-12-09T18:30:00Z",
+      "precision": "instante"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T08AX8",
+      "recibidoEn": "2026-11-22T05:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T08AX8\nOperador: RF\nTren: 03071\nOrigen: ATO\nDestino: BCN\nSalida: 2026-12-10T15:00:00Z\nLlegada: 2026-12-10T19:30:00Z\nEmitido: 2026-11-22T05:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T08AX8",
+      "emisor": "ferrocarril:RF",
+      "operador": "RF",
+      "tren": "03071",
+      "origen": "ATO",
+      "destino": "BCN",
+      "emitido": "2026-11-22T05:00:00Z",
+      "salida": "2026-12-10T15:00:00Z",
+      "llegada": "2026-12-10T19:30:00Z",
+      "precision": "instante"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T09BX9",
+      "recibidoEn": "2026-11-22T04:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T09BX9\nOperador: RF\nTren: 03142\nOrigen: BCN\nDestino: ATO\nFecha: 2026-12-11\nCoche: 1\nAsiento: 19A\nAnden: 10\nEmitido: 2026-11-22T04:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T09BX9",
+      "emisor": "ferrocarril:RF",
+      "operador": "RF",
+      "tren": "03142",
+      "origen": "BCN",
+      "destino": "ATO",
+      "emitido": "2026-11-22T04:00:00Z",
+      "salida": "2026-12-11T00:00:00Z",
+      "llegada": "2026-12-11T00:00:00Z",
+      "precision": "dia",
+      "coche": "1",
+      "asiento": "19A",
+      "anden": "10"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T10CX0",
+      "recibidoEn": "2026-11-22T03:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T10CX0\nOperador: TA\nTren: 202\nOrigen: RET\nDestino: MDQ\nSalida: 2026-12-12T17:00:00Z\nLlegada: 2026-12-12T21:30:00Z\nEmitido: 2026-11-22T03:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T10CX0",
+      "emisor": "ferrocarril:TA",
+      "operador": "TA",
+      "tren": "202",
+      "origen": "RET",
+      "destino": "MDQ",
+      "emitido": "2026-11-22T03:00:00Z",
+      "salida": "2026-12-12T17:00:00Z",
+      "llegada": "2026-12-12T21:30:00Z",
+      "precision": "instante"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T11DX1",
+      "recibidoEn": "2026-11-22T02:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T11DX1\nOperador: TA\nTren: 331\nOrigen: CON\nDestino: MDQ\nSalida: 2026-12-13T18:00:00Z\nLlegada: 2026-12-13T22:30:00Z\nEmitido: 2026-11-22T02:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T11DX1",
+      "emisor": "ferrocarril:TA",
+      "operador": "TA",
+      "tren": "331",
+      "origen": "CON",
+      "destino": "MDQ",
+      "emitido": "2026-11-22T02:00:00Z",
+      "salida": "2026-12-13T18:00:00Z",
+      "llegada": "2026-12-13T22:30:00Z",
+      "precision": "instante"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T12AX2",
+      "recibidoEn": "2026-11-22T01:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T12AX2\nOperador: TA\nTren: 118\nOrigen: RET\nDestino: ROS\nSalida: 2026-12-14T13:00:00Z\nLlegada: 2026-12-14T17:30:00Z\nCoche: 4\nAsiento: 22A\nEmitido: 2026-11-22T01:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T12AX2",
+      "emisor": "ferrocarril:TA",
+      "operador": "TA",
+      "tren": "118",
+      "origen": "RET",
+      "destino": "ROS",
+      "emitido": "2026-11-22T01:00:00Z",
+      "salida": "2026-12-14T13:00:00Z",
+      "llegada": "2026-12-14T17:30:00Z",
+      "precision": "instante",
+      "coche": "4",
+      "asiento": "22A"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T13BX3",
+      "recibidoEn": "2026-11-22T00:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T13BX3\nOperador: RF\nTren: 03071\nOrigen: ATO\nDestino: BCN\nSalida: 2026-12-15T14:00:00Z\nLlegada: 2026-12-15T18:30:00Z\nAnden: 2\nEmitido: 2026-11-22T00:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T13BX3",
+      "emisor": "ferrocarril:RF",
+      "operador": "RF",
+      "tren": "03071",
+      "origen": "ATO",
+      "destino": "BCN",
+      "emitido": "2026-11-22T00:00:00Z",
+      "salida": "2026-12-15T14:00:00Z",
+      "llegada": "2026-12-15T18:30:00Z",
+      "precision": "instante",
+      "anden": "2"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T14CX4",
+      "recibidoEn": "2026-11-21T23:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T14CX4\nOperador: RF\nTren: 03142\nOrigen: BCN\nDestino: ATO\nFecha: 2026-12-16\nEmitido: 2026-11-21T23:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T14CX4",
+      "emisor": "ferrocarril:RF",
+      "operador": "RF",
+      "tren": "03142",
+      "origen": "BCN",
+      "destino": "ATO",
+      "emitido": "2026-11-21T23:00:00Z",
+      "salida": "2026-12-16T00:00:00Z",
+      "llegada": "2026-12-16T00:00:00Z",
+      "precision": "dia"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T15DX5",
+      "recibidoEn": "2026-11-21T22:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T15DX5\nOperador: TA\nTren: 202\nOrigen: RET\nDestino: MDQ\nSalida: 2026-12-17T16:00:00Z\nLlegada: 2026-12-17T20:30:00Z\nCoche: 7\nAsiento: 25A\nEmitido: 2026-11-21T22:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T15DX5",
+      "emisor": "ferrocarril:TA",
+      "operador": "TA",
+      "tren": "202",
+      "origen": "RET",
+      "destino": "MDQ",
+      "emitido": "2026-11-21T22:00:00Z",
+      "salida": "2026-12-17T16:00:00Z",
+      "llegada": "2026-12-17T20:30:00Z",
+      "precision": "instante",
+      "coche": "7",
+      "asiento": "25A"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T16AX6",
+      "recibidoEn": "2026-11-21T21:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T16AX6\nOperador: TA\nTren: 331\nOrigen: CON\nDestino: MDQ\nSalida: 2026-12-18T17:00:00Z\nLlegada: 2026-12-18T21:30:00Z\nEmitido: 2026-11-21T21:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T16AX6",
+      "emisor": "ferrocarril:TA",
+      "operador": "TA",
+      "tren": "331",
+      "origen": "CON",
+      "destino": "MDQ",
+      "emitido": "2026-11-21T21:00:00Z",
+      "salida": "2026-12-18T17:00:00Z",
+      "llegada": "2026-12-18T21:30:00Z",
+      "precision": "instante"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T17BX7",
+      "recibidoEn": "2026-11-21T20:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T17BX7\nOperador: TA\nTren: 118\nOrigen: RET\nDestino: ROS\nSalida: 2026-12-19T18:00:00Z\nLlegada: 2026-12-19T22:30:00Z\nAnden: 6\nEmitido: 2026-11-21T20:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T17BX7",
+      "emisor": "ferrocarril:TA",
+      "operador": "TA",
+      "tren": "118",
+      "origen": "RET",
+      "destino": "ROS",
+      "emitido": "2026-11-21T20:00:00Z",
+      "salida": "2026-12-19T18:00:00Z",
+      "llegada": "2026-12-19T22:30:00Z",
+      "precision": "instante",
+      "anden": "6"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T18CX8",
+      "recibidoEn": "2026-11-21T19:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T18CX8\nOperador: RF\nTren: 03071\nOrigen: ATO\nDestino: BCN\nSalida: 2026-12-20T13:00:00Z\nLlegada: 2026-12-20T17:30:00Z\nCoche: 1\nAsiento: 28A\nEmitido: 2026-11-21T19:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T18CX8",
+      "emisor": "ferrocarril:RF",
+      "operador": "RF",
+      "tren": "03071",
+      "origen": "ATO",
+      "destino": "BCN",
+      "emitido": "2026-11-21T19:00:00Z",
+      "salida": "2026-12-20T13:00:00Z",
+      "llegada": "2026-12-20T17:30:00Z",
+      "precision": "instante",
+      "coche": "1",
+      "asiento": "28A"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "boletos@ferrocarril.example",
+      "asunto": "Tu boleto T19DX9",
+      "recibidoEn": "2026-11-21T18:00:00Z",
+      "cuerpoTexto": "Boleto de tren simulado v1\nLocalizador: T19DX9\nOperador: RF\nTren: 03142\nOrigen: BCN\nDestino: ATO\nFecha: 2026-12-21\nEmitido: 2026-11-21T18:00:00Z"
+    },
+    "esperado": {
+      "localizador": "T19DX9",
+      "emisor": "ferrocarril:RF",
+      "operador": "RF",
+      "tren": "03142",
+      "origen": "BCN",
+      "destino": "ATO",
+      "emitido": "2026-11-21T18:00:00Z",
+      "salida": "2026-12-21T00:00:00Z",
+      "llegada": "2026-12-21T00:00:00Z",
+      "precision": "dia"
+    }
+  }
+]

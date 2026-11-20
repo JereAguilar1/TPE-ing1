@@ -1,4 +1,4 @@
-# Configuración del único complemento del recorte del paso 9.
+# Complementos extractores configurados (ADR-0006): el del paso 9 y el del tren (QA-15).
 - modulo: trotamundos.servicios.booking_extraction.complementos.reserva_simulada
   manifiesto:
     id: extractor-reserva-simulada
@@ -8,3 +8,14 @@
     tiposDeSegmento: [vuelo]
     umbrales: {alto: 0.90, bajo: 0.60}
     corpus: tests/booking_extraction/corpus/reserva_simulada.json
+# Boletos de tren por correo (QA-15, guía de extensión de la iteración 4, paso 4): un complemento
+# más, sin cambios en booking-extraction; su remitente entra solo al catálogo de mail-ingest (RF-04).
+- modulo: trotamundos.servicios.booking_extraction.complementos.boleto_tren_simulado
+  manifiesto:
+    id: extractor-boleto-tren-simulado
+    version: 1.0.0
+    apiContrato: '1.0'
+    remitentesQueReconoce: [boletos@ferrocarril.example]
+    tiposDeSegmento: [tren]
+    umbrales: {alto: 0.90, bajo: 0.60}
+    corpus: tests/booking_extraction/corpus/boleto_tren_simulado.json
