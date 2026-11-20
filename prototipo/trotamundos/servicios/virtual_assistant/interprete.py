@@ -176,6 +176,10 @@ class InterpretePorReglas:
                     proximo = proximo_tramo([reserva], contexto.ahora)
                     return reserva, (proximo[1] if proximo else reserva["segmentos"][0]), True
         proximo = proximo_tramo(contexto.reservas, contexto.ahora, tipo)
+        if proximo is None and tipo is not None:
+            # «¿cuándo sale mi tren?» con el foco en otro viaje: el tren está en otro viaje
+            todas = [r for v in contexto.viajes for r in v.get("reservas", [])]
+            proximo = proximo_tramo(todas, contexto.ahora, tipo)
         return (proximo[0], proximo[1], False) if proximo else (None, None, False)
 
     def _viaje(self, normal: str, contexto: ContextoDelViajero) -> str | None:

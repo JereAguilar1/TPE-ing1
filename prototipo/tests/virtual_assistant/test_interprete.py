@@ -87,6 +87,15 @@ def test_la_reserva_por_su_codigo_o_el_proximo_tramo(interprete, contexto):
     assert (por_confirmar.reserva_id, por_confirmar.por_referencia) == (TREN, True)
 
 
+def test_un_tipo_que_no_esta_en_el_viaje_en_foco_se_busca_en_los_demas(interprete):
+    """Con el foco en un viaje sin trenes, «¿cuándo sale mi tren?» encuentra el tren de otro viaje."""
+    datos = itinerario_inicial()
+    otro = {"id": "otro-viaje", "titulo": "Escapada", "reservas": [datos["viajes"][0]["reservas"][1]]}
+    en_foco = [datos["viajes"][0]["reservas"][0]]  # solo el vuelo
+    contexto = ContextoDelViajero(ahora=AHORA, viajes=[datos["viajes"][0], otro], reservas=en_foco)
+    assert interprete.interpretar("¿cuándo es el hotel?", contexto).reserva_id == HOTEL
+
+
 def test_el_viaje_por_su_titulo(interprete, contexto):
     assert interprete.interpretar("¿cómo viene el viaje a madrid?", contexto).viaje_id == VIAJE
 
