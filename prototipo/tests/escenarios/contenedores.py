@@ -128,20 +128,38 @@ class Viajero:
         return self
 
     def reenviar_confirmacion(self, localizador: str, salida: datetime, origen: str = "AEP",
-                              destino: str = "MDZ") -> httpx.Response:
-        """El viajero reenvía a su alias la confirmación de la aerolínea."""
+                              destino: str = "MDZ", rotulo: str = "Localizador",
+                              numero: str = "1402") -> httpx.Response:
+        """El viajero reenvía a su alias la confirmación de la aerolínea. Con el rótulo
+        «Localizador tentativo» el extractor la lee con confianza media: queda por confirmar."""
         emitido = ahora().replace(microsecond=0)
         cuerpo = "\n".join([
-            "Reserva aérea simulada v1", f"Localizador: {localizador}", "Aerolinea: AR",
-            "Numero: 1402", f"Origen: {origen}", f"Destino: {destino}", f"Salida: {texto_utc(salida)}",
+            "Reserva aérea simulada v1", f"{rotulo}: {localizador}", "Aerolinea: AR",
+            f"Numero: {numero}", f"Origen: {origen}", f"Destino: {destino}", f"Salida: {texto_utc(salida)}",
             f"Llegada: {texto_utc(salida + timedelta(hours=2))}", f"Emitido: {texto_utc(emitido)}"])
+        return self.reenviar(REMITENTE, f"Tu reserva {localizador}", cuerpo, emitido)
+
+    def reenviar_boleto_de_tren(self, localizador: str, salida: datetime, origen: str = "ATO",
+                                destino: str = "BCN") -> httpx.Response:
+        """El viajero reenvía el boleto del ferrocarril de ejemplo (extractor del tren, QA-15)."""
+        emitido = ahora().replace(microsecond=0)
+        cuerpo = "\n".join([
+            "Boleto de tren simulado v1", f"Localizador: {localizador}", "Operador: RF",
+            "Tren: 03071", f"Origen: {origen}", f"Destino: {destino}",
+            f"Salida: {texto_utc(salida)}", f"Llegada: {texto_utc(salida + timedelta(hours=3))}",
+            "Coche: 5", "Asiento: 12A", "Anden: 7", f"Emitido: {texto_utc(emitido)}"])
+        return self.reenviar("boletos@ferrocarril.example", f"Tu boleto {localizador}", cuerpo,
+                             emitido)
+
+    def reenviar(self, remitente: str, asunto: str, cuerpo: str, emitido: datetime) -> httpx.Response:
+        """Reenvía a su alias un correo de `remitente`, verificado por el servidor propio."""
         correo = EmailMessage()
         correo["Return-Path"] = f"<{self.correo}>"  # quien reenvía es el titular del buzón
-        correo["From"] = REMITENTE
+        correo["From"] = remitente
         correo["To"] = self.alias
-        correo["Subject"] = f"Tu reserva {localizador}"
+        correo["Subject"] = asunto
         correo["Date"] = format_datetime(emitido)
-        correo["Message-ID"] = f"<{localizador}-{uuid4().hex[:6]}@aerolinea.example>"
+        correo["Message-ID"] = f"<{uuid4().hex}@{remitente.partition('@')[2]}>"
         correo["Authentication-Results"] = "ingesta.trotamundos.app; dkim=pass; spf=pass"
         correo.set_content(cuerpo)
         return self.cliente.post(f"{MAIL_INGEST}/webhooks/correo/reenvio", content=bytes(correo),

@@ -71,7 +71,7 @@ jobs:
       - name: Escenarios QA-01 (frescura) y QA-04 (ráfaga) e interfaz web contra los contenedores
         env:
           TROTAMUNDOS_EXIGIR_CONTENEDORES: "1"
-        run: .venv/bin/python -m pytest -q -s tests/escenarios/test_qa01_frescura.py tests/escenarios/test_qa04_rafaga.py tests/escenarios/test_rf07_agrupacion.py tests/app_web
+        run: .venv/bin/python -m pytest -q -s tests/escenarios/test_qa01_frescura.py tests/escenarios/test_qa04_rafaga.py tests/escenarios/test_rf07_agrupacion.py tests/escenarios/test_qa15_tren_por_correo.py tests/app_web
 
       - name: Estado y registros de los contenedores (si algo falló)
         if: failure()
