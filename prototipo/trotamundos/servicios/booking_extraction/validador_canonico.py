@@ -1,7 +1,7 @@
 """Salida contractual, detalles registrados e invariantes de ADR-0035."""
 from zoneinfo import ZoneInfo
 
-from trotamundos.comun.modelo import instante_desde_texto
+from trotamundos.comun.modelo import limites_del_extremo
 from trotamundos.comun.tipos_de_segmento import RegistroDeTipos
 
 
@@ -38,7 +38,9 @@ def validar(salida: dict, contratos, registro: RegistroDeTipos) -> set[str]:
                          observacion, raiz, prefijo)
         for j, segmento in enumerate(observacion['segmentos']):
             inicio, fin = segmento['inicio'], segmento['fin']
-            desde, hasta = instante_desde_texto(inicio['instante']), instante_desde_texto(fin['instante'])
+            # Con los límites del modelo: un boleto abierto (`precision: dia`) cubre el día local
+            # entero, así que empieza y termina el mismo día sin ser un tramo vacío (ADR-0011).
+            desde, hasta = limites_del_extremo(inicio)[0], limites_del_extremo(fin)[1]
             if hasta <= desde:
                 raise ValueError('El fin debe ser posterior al inicio')
             for extremo in (inicio, fin):
