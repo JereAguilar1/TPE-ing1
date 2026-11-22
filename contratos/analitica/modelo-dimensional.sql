@@ -1,6 +1,6 @@
 -- =============================================================================
 -- Trotamundos — modelo dimensional del plano analítico (analytics-store)
--- Versión de contrato: 1.1
+-- Versión de contrato: 1.2
 --
 -- Trazabilidad:
 --   - Esquema en estrella alimentado desde eventos de dominio retenidos crudos: ADR-0016
@@ -8,7 +8,8 @@
 --   - Separación de planos: ADR-0003. Nada de este esquema referencia tablas del plano
 --     operacional (regla R6 de la vista de módulos N1).
 --   - Seudónimo en lugar de datos personales: ADR-0016. Lista de supresión y vistas filtradas:
---     ADR-0030 (agregadas en la versión 1.1, iteración 4).
+--     ADR-0030 (agregadas en la versión 1.1, iteración 4). Cubo anónimo y acta de la compactación
+--     de fase 2: ADR-0030 (versión 1.2, prototipo paso 14; cambio compatible: solo agrega).
 --   - Un tipo de segmento nuevo es una FILA nueva en dim_tipo_segmento, nunca una columna (QA-15).
 --
 -- SQL ANSI. El producto columnar concreto no forma parte del contrato; las particiones y el
@@ -142,6 +143,37 @@ JOIN dim_usuario u ON u.usuario_sk = h.usuario_sk
 WHERE NOT EXISTS (
     SELECT 1 FROM lista_supresion_analitica s
     WHERE s.seudonimo_analitico = u.seudonimo_analitico
+);
+
+-- -----------------------------------------------------------------------------
+-- Compactación de fase 2 (versión 1.2, ADR-0030). Esta sección se puede ejecutar sobre un esquema
+-- ya instalado: solo agrega (IF NOT EXISTS / OR REPLACE).
+-- -----------------------------------------------------------------------------
+
+-- Cada 15 días, las filas de los seudónimos suprimidos se borran y su aporte queda solo aquí,
+-- sin usuario: cuántos cambios hubo por mes, tipo de segmento y tipo de cambio.
+CREATE TABLE IF NOT EXISTS cubo_cambios_anonimo (
+    anio             SMALLINT     NOT NULL,
+    mes              SMALLINT     NOT NULL,
+    tipo_segmento_id INTEGER      NOT NULL REFERENCES dim_tipo_segmento (tipo_segmento_id),
+    tipo_de_cambio   VARCHAR(16)  NOT NULL,
+    cantidad         INTEGER      NOT NULL,
+    usuarios         INTEGER      NOT NULL,   -- usuarios distintos que aportaron a la celda
+    PRIMARY KEY (anio, mes, tipo_segmento_id, tipo_de_cambio)
+);
+
+-- Los analistas ven solo las celdas con k ≥ 50 usuarios (umbral de anonimato de ADR-0030).
+CREATE OR REPLACE VIEW v_cubo_cambios_anonimo AS
+SELECT * FROM cubo_cambios_anonimo WHERE usuarios >= 50;
+
+-- Acta de cada compactación: cantidades y un resumen de los seudónimos, nunca los seudónimos.
+CREATE TABLE IF NOT EXISTS acta_compactacion (
+    acta_id          BIGINT       PRIMARY KEY,
+    ejecutada_en     TIMESTAMP    NOT NULL,
+    seudonimos       INTEGER      NOT NULL,
+    filas_borradas   INTEGER      NOT NULL,
+    resumen          CHAR(64)     NOT NULL,   -- SHA-256 de los seudónimos compactados, ordenados
+    firma            CHAR(64)     NOT NULL    -- HMAC-SHA256 del acta con la clave de actas
 );
 
 -- -----------------------------------------------------------------------------

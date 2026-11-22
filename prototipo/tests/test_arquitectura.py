@@ -199,9 +199,11 @@ DEPENDENCIAS_DE_IDENTITY_ACCESS = {
     "autenticacion_oidc": {"auditoria_y_revocacion"},
     "consentimiento_buzones": {"custodia_boveda", "auditoria_y_revocacion"},
     "motor_autorizacion_abac": {"auditoria_y_revocacion"},
+    "ordenes_de_borrado": set(),
     "publicacion": set(),
     "api": set(),
     "servicio": {
+        "ordenes_de_borrado",
         "auditoria_y_revocacion",
         "custodia_boveda",
         "autenticacion_oidc",
@@ -417,7 +419,8 @@ def test_los_adaptadores_no_importan_otros_complementos():
 DEPENDENCIAS_DE_EVENT_PIPELINE = {
     "aterrizaje": set(),
     "modelo_dimensional": {"aterrizaje"},
-    "servicio": {"aterrizaje", "modelo_dimensional"},
+    "compactacion": set(),
+    "servicio": {"aterrizaje", "modelo_dimensional", "compactacion"},
 }
 
 

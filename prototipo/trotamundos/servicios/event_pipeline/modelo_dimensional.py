@@ -24,6 +24,8 @@ from trotamundos.comun.tipos_de_segmento import RegistroDeTipos
 from trotamundos.servicios.event_pipeline.aterrizaje import EventoCrudo
 
 _CONTRATO_SQL = "analitica/modelo-dimensional.sql"
+# Desde aquí, el contrato solo agrega (versión 1.2): se ejecuta también sobre un esquema instalado.
+_SECCION_INCREMENTAL = "-- Compactación de fase 2 (versión 1.2, ADR-0030)."
 _FUENTES_FIJAS = ((1, "correo"), (2, "proveedor"), (3, "manual"))
 
 DDL_AUXILIAR = (
@@ -50,9 +52,11 @@ def instalar_modelo_dimensional(conexion: psycopg.Connection, contratos: Contrat
     """Ejecuta `contratos/analitica/modelo-dimensional.sql` si aún no está instalado en el esquema
     y sincroniza las dimensiones fijas (`dim_fuente` y `dim_tipo_segmento`)."""
     existe = conexion.execute("SELECT to_regclass('dim_fecha') AS tabla").fetchone()
+    sql_contrato = (contratos.ruta / _CONTRATO_SQL).read_text(encoding="utf-8")
     if existe is None or existe["tabla"] is None:
-        sql_contrato = (contratos.ruta / _CONTRATO_SQL).read_text(encoding="utf-8")
         conexion.execute(sql_contrato)
+    else:  # un esquema de una versión anterior: se le agrega lo nuevo del contrato
+        conexion.execute(sql_contrato[sql_contrato.index(_SECCION_INCREMENTAL):])
     for sentencia in DDL_AUXILIAR:
         conexion.execute(sentencia)
     for fuente_id, nombre in _FUENTES_FIJAS:
@@ -197,6 +201,11 @@ def _fuente_id(conexion: psycopg.Connection, nombre_fuente: str) -> int:
     return 1
 
 
+def _atributos_de(fila: Mapping[str, Any]) -> tuple[str, str, str]:
+    """Los atributos que versiona el SCD tipo 2 de `dim_proveedor`."""
+    return (fila["nombre"], fila["tipo_proveedor"], (fila["pais"] or "").strip())
+
+
 def _asegurar_proveedor(conexion: psycopg.Connection, reserva: Mapping[str, Any],
                         segmento: Mapping[str, Any],
                         ocurrido_en: datetime) -> int | None:
@@ -214,21 +223,40 @@ def _asegurar_proveedor(conexion: psycopg.Connection, reserva: Mapping[str, Any]
     lugar_inicio = segmento.get("inicio", {}).get("lugar") if isinstance(segmento.get("inicio"), Mapping) else None
     pais = str(lugar_inicio.get("pais") or "AR")[:2] if isinstance(lugar_inicio, Mapping) else "AR"
 
-    existente = conexion.execute(
+    # SCD tipo 2 (ADR-0016): cada hecho apunta a la versión del proveedor vigente al ocurrir.
+    momento = ocurrido_en.replace(tzinfo=None)
+    atributos = (nombre, tipo_prov, pais)
+    en_su_momento = conexion.execute(
         """
-        SELECT proveedor_sk FROM dim_proveedor
-        WHERE proveedor_codigo = %s AND es_vigente = TRUE
+        SELECT proveedor_sk, nombre, tipo_proveedor, pais FROM dim_proveedor
+        WHERE proveedor_codigo = %s AND vigente_desde <= %s
+          AND (vigente_hasta IS NULL OR %s < vigente_hasta)
+        ORDER BY vigente_desde DESC LIMIT 1
         """,
+        (codigo, momento, momento),
+    ).fetchone()
+    if en_su_momento is not None and _atributos_de(en_su_momento) == atributos:
+        return int(en_su_momento["proveedor_sk"])
+    vigente = conexion.execute(
+        "SELECT proveedor_sk, vigente_desde FROM dim_proveedor "
+        "WHERE proveedor_codigo = %s AND es_vigente = TRUE",
         (codigo,),
     ).fetchone()
-    if existente is not None:
-        return int(existente["proveedor_sk"])
+    if vigente is not None and momento < vigente["vigente_desde"]:
+        # Un evento atrasado no reescribe la historia: usa la versión de su momento (o la primera).
+        return int((en_su_momento or vigente)["proveedor_sk"])
+    if vigente is not None:  # cambió un atributo: se cierra la versión vigente y se abre otra
+        conexion.execute(
+            "UPDATE dim_proveedor SET vigente_hasta = %s, es_vigente = FALSE "
+            "WHERE proveedor_sk = %s",
+            (momento, vigente["proveedor_sk"]),
+        )
 
     max_fila = conexion.execute(
         "SELECT COALESCE(MAX(proveedor_sk), 0) AS maximo FROM dim_proveedor"
     ).fetchone()
     nuevo_sk = int(max_fila["maximo"]) + 1 if max_fila else 1
-    vigente_desde = ocurrido_en.replace(tzinfo=None)
+    vigente_desde = momento
     conexion.execute(
         """
         INSERT INTO dim_proveedor (

@@ -11,12 +11,13 @@ import asyncio
 import contextlib
 from datetime import datetime, timezone
 import logging
-from typing import Any, AsyncIterator
+import secrets
+from typing import Any, AsyncIterator, Callable
 
 from fastapi import FastAPI
 
 from trotamundos.comun.carriles import Carril, asegurar_topicos, carriles_posibles, topico
-from trotamundos.comun.config import Configuracion
+from trotamundos.comun.config import Configuracion, _variable
 from trotamundos.comun.consumidor import DDL_RECHAZADOS, ConsumidorConCarriles
 from trotamundos.comun.contratos import Contratos, ErrorDeContrato, contratos_por_omision
 from trotamundos.comun.eventos import Evento
@@ -28,7 +29,7 @@ from trotamundos.comun.persistencia import (
     transaccion,
 )
 from trotamundos.comun.tipos_de_segmento import RegistroDeTipos
-from trotamundos.servicios.event_pipeline import aterrizaje, modelo_dimensional
+from trotamundos.servicios.event_pipeline import aterrizaje, compactacion, modelo_dimensional
 
 ESQUEMA = "analytics_store"
 CONSUMIDOR = "event-pipeline"
@@ -54,11 +55,17 @@ class EventPipeline:
     def __init__(self, configuracion: Configuracion | None = None, *,
                  esquema: str = ESQUEMA,
                  contratos: Contratos | None = None,
-                 tipos: RegistroDeTipos | None = None):
+                 tipos: RegistroDeTipos | None = None,
+                 clave_de_actas: str | None = None,
+                 reloj: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
         self._configuracion = configuracion or Configuracion.desde_entorno()
         self._esquema = esquema
         self._contratos = contratos or contratos_por_omision()
         self.tipos = tipos or RegistroDeTipos.desde_contratos(self._contratos)
+        # La clave que firma las actas de compactación (ADR-0030): de .env, nunca del código.
+        self._clave_de_actas = (clave_de_actas or _variable("TROTAMUNDOS_SECRETO_ACTAS")
+                                or secrets.token_hex(32))
+        self._reloj = reloj
 
     def crear_esquema(self) -> None:
         crear_esquema(self._configuracion.dsn_postgres, self._esquema, DDL)
@@ -104,10 +111,17 @@ class EventPipeline:
         with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
             return modelo_dimensional.consultar_cancelaciones(conexion)
 
+    def compactar_supresiones(self) -> dict[str, Any] | None:
+        """Compactación de fase 2 (ADR-0030): devuelve el acta, o `None` si no había nada."""
+        with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
+            return compactacion.compactar(conexion, self._reloj(), self._clave_de_actas)
+
     def tareas_periodicas(self) -> None:
-        ahora = datetime.now(timezone.utc)
+        ahora = self._reloj()
         with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
             purgar(conexion, ahora)
+            if compactacion.corresponde(conexion, ahora):  # cada 15 días, si hay bajas
+                compactacion.compactar(conexion, ahora, self._clave_de_actas)
 
     def app(self) -> FastAPI:
         intervalo = self._configuracion.intervalo_tareas_s
