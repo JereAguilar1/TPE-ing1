@@ -15,3 +15,21 @@
       sondeo: true
       cancelaciones: true
       cuotaPorMinuto: 60
+# Ferrocarril de ejemplo (QA-15, guía de extensión de la iteración 4, paso 3): un complemento más,
+# sin cambios en provider-sync ni en el dominio.
+- modulo: trotamundos.servicios.provider_sync.complementos.ferrocarril_simulado
+  emisores: [ferrocarril:RF, ferrocarril:TA]
+  credencial:
+    tipo: apiKey
+    valor: credencial-osdm-simulada
+  manifiesto:
+    id: adaptador-ferrocarril-simulado
+    version: 1.0.0
+    apiContrato: '1.0'
+    estandar: OSDM
+    tiposDeSegmento: [tren]
+    capacidades:
+      push: true
+      sondeo: true
+      cancelaciones: true
+      cuotaPorMinuto: 30

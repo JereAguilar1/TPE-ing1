@@ -1,0 +1,122 @@
+[
+  {
+    "nombre": "confirmacion_con_anden",
+    "notificacion": {
+      "eventId": "osdm-01",
+      "issuedAt": "2026-11-18T12:00:00Z",
+      "bookings": [
+        {
+          "bookingRef": "RFX123",
+          "carrier": "RF",
+          "trips": [
+            {
+              "trainNumber": "03071",
+              "status": "CONFIRMED",
+              "coach": "5",
+              "seat": "12A",
+              "origin": {
+                "station": "ATO",
+                "time": "2026-12-06T08:30:00+01:00"
+              },
+              "destination": {
+                "station": "BCN",
+                "time": "2026-12-06T11:30:00+01:00"
+              },
+              "platform": "7"
+            }
+          ]
+        }
+      ]
+    },
+    "esperado": {
+      "referencia": "RFX123",
+      "cancelada": false,
+      "versionDeFuente": "2026-11-18T12:00:00Z",
+      "emisor": "ferrocarril:RF",
+      "inicio": "2026-12-06T07:30:00Z",
+      "fin": "2026-12-06T10:30:00Z",
+      "anden": "7",
+      "disrupcion": false
+    }
+  },
+  {
+    "nombre": "cambio_de_horario_y_anden",
+    "notificacion": {
+      "eventId": "osdm-02",
+      "issuedAt": "2026-11-18T15:00:00Z",
+      "bookings": [
+        {
+          "bookingRef": "RFX123",
+          "carrier": "RF",
+          "trips": [
+            {
+              "trainNumber": "03071",
+              "status": "CONFIRMED",
+              "coach": "5",
+              "seat": "12A",
+              "origin": {
+                "station": "ATO",
+                "time": "2026-12-06T10:15:00+01:00"
+              },
+              "destination": {
+                "station": "BCN",
+                "time": "2026-12-06T13:15:00+01:00"
+              },
+              "platform": "9"
+            }
+          ]
+        }
+      ]
+    },
+    "esperado": {
+      "referencia": "RFX123",
+      "cancelada": false,
+      "versionDeFuente": "2026-11-18T15:00:00Z",
+      "emisor": "ferrocarril:RF",
+      "inicio": "2026-12-06T09:15:00Z",
+      "fin": "2026-12-06T12:15:00Z",
+      "anden": "9",
+      "disrupcion": false
+    }
+  },
+  {
+    "nombre": "cancelacion",
+    "notificacion": {
+      "eventId": "osdm-03",
+      "issuedAt": "2026-11-19T09:00:00Z",
+      "bookings": [
+        {
+          "bookingRef": "RFX123",
+          "carrier": "RF",
+          "status": "CANCELLED",
+          "trips": [
+            {
+              "trainNumber": "03071",
+              "status": "CANCELLED",
+              "coach": "5",
+              "seat": "12A",
+              "origin": {
+                "station": "ATO",
+                "time": "2026-12-06T10:15:00+01:00"
+              },
+              "destination": {
+                "station": "BCN",
+                "time": "2026-12-06T13:15:00+01:00"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "esperado": {
+      "referencia": "RFX123",
+      "cancelada": true,
+      "versionDeFuente": "2026-11-19T09:00:00Z",
+      "emisor": "ferrocarril:RF",
+      "inicio": "2026-12-06T09:15:00Z",
+      "fin": "2026-12-06T12:15:00Z",
+      "anden": null,
+      "disrupcion": true
+    }
+  }
+]
