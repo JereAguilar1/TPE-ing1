@@ -104,6 +104,7 @@ Decisiones D37 a D41, con sus alternativas en [Iteración 5 — Paso 4](../02-pr
 | [ADR-0039](ADR-0039-politica-de-derivacion-a-la-agencia.md) | Cuatro disparadores de derivación a la agencia, con confirmación y caso idempotente por `POST /casos` | `aceptado` | RF-B2, RF-12, CON-06, CRN-12 |
 | [ADR-0040](ADR-0040-sesion-conversacional-y-privacidad.md) | Sesión conversacional mínima de 30 días, supresión de fase 1 por `usuario_id` y disrupciones por evento (precisa a ADR-0034) | `aceptado` | RF-B1, QA-14, CON-10, QA-12 |
 | [ADR-0041](ADR-0041-alias-de-reenvio-generado-por-identity-access.md) | El alias de reenvío lo genera `identity-access` al conectar el buzón y `mail-ingest` lo recibe por evento (precisa a ADR-0035) | `aceptado` | CON-08, RF-01, QA-13, CON-04 |
+| [ADR-0042](ADR-0042-orden-de-borrado-de-la-fase-1.md) | `identity-access` ordena el borrado de la fase 1 con una operación interna por servicio, guardando cada orden hasta que se confirma (precisa a ADR-0030) | `aceptado` | QA-14, CON-10, CON-04, CRN-12 |
 
 ## Plantilla
 

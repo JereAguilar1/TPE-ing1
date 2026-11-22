@@ -95,6 +95,7 @@ drivers verificables, y deja explícito todo lo que el enunciado no dice.
 | [ADR-0039](03-adr/ADR-0039-politica-de-derivacion-a-la-agencia.md) | Derivación a la agencia ante cuatro situaciones, con confirmación y un caso idempotente por `support-liaison` | 5 |
 | [ADR-0040](03-adr/ADR-0040-sesion-conversacional-y-privacidad.md) | Sesión conversacional particionada por usuario, retención acotada, supresión de fase 1 y disrupciones por `DisrupcionDetectada` (precisa ADR-0034) | 5 |
 | [ADR-0041](03-adr/ADR-0041-alias-de-reenvio-generado-por-identity-access.md) | El alias de reenvío lo genera `identity-access` y `mail-ingest` lo recibe por `EstadoDeBuzonCambiado` (precisa ADR-0035) | 5 |
+| [ADR-0042](03-adr/ADR-0042-orden-de-borrado-de-la-fase-1.md) | Orden de borrado de la fase 1 por una operación interna en cada servicio, guardada hasta que se confirma (precisa ADR-0030) | prototipo |
 
 ## 4. Vistas arquitectónicas
 
