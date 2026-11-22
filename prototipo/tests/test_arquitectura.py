@@ -424,6 +424,33 @@ DEPENDENCIAS_DE_EVENT_PIPELINE = {
 }
 
 
+DEPENDENCIAS_DE_PREFERENCES = {
+    "almacen": set(),
+    "publicacion": set(),
+    "api": set(),
+    "servicio": {"almacen", "publicacion", "api"},
+}
+
+
+def test_los_modulos_de_preferences_respetan_sus_dependencias():
+    assert violaciones_internas(PAQUETE, "preferences", DEPENDENCIAS_DE_PREFERENCES) == []
+
+
+DEPENDENCIAS_DE_NOTIFICATION = {
+    "canales": set(),
+    "complementos": set(),
+    "reglas": set(),
+    "preferencias": set(),
+    "avisos": {"reglas"},
+    "publicacion": set(),
+    "servicio": {"canales", "complementos", "reglas", "preferencias", "avisos", "publicacion"},
+}
+
+
+def test_los_modulos_de_notification_respetan_sus_dependencias():
+    assert violaciones_internas(PAQUETE, "notification", DEPENDENCIAS_DE_NOTIFICATION) == []
+
+
 def test_los_modulos_de_event_pipeline_respetan_sus_dependencias():
     assert violaciones_internas(PAQUETE, "event_pipeline",
                                 DEPENDENCIAS_DE_EVENT_PIPELINE) == []

@@ -34,9 +34,11 @@ IDENTITY_ACCESS = "http://localhost:18103"
 MAIL_INGEST = "http://localhost:18104"
 BFF_WEB = "http://localhost:18108"
 PROVIDER_SYNC = "http://localhost:18109"
+PREFERENCES = "http://localhost:18112"
 PUERTOS = {"itinerary-escritura": 18101, "itinerary-lectura": 18102, "identity-access": 18103,
            "mail-ingest": 18104, "booking-extraction": 18107, "bff-web": 18108,
-           "provider-sync": 18109, "app-web": 18111}
+           "provider-sync": 18109, "app-web": 18111, "preferences": 18112,
+           "notification": 18113}
 ADAPTADOR = "adaptador-aerolinea-simulada"
 REMITENTE = "reservas@aerolinea.example"  # lo reconoce el extractor de ejemplo del paso 9
 SONDEO_S = 0.05

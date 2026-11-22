@@ -1,0 +1,21 @@
+"""La *outbox* de `PreferenciasActualizadas` (ADR-0012), con el carril que fija el contrato."""
+
+from __future__ import annotations
+
+from typing import Iterable
+
+import psycopg
+
+from trotamundos.comun.contratos import Contratos
+from trotamundos.comun.eventos import Evento
+from trotamundos.comun.persistencia import escribir_en_outbox
+
+PUBLICA = frozenset({"PreferenciasActualizadas"})
+
+
+def registrar(conexion: psycopg.Connection, eventos: Iterable[Evento], contratos: Contratos) -> None:
+    lista = list(eventos)
+    ajenos = sorted({e.tipo for e in lista} - PUBLICA)
+    if ajenos:
+        raise ValueError(f"preferences no publica {', '.join(ajenos)}")
+    escribir_en_outbox(conexion, lista, contratos)

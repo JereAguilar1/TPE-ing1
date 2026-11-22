@@ -106,6 +106,7 @@ services:
       TROTAMUNDOS_URL_ITINERARY_ESCRITURA: http://itinerary-escritura:8000
       TROTAMUNDOS_URL_SUPPORT_LIAISON: http://support-liaison:8000
       TROTAMUNDOS_URL_VIRTUAL_ASSISTANT: http://virtual-assistant:8000
+      TROTAMUNDOS_URL_PREFERENCES: http://preferences:8000
     ports:
       - "18103:8000"
     depends_on:
@@ -318,6 +319,55 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  preferences:
+    # Preferencias del viajero (paso 12 completo, RF-15): GET/PUT /preferencias con su sesión y
+    # PreferenciasActualizadas por la outbox, que consumen notification y support-liaison.
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.preferences.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TROTAMUNDOS_DSN: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres:5432/trotamundos
+      TROTAMUNDOS_BROKER: broker:9092
+      TROTAMUNDOS_REGION: AM
+      # De .env (make infra-arriba): la sesión la emite identity-access con el mismo secreto.
+      TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
+    ports:
+      - "18112:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  notification:
+    # Avisos al viajero (paso 12 completo, RF-10): severidad según el descriptor, correlación por
+    # idDeCausa, coalescencia de 30 s, horas de silencio y NotificacionEmitida. Sin operaciones
+    # HTTP: el puerto solo sirve para el healthcheck. Push y correo son simulados.
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.notification.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TROTAMUNDOS_DSN: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres:5432/trotamundos
+      TROTAMUNDOS_BROKER: broker:9092
+      TROTAMUNDOS_REGION: AM
+    ports:
+      - "18113:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2)"]
       interval: 5s
       timeout: 3s
       retries: 20

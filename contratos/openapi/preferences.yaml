@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — preferences
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Preferencias del usuario (RF-15) que habilitan RF-08, RF-10, RF-12 y QA-18.
 
@@ -10,6 +10,9 @@ info:
     local, de modo que no hay llamadas sincrónicas a este servicio durante un pico (QA-04).
     Los filtros de correo (RF-04) **no** están aquí: viven en `mail-ingest`
     (ver `mail-ingest-filtros.yaml`).
+
+    - `1.1.0`: `DELETE /interno/usuarios/{usuarioId}`, la orden de borrado de la fase 1 de la
+      supresión (ADR-0030, ADR-0042). Agregar una operación es un cambio compatible (ADR-0027).
 servers:
   - url: https://api.trotamundos.app
 security:
@@ -38,6 +41,18 @@ paths:
             application/vnd.trotamundos.v1+json:
               schema: { $ref: '#/components/schemas/Preferencias' }
         '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
+  /interno/usuarios/{usuarioId}:
+    delete:
+      operationId: suprimirDatosDeUsuario
+      summary: Borra físicamente las preferencias del usuario (fase 1 de la supresión)
+      description: |
+        Solo la llama `identity-access` al suprimir una cuenta (ADR-0030 fase 1, ADR-0042), por la
+        red interna (mTLS en producción); no la exponen los BFF. Es idempotente.
+      security: []
+      parameters:
+        - { name: usuarioId, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+      responses:
+        '204': { description: Preferencias del usuario borradas (o no había). }
 components:
   securitySchemes:
     oidc:
