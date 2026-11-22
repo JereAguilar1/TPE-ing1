@@ -39,6 +39,7 @@ from trotamundos.servicios.provider_sync import (
     api,
     detector_de_disrupciones,
     programador,
+    proteccion,
     publicacion,
     receptor_de_notificaciones,
     seguimiento,
@@ -54,6 +55,7 @@ PAUSA_S = 0.5
 DDL = (
     *seguimiento.DDL,
     *programador.DDL,
+    *proteccion.DDL,
     *detector_de_disrupciones.DDL,
     *DDL_RECHAZADOS,
     """
@@ -83,6 +85,10 @@ class ProviderSync:
         self._esquema = esquema
         self._contratos = contratos or contratos_por_omision()
         self.registro = registro or RegistroDeAdaptadores(self._contratos)
+        # Una barrera por adaptador, con la cuota de su manifiesto (ADR-0024)
+        self.protector = proteccion.ProtectorDeProveedores({
+            adaptador_id: int(self.registro.obtener(adaptador_id).capacidades["cuotaPorMinuto"])
+            for adaptador_id in self.registro.ids()})
         self._secreto_webhook = (
             secreto_webhook
             or os.environ.get("TROTAMUNDOS_SECRETO_WEBHOOK_PROVEEDOR")
@@ -166,7 +172,8 @@ class ProviderSync:
         ahora = self._reloj()
         emitidos = 0
         with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
-            for adaptador_id, cambios in programador.sondear_todos(conexion, self.registro, ahora):
+            for adaptador_id, cambios in programador.sondear_todos(conexion, self.registro, ahora,
+                                                                   self.protector):
                 emitidos += self._procesar_cambios(conexion, adaptador_id, cambios, ahora)
         return emitidos
 
@@ -248,6 +255,7 @@ class ProviderSync:
         with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
             purgar(conexion, ahora)
             detector_de_disrupciones.purgar_emitidas(conexion, ahora, RETENCION)
+            proteccion.purgar_vencidos(conexion, ahora)
             conexion.execute(
                 "DELETE FROM observacion_emitida WHERE emitida_en < %s",
                 (ahora - RETENCION,),
