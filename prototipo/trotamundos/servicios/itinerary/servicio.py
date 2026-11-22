@@ -43,6 +43,7 @@ from trotamundos.comun.modelo import instante_a_texto
 from trotamundos.comun.persistencia import (
     RespuestaGuardada,
     bloquear_usuario,
+    borrar_usuario,
     crear_esquema,
     guardar_respuesta,
     huella_de_solicitud,
@@ -220,6 +221,15 @@ class Itinerary:
 
     def tipos_de_segmento(self) -> list[dict[str, Any]]:
         return self._registro.documentos()
+
+    # --- supresión de fase 1 (ADR-0030, ADR-0042) ------------------------------------------
+
+    def suprimir_usuario(self, usuario_id: UUID) -> int:
+        """`DELETE /interno/usuarios/{usuarioId}`: borra todas las filas del usuario en el esquema
+        del servicio, en una transacción. Devuelve cuántas borró (idempotente)."""
+        with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
+            bloquear_usuario(conexion, usuario_id)
+            return borrar_usuario(conexion, usuario_id)
 
     # --- eventos consumidos (ingesta) ----------------------------------------------------
 

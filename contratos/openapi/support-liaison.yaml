@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — support-liaison
-  version: 1.1.0
+  version: 1.2.0
   description: |
     Derivación de casos de soporte a la agencia preferida del usuario (RF-12, UC-7).
 
@@ -9,6 +9,9 @@ info:
     idempotente (ADR-0014) y lleva testigo transregional síncrono (ADR-0018). El caso guarda una
     instantánea inmutable del viaje tomada de `itinerary`. La conexión con cada agencia es un
     adaptador cargado como complemento (ADR-0006).
+
+    - `1.2.0`: `DELETE /interno/usuarios/{usuarioId}`, la orden de borrado de la fase 1 de la
+      supresión (ADR-0030, ADR-0042). Agregar una operación es un cambio compatible (ADR-0027).
 servers:
   - url: https://api.trotamundos.app
 security:
@@ -77,6 +80,20 @@ paths:
         '401': { $ref: 'comun.yaml#/components/responses/NoAutenticado' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
         '409': { $ref: 'comun.yaml#/components/responses/Conflicto' }
+  /interno/usuarios/{usuarioId}:
+    delete:
+      operationId: suprimirDatosDeUsuario
+      summary: Borra físicamente todos los datos del usuario en este servicio (fase 1 de la supresión)
+      description: |
+        Solo la llama `identity-access` al suprimir una cuenta (`DELETE /privacidad/cuenta`,
+        ADR-0030 fase 1, ADR-0042), por la red interna (mTLS en producción); no la exponen los BFF.
+        Borra en una transacción toda fila con ese `usuario_id` (ADR-0012). Es idempotente: un
+        usuario sin datos también responde `204`. Incluye los casos y su instantánea del viaje.
+      security: []
+      parameters:
+        - { name: usuarioId, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+      responses:
+        '204': { description: Datos del usuario borrados (o no había). }
 components:
   securitySchemes:
     oidc:

@@ -102,6 +102,10 @@ services:
       TROTAMUNDOS_KMS_SECRETO: ${TROTAMUNDOS_KMS_SECRETO}
       TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
       TROTAMUNDOS_VALE_SECRETO: ${TROTAMUNDOS_VALE_SECRETO}
+      # A quién ordena el borrado de la fase 1 al suprimir una cuenta (ADR-0030, ADR-0042).
+      TROTAMUNDOS_URL_ITINERARY_ESCRITURA: http://itinerary-escritura:8000
+      TROTAMUNDOS_URL_SUPPORT_LIAISON: http://support-liaison:8000
+      TROTAMUNDOS_URL_VIRTUAL_ASSISTANT: http://virtual-assistant:8000
     ports:
       - "18103:8000"
     depends_on:
@@ -282,6 +286,8 @@ services:
       TROTAMUNDOS_DSN: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres:5432/trotamundos
       TROTAMUNDOS_BROKER: broker:9092
       TROTAMUNDOS_REGION: AM
+      # De .env (make infra-arriba): firma las actas de la compactación de fase 2 (ADR-0030).
+      TROTAMUNDOS_SECRETO_ACTAS: ${TROTAMUNDOS_SECRETO_ACTAS}
     ports:
       - "18110:8000"
     depends_on:

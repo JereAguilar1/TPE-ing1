@@ -18,7 +18,7 @@ from contextlib import AbstractAsyncContextManager
 from typing import Any, Callable, Mapping, Protocol, TypeVar
 from uuid import UUID
 
-from fastapi import Body, FastAPI, Header, Query
+from fastapi import Body, FastAPI, Header, Path, Query
 from fastapi.routing import APIRoute
 from fastapi.responses import JSONResponse, Response
 
@@ -78,6 +78,8 @@ class Itinerario(Protocol):
     def leer_reserva(self, usuario_id: UUID, reserva_id: UUID) -> dict[str, Any] | None: ...
 
     def tipos_de_segmento(self) -> list[dict[str, Any]]: ...
+
+    def suprimir_usuario(self, usuario_id: UUID) -> int: ...
 
 
 def crear_app(itinerario: Itinerario, contratos: Contratos,
@@ -197,6 +199,12 @@ def crear_app(itinerario: Itinerario, contratos: Contratos,
     @app.get("/tipos-de-segmento")
     def leer_tipos_de_segmento() -> JSONResponse:
         return JSONResponse(itinerario.tipos_de_segmento())
+
+    @app.delete("/interno/usuarios/{usuarioId}", status_code=204)
+    def suprimir_datos_de_usuario(usuario_id: UUID = Path(alias="usuarioId")) -> Response:
+        """Orden de borrado de la fase 1 (ADR-0030, ADR-0042): solo desde `identity-access`."""
+        itinerario.suprimir_usuario(usuario_id)
+        return Response(status_code=204)
 
     _quedarse_con(app, _etiquetas(contratos), MODOS[modo])
     return app

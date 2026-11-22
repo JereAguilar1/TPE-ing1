@@ -46,6 +46,7 @@ from trotamundos.servicios.identity_access import (
     consentimiento_buzones,
     custodia_boveda,
     motor_autorizacion_abac,
+    ordenes_de_borrado,
     publicacion,
 )
 
@@ -56,6 +57,7 @@ PAUSA_DEL_PUBLICADOR_S = 0.5
 _registro_de_errores = logging.getLogger(__name__)
 
 DDL = (
+    *ordenes_de_borrado.DDL,
     *auditoria_y_revocacion.DDL,
     *custodia_boveda.DDL,
     *autenticacion_oidc.DDL,
@@ -95,8 +97,11 @@ class IdentityAccess:
         secreto_vale: str | None = None,
         reloj: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
         nuevo_id: Callable[[], UUID] = uuid4,
+        ejecutor_de_borrado: ordenes_de_borrado.EjecutorHttp | None = None,
     ):
         self._configuracion = configuracion or Configuracion.desde_entorno()
+        # Las órdenes de borrado de la fase 1 a los servicios operacionales (ADR-0030, ADR-0042)
+        self._borrado = ejecutor_de_borrado or ordenes_de_borrado.EjecutorHttp()
         self._esquema = esquema
         self._contratos = contratos or contratos_por_omision()
         semilla_kms = os.environ.get("TROTAMUNDOS_KMS_SECRETO")
@@ -446,6 +451,9 @@ class IdentityAccess:
             self._publicar_cambios_de_buzon(con, usuario_id, region, cambios, traceparent)
             con.execute("DELETE FROM buzon WHERE usuario_id = %s", (usuario_id,))
             con.execute("DELETE FROM exportacion_privacidad WHERE usuario_id = %s", (usuario_id,))
+            # Y ordena el borrado en el resto del plano operacional: la orden queda guardada en
+            # esta misma transacción, así que no se pierde aunque un servicio no responda.
+            ordenes_de_borrado.registrar(con, usuario_id, self._borrado.servicios, instante)
             custodia_boveda.destruir_dek(
                 con, usuario_id=usuario_id, actor=str(usuario_id), ahora=instante
             )
@@ -477,7 +485,26 @@ class IdentityAccess:
                 clave,
                 RespuestaGuardada("DELETE /privacidad/cuenta", huella, 202, respuesta),
             )
-            return 202, respuesta
+        self.cumplir_ordenes_de_borrado()  # enseguida; lo que falle, en el trabajo periódico
+        return 202, respuesta
+
+    def cumplir_ordenes_de_borrado(self) -> int:
+        """Envía las órdenes de borrado vencidas; devuelve cuántas se cumplieron."""
+        ahora = self._reloj()
+        with transaccion(self._configuracion.dsn_postgres, self._esquema) as con:
+            pendientes = ordenes_de_borrado.vencidas(con, ahora)
+        cumplidas = 0
+        for orden in pendientes:
+            try:
+                self._borrado.borrar(orden["servicio"], orden["usuario_id"])
+            except ordenes_de_borrado.OrdenNoCumplida as error:
+                with transaccion(self._configuracion.dsn_postgres, self._esquema) as con:
+                    ordenes_de_borrado.postergar(con, orden, error, ahora)
+                continue
+            with transaccion(self._configuracion.dsn_postgres, self._esquema) as con:
+                ordenes_de_borrado.cumplida(con, orden)
+            cumplidas += 1
+        return cumplidas
 
     # --- Operaciones de mantenimiento y emergencia (ADR-0029) --------------------------------
 
@@ -606,6 +633,7 @@ class IdentityAccess:
             await asyncio.sleep(intervalo)
             try:
                 await asyncio.to_thread(self.purgar_vencidos)
+                await asyncio.to_thread(self.cumplir_ordenes_de_borrado)
             except Exception:  # la purga sigue en la próxima vuelta
                 _registro_de_errores.exception("Falló la purga de identity-access")
 

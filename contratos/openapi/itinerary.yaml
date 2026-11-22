@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — itinerary (API interna)
-  version: 1.1.0
+  version: 1.2.0
   description: |
     API REST interna del núcleo del dominio, servida por el módulo `api` de `itinerary`
     (vista de módulos N2). La consumen los BFF y `support-liaison`; no se expone en `api-gateway`.
@@ -18,6 +18,8 @@ info:
       devolver (`400` por un cuerpo o un detalle inválido, `404` por una reserva o un conflicto
       inexistente, `409` por versión o estado). Agregar respuestas es un cambio compatible
       (ADR-0027).
+    - `1.2.0`: `DELETE /interno/usuarios/{usuarioId}`, la orden de borrado de la fase 1 de la
+      supresión (ADR-0030, ADR-0042). Agregar una operación es un cambio compatible (ADR-0027).
 servers:
   - url: https://itinerary.interno
 security:
@@ -276,6 +278,21 @@ paths:
               schema:
                 type: array
                 items: { $ref: 'comun.yaml#/components/schemas/DescriptorTipoDeSegmento' }
+  /interno/usuarios/{usuarioId}:
+    delete:
+      tags: [comando]
+      operationId: suprimirDatosDeUsuario
+      summary: Borra físicamente todos los datos del usuario en este servicio (fase 1 de la supresión)
+      description: |
+        Solo la llama `identity-access` al suprimir una cuenta (`DELETE /privacidad/cuenta`,
+        ADR-0030 fase 1, ADR-0042), por la red interna (mTLS en producción); no la exponen los BFF.
+        Borra en una transacción toda fila con ese `usuario_id` (ADR-0012). Es idempotente: un
+        usuario sin datos también responde `204`.
+      security: []
+      parameters:
+        - { name: usuarioId, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+      responses:
+        '204': { description: Datos del usuario borrados (o no había). }
 components:
   securitySchemes:
     valeInterno:

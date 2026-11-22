@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — virtual-assistant
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Asistente virtual de primer nivel (Opción B de la 2da entrega, RF-B1 y RF-B2): atiende consultas
     de estado, corrige el itinerario cuando el viajero ya cambió una reserva y deriva a la agencia
@@ -19,6 +19,9 @@ info:
 
     La sesión OIDC es la del propio viajero, que el BFF reenvía (ADR-0007, ADR-0028): el asistente
     actúa siempre en su nombre y nunca ve datos de otro usuario. Una sesión ajena responde `404`.
+
+    - `1.1.0`: `DELETE /interno/usuarios/{usuarioId}`, la orden de borrado de la fase 1 de la
+      supresión: el asistente se suma a la lista de ADR-0030, como pide ADR-0040 (ADR-0042).
 servers:
   - url: https://virtual-assistant.interno
     description: Solo para los BFF (las rutas públicas las expone `bff-web`, ADR-0005)
@@ -102,6 +105,22 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: 'comun.yaml#/components/schemas/Problema' }
+
+  /interno/usuarios/{usuarioId}:
+    delete:
+      tags: [conversacion]
+      operationId: suprimirDatosDeUsuario
+      summary: Borra físicamente todos los datos del usuario en este servicio (fase 1 de la supresión)
+      description: |
+        Solo la llama `identity-access` al suprimir una cuenta (`DELETE /privacidad/cuenta`,
+        ADR-0030 fase 1, ADR-0042), por la red interna (mTLS en producción); no la exponen los BFF.
+        Borra en una transacción toda fila con ese `usuario_id` (ADR-0012). Es idempotente: un
+        usuario sin datos también responde `204`. Incluye las sesiones, sus turnos y las disrupciones conocidas.
+      security: []
+      parameters:
+        - { name: usuarioId, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+      responses:
+        '204': { description: Datos del usuario borrados (o no había). }
 
 components:
   securitySchemes:

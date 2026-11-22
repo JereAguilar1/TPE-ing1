@@ -10,8 +10,8 @@ from contextlib import AbstractAsyncContextManager
 from typing import Any, Callable, Mapping, Protocol
 from uuid import UUID
 
-from fastapi import Body, FastAPI, Header
-from fastapi.responses import JSONResponse
+from fastapi import Body, FastAPI, Header, Path
+from fastapi.responses import JSONResponse, Response
 
 from trotamundos.comun.contratos import Contratos
 from trotamundos.comun.errores import Problema, instalar_manejadores
@@ -32,6 +32,8 @@ class SupportLiaisonApi(Protocol):
     def leer_caso(self, usuario_id: UUID, caso_id: UUID) -> dict[str, Any]: ...
 
     def resolver_caso(self, usuario_id: UUID, caso_id: UUID) -> dict[str, Any]: ...
+
+    def suprimir_usuario(self, usuario_id: UUID) -> int: ...
 
 
 def crear_app(servicio: SupportLiaisonApi, contratos: Contratos, secreto_jwt: str,
@@ -64,5 +66,11 @@ def crear_app(servicio: SupportLiaisonApi, contratos: Contratos, secreto_jwt: st
                              authorization: str | None = Header(default=None)) -> JSONResponse:
         usuario_id = usuario_de_sesion(authorization, secreto_jwt)
         return JSONResponse(servicio.resolver_caso(usuario_id, caso_id), media_type=TIPO_DE_MEDIO)
+
+    @app.delete("/interno/usuarios/{usuarioId}", status_code=204)
+    def suprimir_datos_de_usuario(usuario_id: UUID = Path(alias="usuarioId")) -> Response:
+        """Orden de borrado de la fase 1 (ADR-0030, ADR-0042): solo desde `identity-access`."""
+        servicio.suprimir_usuario(usuario_id)
+        return Response(status_code=204)
 
     return app

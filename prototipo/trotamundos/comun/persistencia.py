@@ -226,3 +226,34 @@ def purgar(conexion: psycopg.Connection, ahora: datetime, retencion: timedelta =
     borradas += conexion.execute("DELETE FROM comando_idempotente WHERE creado_en < %s",
                                  (limite,)).rowcount
     return borradas
+
+
+# --- supresión de fase 1 (ADR-0030, ADR-0042) -----------------------------------------------
+
+def borrar_usuario(conexion: psycopg.Connection, usuario_id: UUID | str) -> int:
+    """Borra físicamente, en la transacción de `conexion`, todas las filas del usuario en el
+    esquema del servicio. Por ADR-0012 toda tabla del plano operacional lleva `usuario_id`; las
+    tablas se recorren hasta que ninguna clave foránea lo impida (hijas antes que madres).
+    Devuelve cuántas filas borró. Borrar a alguien que no tiene datos no es un error."""
+    tablas = [f["table_name"] for f in conexion.execute(
+        """SELECT c.table_name FROM information_schema.columns c
+           JOIN information_schema.tables t
+             ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+           WHERE c.table_schema = current_schema() AND c.column_name = 'usuario_id'
+             AND t.table_type = 'BASE TABLE'
+           ORDER BY c.table_name""").fetchall()]
+    borradas, pendientes = 0, tablas
+    for _ in range(len(tablas) + 1):
+        trabadas = []
+        for tabla in pendientes:
+            try:
+                with conexion.transaction():  # un punto de guardado por tabla
+                    borradas += conexion.execute(
+                        sql.SQL("DELETE FROM {} WHERE usuario_id = %s").format(sql.Identifier(tabla)),
+                        (str(usuario_id),)).rowcount
+            except psycopg.errors.ForeignKeyViolation:
+                trabadas.append(tabla)  # una hija todavía la referencia: va en la próxima vuelta
+        if not trabadas:
+            return borradas
+        pendientes = trabadas
+    raise RuntimeError(f"No se pudieron borrar las filas de {pendientes}: claves foráneas en ciclo")

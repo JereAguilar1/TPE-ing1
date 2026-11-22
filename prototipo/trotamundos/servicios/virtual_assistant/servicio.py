@@ -37,6 +37,7 @@ from trotamundos.comun.persistencia import (
     RETENCION,
     RespuestaGuardada,
     bloquear_usuario,
+    borrar_usuario,
     crear_esquema,
     guardar_respuesta,
     huella_de_solicitud,
@@ -252,6 +253,15 @@ class VirtualAssistant:
             raise Problema(400, "Solicitud inválida",
                            "La Idempotency-Key ya se usó con otra solicitud")
         return previa.cuerpo
+
+    # --- supresión de fase 1 (ADR-0030, ADR-0042) ------------------------------------------
+
+    def suprimir_usuario(self, usuario_id: UUID) -> int:
+        """`DELETE /interno/usuarios/{usuarioId}`: borra todas las filas del usuario en el esquema
+        del servicio, en una transacción. Devuelve cuántas borró (idempotente)."""
+        with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
+            bloquear_usuario(conexion, usuario_id)
+            return borrar_usuario(conexion, usuario_id)
 
     # --- trabajo periódico ---------------------------------------------------------------
 

@@ -11,8 +11,8 @@ from contextlib import AbstractAsyncContextManager
 from typing import Any, Callable, Mapping, Protocol
 from uuid import UUID
 
-from fastapi import Body, FastAPI, Header
-from fastapi.responses import JSONResponse
+from fastapi import Body, FastAPI, Header, Path
+from fastapi.responses import JSONResponse, Response
 
 from trotamundos.comun.contratos import Contratos
 from trotamundos.comun.errores import Problema, instalar_manejadores
@@ -34,6 +34,8 @@ class AsistenteApi(Protocol):
 
     def enviar_mensaje(self, usuario_id: UUID, authorization: str, sesion_id: UUID, clave: UUID,
                        cuerpo: Mapping[str, Any]) -> dict[str, Any]: ...
+
+    def suprimir_usuario(self, usuario_id: UUID) -> int: ...
 
 
 def _validar(contratos: Contratos, referencia: str, cuerpo: Any) -> None:
@@ -73,5 +75,11 @@ def crear_app(servicio: AsistenteApi, contratos: Contratos, secreto_jwt: str,
         _validar(contratos, _CUERPO_MENSAJE, cuerpo)
         return JSONResponse(servicio.enviar_mensaje(usuario_id, authorization, sesion_id, clave,
                                                     cuerpo))
+
+    @app.delete("/interno/usuarios/{usuarioId}", status_code=204)
+    def suprimir_datos_de_usuario(usuario_id: UUID = Path(alias="usuarioId")) -> Response:
+        """Orden de borrado de la fase 1 (ADR-0030, ADR-0042): solo desde `identity-access`."""
+        servicio.suprimir_usuario(usuario_id)
+        return Response(status_code=204)
 
     return app

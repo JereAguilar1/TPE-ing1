@@ -35,6 +35,7 @@ from trotamundos.comun.eventos import Evento
 from trotamundos.comun.persistencia import (
     RespuestaGuardada,
     bloquear_usuario,
+    borrar_usuario,
     crear_esquema,
     guardar_respuesta,
     huella_de_solicitud,
@@ -193,6 +194,15 @@ class SupportLiaison:
                 region=self._configuracion.region, id_de_causa=fila["id_de_causa"])],
                 self._contratos)
             return fila
+
+    # --- supresión de fase 1 (ADR-0030, ADR-0042) ------------------------------------------
+
+    def suprimir_usuario(self, usuario_id: UUID) -> int:
+        """`DELETE /interno/usuarios/{usuarioId}`: borra todas las filas del usuario en el esquema
+        del servicio, en una transacción. Devuelve cuántas borró (idempotente)."""
+        with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
+            bloquear_usuario(conexion, usuario_id)
+            return borrar_usuario(conexion, usuario_id)
 
     # --- trabajo periódico ---------------------------------------------------------------
 
