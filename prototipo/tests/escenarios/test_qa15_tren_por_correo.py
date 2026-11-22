@@ -17,8 +17,10 @@ from tests.escenarios.contenedores import (
     Viajero,
     ahora,
     esperar,
+    esperar_seguimiento,
     exigir_contenedores,
     inicio_en_el_panel,
+    notificar_cambio_de_tren,
     texto_utc,
 )
 
@@ -44,3 +46,22 @@ def test_qa15_un_boleto_de_tren_reenviado_llega_al_panel(cliente):
     assert (tramo["tipo"], tramo["referencia"]) == ("tren", "RF03071")
     assert tramo["detalle"] == {"numeroDeTren": "03071", "coche": "5", "asiento": "12A", "anden": "7"}
     assert tramo["inicio"]["lugar"]["nombre"] == "Madrid Atocha"
+
+
+def test_qa15_el_operador_ferroviario_avisa_un_cambio_y_llega_al_panel(cliente):
+    """Paso 3 de la guía: el adaptador del ferrocarril, un complemento de `provider-sync`, sigue el
+    tren por su emisor y su aviso llega al panel (horario y andén nuevos)."""
+    viajero = Viajero(cliente).iniciar_sesion().conectar_reenvio()
+    localizador = ("T" + uuid4().hex.upper())[:6]
+    salida = ahora().replace(microsecond=0) + timedelta(days=12)
+    assert viajero.reenviar_boleto_de_tren(localizador, salida).status_code == 202
+    esperar(lambda: inicio_en_el_panel(viajero, localizador), 60, "el tren en el panel")
+    esperar_seguimiento(localizador, adaptador="adaptador-ferrocarril-simulado")
+
+    nueva = salida + timedelta(hours=2)
+    assert notificar_cambio_de_tren(cliente, localizador, nueva, anden="9").status_code == 202
+    esperar(lambda: inicio_en_el_panel(viajero, localizador) == texto_utc(nueva), 60,
+            "el cambio del operador en el panel")
+    reserva = viajero.reservas()[localizador]
+    assert reserva["segmentos"][0]["detalle"]["anden"] == "9"
+    assert set(reserva["fuentes"]) == {"correo", "proveedor"}

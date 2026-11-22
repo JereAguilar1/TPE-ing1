@@ -187,14 +187,34 @@ def inicio_en_el_panel(viajero: Viajero, localizador: str) -> str | None:
     return reserva["segmentos"][0]["inicio"]["instante"] if reserva else None
 
 
-def esperar_seguimiento(localizador: str, limite_s: float = 90) -> None:
+def esperar_seguimiento(localizador: str, limite_s: float = 90, adaptador: str = ADAPTADOR) -> None:
     """`provider-sync` sigue la reserva desde que consume su `ReservaActualizada`."""
     esperar(lambda: fila("provider_sync", "SELECT 1 FROM reserva_seguida WHERE adaptador_id = %s "
-                                          "AND referencia = %s", ADAPTADOR, localizador),
+                                          "AND referencia = %s", adaptador, localizador),
             limite_s, f"provider-sync sigue {localizador}")
 
 
 # --- la aerolínea -----------------------------------------------------------------------------
+
+def _avisar(cliente: httpx.Client, adaptador: str, notificacion: dict) -> httpx.Response:
+    crudo = json.dumps(notificacion).encode("utf-8")
+    firma = hmac.new(_variable("TROTAMUNDOS_SECRETO_WEBHOOK_PROVEEDOR").encode("utf-8"), crudo,
+                     hashlib.sha256).hexdigest()
+    return cliente.post(f"{PROVIDER_SYNC}/webhooks/proveedor", content=crudo,
+                        headers={"X-Proveedor-Id": adaptador, "X-Firma": firma,
+                                 "Content-Type": "application/json"})
+
+
+def notificar_cambio_de_tren(cliente: httpx.Client, localizador: str, salida: datetime,
+                             anden: str) -> httpx.Response:
+    """El operador ferroviario avisa por *push* un cambio de horario y de andén (OSDM simulado)."""
+    return _avisar(cliente, "adaptador-ferrocarril-simulado", {
+        "eventId": f"osdm-{uuid4()}", "issuedAt": ahora().isoformat(),
+        "bookings": [{"bookingRef": localizador, "carrier": "RF", "trips": [{
+            "trainNumber": "03071", "coach": "5", "seat": "12A", "platform": anden,
+            "origin": {"station": "ATO", "time": salida.isoformat()},
+            "destination": {"station": "BCN", "time": (salida + timedelta(hours=3)).isoformat()}}]}]})
+
 
 def notificar_cambio(cliente: httpx.Client, localizador: str, salida: datetime,
                      emitida: datetime | None = None) -> httpx.Response:
@@ -206,9 +226,4 @@ def notificar_cambio(cliente: httpx.Client, localizador: str, salida: datetime,
             "departure": {"airport": "AEP", "time": salida.isoformat()},
             "arrival": {"airport": "MDZ", "time": (salida + timedelta(hours=2)).isoformat()},
             "statusCode": "HK", "gate": "7"}]}]}
-    crudo = json.dumps(notificacion).encode("utf-8")
-    firma = hmac.new(_variable("TROTAMUNDOS_SECRETO_WEBHOOK_PROVEEDOR").encode("utf-8"), crudo,
-                     hashlib.sha256).hexdigest()
-    return cliente.post(f"{PROVIDER_SYNC}/webhooks/proveedor", content=crudo,
-                        headers={"X-Proveedor-Id": ADAPTADOR, "X-Firma": firma,
-                                 "Content-Type": "application/json"})
+    return _avisar(cliente, ADAPTADOR, notificacion)
