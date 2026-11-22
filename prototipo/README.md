@@ -113,12 +113,13 @@ prototipo/
 │           └── servicio.py           # arma el elemento sin estado propio
 │       ├── provider_sync/           # sincronización con proveedores de viaje (paso 10, ADR-0006, QA-10)
 │           ├── interfaz_de_adaptador.py      # puerto AdaptadorDeProveedor v1.x (plugins/adaptador.yaml)
-│           ├── complementos/                 # adaptador NDC de aerolínea simulada (JSON y XML)
+│           ├── complementos/                 # adaptadores simulados: aerolínea (NDC, JSON y XML) y ferrocarril (OSDM)
 │           ├── catalogo_adaptadores.yaml     # manifiesto declarativo de adaptadores registrados
 │           ├── registro_de_adaptadores.py    # carga por configuración, verifica SemVer y valida salidas
 │           ├── seguimiento.py                # índice (adaptador, referencia) → (usuarioId, reservaId)
 │           ├── receptor_de_notificaciones.py # firma HMAC-SHA256 y decodificación de webhooks
 │           ├── programador.py                # sondeo periódico de proveedores con sondeo: true
+│           ├── proteccion.py                 # cortacircuitos, mamparo, cuota y cola_pendientes (ADR-0024)
 │           ├── detector_de_disrupciones.py   # expande disrupciones a usuarios afectados con seguimiento
 │           ├── publicacion.py                # outbox: ReservaObservada (P1/P2) y DisrupcionDetectada (P1)
 │           ├── api.py                        # POST /webhooks/proveedor (provider-sync-webhooks.yaml)
@@ -258,6 +259,9 @@ un ADR; si alguna llegara a afectar a un driver, se promueve a un ADR propio.
 | nginx de `app-web` resuelve `bff-web` e `identity-access` con el DNS de Docker en cada pedido | Con nombres fijos los resolvía una sola vez al arrancar: si `make servicios-arriba` recreaba esos contenedores, la página quedaba hablando con IP viejas (el inicio de sesión daba `404`) | ADR-0005 |
 | El validador estructural de `booking-extraction` compara el inicio y el fin de un tramo con los límites del modelo (`limites_del_extremo`): un boleto abierto (`precision: dia`) cubre el día local entero | Comparaba los instantes crudos y rechazaba todo boleto abierto, que empieza y termina el mismo día. Apareció con el extractor del tren: los vuelos nunca son abiertos | ADR-0011; QA-15 |
 | El extractor de boletos de tren usa códigos de estación propios (`esquemaDeCodigo: interno`) con coordenadas, y el emisor `ferrocarril:<operador>` | No hay un código universal de estaciones (iteración 2, paso 7); las coordenadas permiten agrupar el tren con un hotel o un vuelo de la misma ciudad | ADR-0011; RF-07 |
+| La protección de ADR-0024 se aplica al sondeo de `provider-sync`, que es donde el servicio llama al proveedor (los *webhooks* traen el dato). El sondeo usa el cupo de reconciliación (15 %); un sondeo que no pasa queda como **un** pendiente por proveedor, porque el siguiente consulta desde el último exitoso | El cupo «vivo» (60 %) y el de viajes futuros (25 %) quedan para las consultas por reserva (`obtenerReserva`), que el recorte no usa | ADR-0024; RF-05 |
+| El cortacircuitos abre con 5 fallas transitorias seguidas (además del 50 % de la ventana), sin distinguir *timeouts* de `5xx` | El puerto del adaptador informa ambos como `ProveedorNoDisponible`; ADR-0024 pide 5 *timeouts* seguidos, y contar todas las fallas transitorias es más estricto | ADR-0024 |
+| El adaptador ferroviario simulado habla JSON al estilo OSDM, con códigos de estación propios y coordenadas, y sigue los emisores `ferrocarril:RF` y `ferrocarril:TA` (los mismos del extractor del tren) | Así un tren llegado por correo lo sigue el operador sin configuración extra | QA-15; ADR-0006 |
 | La sesión OIDC de las operaciones públicas se verifica en `comun/sesion.py` (`HS256` con `TROTAMUNDOS_JWT_SECRETO`, compartido por `.env`); la usan `identity-access` y la API de filtros de `mail-ingest` | El token lo emite `identity-access`. En producción cada servicio verificaría con la clave pública de `identity-access` | ADR-0007 |
 | El alias de reenvío lo genera `identity-access` al conectar el buzón y lo devuelve en `POST /buzones`; `mail-ingest` lo recibe por `EstadoDeBuzonCambiado` | ADR-0035 dice que lo asigna `mail-ingest`, pero el contrato `identity-access.yaml` lo devuelve al conectar el buzón, y el contrato manda (AGENTS.md). Lo precisa [ADR-0041](../docs/03-adr/ADR-0041-alias-de-reenvio-generado-por-identity-access.md) | ADR-0035; ADR-0041; `identity-access.yaml` |
 | AsyncAPI 1.4.0: `EstadoDeBuzonCambiado` suma `via`, `proveedor`, `aliasReenvio` y `correoDelTitular`, que viajan solo cuando el buzón pasa a `Activo` | `mail-ingest` necesita saber cómo atender cada buzón y, para un reenvío, con qué correo comparar el remitente (ADR-0035). Acordado con el grupo frente a un endpoint interno en `identity-access`: un solo mecanismo y sin llamadas sincrónicas. En los demás cambios alcanza con `buzonId`, así el correo no viaja de más | ADR-0004; ADR-0027 (cambio compatible); ADR-0035 |
@@ -383,7 +387,7 @@ construido](#diseñado-y-no-construido).
 | [0021](../docs/03-adr/ADR-0021-estrategia-autoescalado.md) Autoescalado y lectura/escritura separadas | 🟨 | `itinerary-lectura` e `itinerary-escritura` como modos del mismo código (`TROTAMUNDOS_MODO`). El autoescalado es de la plataforma de producción ➖ |
 | [0022](../docs/03-adr/ADR-0022-despliegue-progresivo-y-reversion.md) Entrega canaria y *expand/contract* | ➖ | Requiere varias regiones y tráfico real |
 | [0023](../docs/03-adr/ADR-0023-particionamiento-y-crecimiento.md) Particionamiento, compactación y archivo frío | 🟨 | La clave de partición `usuario_id` está en toda tabla y en el *broker*. Los 64 *buckets*, la compactación y el archivo frío ➖ (volumen de producción); la consolidación ya es indiferente a la compactación (probado) |
-| [0024](../docs/03-adr/ADR-0024-cortacircuitos-reintentos-y-cuotas.md) Cortacircuitos, cola persistente y cuotas | 🟨 | Espera de `5 s × 2^n` con tope de 15 min en la cola de `mail-ingest` (paso 8) y en la derivación a la agencia durante 24 h (paso 12). Cortacircuitos, mamparos y cuotas de `provider-sync` quedan fuera del recorte del paso 10 (ver «Para completar el 100 %») |
+| [0024](../docs/03-adr/ADR-0024-cortacircuitos-reintentos-y-cuotas.md) Cortacircuitos, cola persistente y cuotas | 🟨 | Espera de `5 s × 2^n` con tope de 15 min en la cola de `mail-ingest` (paso 8) y en la derivación a la agencia durante 24 h (paso 12). Paso 10 completo: en `provider-sync`, cortacircuitos de ventana deslizante, mamparo de 50 llamadas, cuota al 80 % repartida por prioridad con freno ante `429`, y `cola_pendientes` de 24 h con espera y variación (prueba de inyección de falla QA-06). En `mail-ingest` y `support-liaison`, solo la espera |
 | [0025](../docs/03-adr/ADR-0025-observabilidad-sli-slo-presupuesto-error.md) Observabilidad y presupuesto de error | 🟨 | `traceparent` e `idDeCorrelacion` se propagan en HTTP y eventos. OpenTelemetry y SLO ➖: no están en el plan |
 | [0026](../docs/03-adr/ADR-0026-modelo-costo-y-camino-escalonado.md) Modelo de costo | ➖ | Es una decisión de operación, no de código |
 | [0027](../docs/03-adr/ADR-0027-versionado-y-evolucion-de-contratos.md) Evolución compatible de contratos | 🟨 | Los contratos evolucionan con SemVer y cambios compatibles (`itinerary.yaml` 1.1.0, `bff-web.yaml` 1.1.0, `identity-access.yaml` 1.2.0, `mail-ingest-filtros.yaml` 1.1.0, `support-liaison.yaml` 1.1.0, `virtual-assistant.yaml` 1.0.0, AsyncAPI 1.5.1), el cargador de `booking-extraction` y `provider-sync` verifica `apiContrato` (`1.x`) y `version` SemVer en el arranque, y la API pública sirve `application/vnd.trotamundos.v1+json` (paso 11) |
@@ -416,15 +420,15 @@ implementa. La columna «Prioridad» ordena lo que falta según el recorte acord
 | # | Paso | Trazabilidad | Prioridad | Estado | Responsable |
 |---|---|---|---|---|---|
 | 1 | Base: tecnología, infraestructura, validación contra `contratos/` | ADR-0009, ADR-0036 | — | ✅ | Francisco Lozano |
-| 2 | Registro de tipos de segmento y modelos canónicos | ADR-0010, ADR-0011 | — | ✅ | Francisco Lozano |
-| 3 | `itinerary`: agregado `Reserva` y fusión determinista | ADR-0010, ADR-0013 | — | ✅ | Francisco Lozano |
-| 4 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | — | ✅ | Francisco Lozano |
-| 5 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | — | ✅ | Francisco Lozano |
-| 6 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | — | ✅ | Francisco Lozano |
-| 7 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | — | ✅ | Jeremias Aguilar |
-| 8 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | — | ✅ | Francisco Lozano |
-| 9 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | Sí o sí | ✅ recorte | Juan Pardo |
-| 10 | `provider-sync`: adaptador simulado, cortacircuitos, disrupciones | QA-10, ADR-0024 | Si sobra (reducido) | ✅ reducido: adaptador simulado, `ReservaObservada` y `DisrupcionDetectada` | Ivo Iriarte |
+| 1 | Registro de tipos de segmento y modelos canónicos | ADR-0010, ADR-0011 | — | ✅ | Francisco Lozano |
+| 2 | `itinerary`: agregado `Reserva` y fusión determinista | ADR-0010, ADR-0013 | — | ✅ | Francisco Lozano |
+| 3 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | — | ✅ | Francisco Lozano |
+| 4 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | — | ✅ | Francisco Lozano |
+| 5 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | — | ✅ | Francisco Lozano |
+| 6 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | — | ✅ | Jeremias Aguilar |
+| 7 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | — | ✅ | Francisco Lozano |
+| 8 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | Sí o sí | ✅ recorte | Juan Pardo |
+| 10 | `provider-sync`: adaptador simulado, cortacircuitos, disrupciones | QA-10, ADR-0024 | Si sobra (reducido) | ✅ completo: el reducido, más la protección de ADR-0024 y el adaptador ferroviario | Ivo Iriarte (reducido), Francisco Lozano (completo) |
 | 11 | BFF y `api-gateway`: panel, límite de tasa, plazos | QA-02, ADR-0020 | Debería (reducido) | ✅ reducido: solo `bff-web` | Ivo Iriarte |
 | 12 | `notification`, `support-liaison` y `preferences` mínimo | UC-5, UC-7, ADR-0034 | Sí o sí (reducido) | ✅ reducido: solo `support-liaison` | Francisco Lozano |
 | 13 | `sharing`: compartición y `ResumenPublicable` | QA-12, ADR-0028 | Completar al 100 % | ⬜ |  |
@@ -466,15 +470,14 @@ en este orden (primero lo que termina algo ya empezado, después lo nuevo):
 
 | Orden | Paso | Qué falta respecto de la versión reducida |
 |---|---|---|
-| 1 | 10 | Cortacircuitos, reintentos y cuotas (ADR-0024), y el adaptador de un proveedor ferroviario (guía de extensión de QA-15, paso 3) |
-| 2 | 14 | El modelo dimensional completo (ADR-0016), la supresión coordinada de fase 1 en todo el plano operacional (incluidos `support-liaison` y el asistente, ADR-0040) y la de fase 2 (ADR-0030) |
-| 3 | 12 | `notification` y `preferences` |
-| 4 | 11 | `bff-mobile` y `api-gateway`, con límite de tasa, plazos y modos de degradación, incluido el del asistente (ADR-0020, ADR-0040) |
-| 5 | 17 | Pruebas de contrato con Schemathesis y el escenario de QA-05 |
-| 6 | 13 | `sharing`: compartición con designados y en redes (ADR-0028) |
-| 7 | 16 | Multirregión: región primaria, testigo transregional y conmutación (ADR-0018). Una versión mínima (dos bases y una conmutación) alcanza para sostener ASR-3 |
-| 8 | 20 | Más pantallas que el panel y el chat |
-| 9 | 9 | Más extractores de correo, para otros remitentes y formatos (el de vuelos y el de boletos de tren ya están) |
+| 1 | 14 | El modelo dimensional completo (ADR-0016), la supresión coordinada de fase 1 en todo el plano operacional (incluidos `support-liaison` y el asistente, ADR-0040) y la de fase 2 (ADR-0030) |
+| 2 | 12 | `notification` y `preferences` |
+| 3 | 11 | `bff-mobile` y `api-gateway`, con límite de tasa, plazos y modos de degradación, incluido el del asistente (ADR-0020, ADR-0040) |
+| 4 | 17 | Pruebas de contrato con Schemathesis y el escenario de QA-05 |
+| 5 | 13 | `sharing`: compartición con designados y en redes (ADR-0028) |
+| 6 | 16 | Multirregión: región primaria, testigo transregional y conmutación (ADR-0018). Una versión mínima (dos bases y una conmutación) alcanza para sostener ASR-3 |
+| 7 | 20 | Más pantallas que el panel y el chat |
+| 8 | 9 | Más extractores de correo, para otros remitentes y formatos (el de vuelos y el de boletos de tren ya están) |
 
 ### Matriz código ↔ ADR
 
@@ -525,6 +528,8 @@ paso; el paso 21 la revisa entera. Las rutas son relativas a `prototipo/`.
 | `app_web/publico/` (`index.html`, `app.js`, `estilos.css`, `locales/es-AR.json`), `app_web/nginx.conf`; servicio `app-web` en `docker-compose.yml` | RF-09 (panel por viaje); RF-B1 y RF-B2 (chat con confirmación); ADR-0005 (solo operaciones de `bff-web.yaml`); ADR-0032 (textos en catálogo, fechas en la zona del lugar); QA-15 (presentación por descriptor) | `tests/app_web/test_app_web.py` (contrato, catálogo y recorrido por nginx contra los contenedores) |
 | `servicios/booking_extraction/complementos/reserva_simulada.py`, `servicios/provider_sync/complementos/aerolinea_simulada.py` (coordenadas de aeropuertos); `servicios/itinerary/viajes/` (agrupación) | RF-07 (agrupación por viaje con reservas de fuentes distintas); iteración 2 §5.1 | `tests/escenarios/test_rf07_agrupacion.py` (contra los contenedores) |
 | `servicios/booking_extraction/complementos/boleto_tren_simulado.py` y su entrada en `comun/catalogo_extractores.yaml`; `validador_canonico.py` (boletos abiertos) | QA-15 (paso 4 de la guía de extensión: un extractor más, sin cambios en el servicio); QA-11 sobre su corpus; RF-04 (su remitente entra solo al catálogo de `mail-ingest`); ADR-0006; ADR-0011 | `tests/booking_extraction/test_extractor_tren.py`, `tests/escenarios/test_qa15_tren_por_correo.py` (contra los contenedores) |
+| `servicios/provider_sync/proteccion.py`, `programador.py` (sondeo protegido) | ADR-0024 (cortacircuitos de ventana deslizante, mamparo de 50, cuota al 80 % repartida por prioridad con freno ante `429` y drenaje ≤ 50 %, `cola_pendientes` de 24 h con espera `5 s × 2^n` y variación ±30 %); QA-06 | `tests/provider_sync/test_proteccion.py` (incluye la inyección de falla de la confirmación de ADR-0024) |
+| `servicios/provider_sync/complementos/ferrocarril_simulado.py` y su entrada en `catalogo_adaptadores.yaml` | QA-15 (paso 3 de la guía de extensión: un adaptador más, sin cambios en `provider-sync`); QA-10; ADR-0006; ADR-0017 (suite de conformidad con grabaciones) | `tests/provider_sync/test_conformidad_ferrocarril.py`, `tests/escenarios/test_qa15_tren_por_correo.py` (contra los contenedores) |
 
 ### Diseñado y no construido
 
@@ -537,9 +542,9 @@ apartado lo dice explícitamente para que no se lea como un faltante. Se complet
 | Inicio de sesión OIDC real desde el navegador (redirección al proveedor de identidad con PKCE) | [ADR-0007](../docs/03-adr/ADR-0007-identidad-y-comparticion.md), `identity-access.yaml` | El prototipo simula el proveedor de identidad: la página manda el código simulado (`oidc:<correo>:<región>`) |
 | `support-liaison` como consumidor de `DisrupcionDetectada` y `ReservaCancelada` | AsyncAPI (`eventos-de-dominio.yaml`, `x-consumidores`), iteración 2 §5.10 | El recorte del paso 12 construye solo `POST /casos`. El diseño no detalla qué hace `support-liaison` con esos eventos; los casos por una disrupción los abre hoy el asistente, con el `disrupcionId` como `idDeCausa` (ADR-0039) |
 | Renombrar un viaje | Iteración 2 §5.1 («el usuario puede renombrarlo») | Ningún contrato de la 1ra entrega tiene la operación (`itinerary.yaml`, `bff-web.yaml`): habría que agregarla a los dos y a `app-web`. El título se deriva del lugar principal del viaje |
+| Protección de ADR-0024 compartida entre réplicas: cortacircuitos y cuota distribuidos por `(proveedor, región)`, y cortacircuitos y mamparo en `mail-ingest` y `support-liaison` | [ADR-0024](../docs/03-adr/ADR-0024-cortacircuitos-reintentos-y-cuotas.md) | El prototipo corre una réplica por servicio: el estado de la protección de `provider-sync` vive en memoria. `mail-ingest` y `support-liaison` tienen solo la espera con reintentos |
 | Escalado en ≤ 3 min y 9.000 peticiones/s sostenidas 30 min, con 450 correos/s (QA-04) | [ADR-0020](../docs/03-adr/ADR-0020-contrapresion-y-sobrecarga.md), [ADR-0021](../docs/03-adr/ADR-0021-estrategia-autoescalado.md), [vista de despliegue N2](../docs/04-vistas/vista-despliegue-nivel-2.md) | Docker Compose no escala réplicas solo y las cifras de producción no se buscan (ADR-0034). El paso 17 demuestra el mecanismo a escala de prototipo: ráfaga sin pérdidas y panel respondiendo |
 | Los tramos de QA-01 que no son del sistema: la fuente avisa a Trotamundos (60 s) y la notificación al viajero (parte de los 60 s finales) | [Presupuesto de frescura](../docs/01-analisis-inicial/07-supuestos-y-carga-derivada.md#presupuesto-de-frescura-5-minutos) | El primero depende del proveedor; `notification` está en «Para completar el 100 %». El escenario mide hasta que el cambio se ve en el panel de `bff-web` |
-| Adaptador de proveedor ferroviario (guía de extensión de QA-15, paso 3) | [Guía de extensión](../docs/02-proceso-add/iteracion-4/guias-de-extension.md), [ADR-0006](../docs/03-adr/ADR-0006-capa-de-anticorrupcion.md) | El recorte del paso 10 construye el adaptador de aerolínea simulada; un adaptador ferroviario es otro complemento en `provider_sync/complementos/` sin tocar servicios de dominio |
 | Aviso al viajero cuando cambia un campo relevante del tren (`camposRelevantes`: horario, andén) | [Guía de extensión](../docs/02-proceso-add/iteracion-4/guias-de-extension.md), descriptor `tren.v1` | `notification` está en «Para completar el 100 %». El ícono y las etiquetas del tren sí están: `app-web` los toma del descriptor y del catálogo (paso 20) |
 | Adaptador de modelo de lenguaje del asistente, con redacción de datos personales y vuelta a las reglas | [ADR-0037](../docs/03-adr/ADR-0037-interpretacion-de-intenciones-del-asistente.md), [vista de módulos del asistente](../docs/04-vistas/vista-modulos-asistente.md) (`complementos/`) | Lo decidió así ADR-0037: el prototipo es determinista y no necesita secretos ni costo por mensaje. Es un complemento detrás del mismo puerto |
 | Catálogos del asistente en otros idiomas | [ADR-0032](../docs/03-adr/ADR-0032-internacionalizacion-y-localizacion.md), ADR-0037 | El prototipo trae solo español (ADR-0037); otro idioma es otro par de archivos en `catalogos/` |
@@ -548,7 +553,6 @@ apartado lo dice explícitamente para que no se lea como un faltante. Se complet
 | Modo sombra, métricas de correcciones de banda alta, panel/alarma y exportación OpenTelemetry de calidad | ADR-0015, ADR-0035 | El paso 9 recortado demuestra un extractor, bandas y degradación con corpus; conserva contadores y huellas locales, sin agregar una plataforma de observabilidad |
 | Aviso al viajero y formulario de carga asistida para `ExtraccionNoReconocida` | ADR-0035; `notification` y clientes | El paso 9 publica el evento seguro con borrador cuando hay candidatos válidos estructuralmente; `notification` no entra en el recorte del paso 12 y no se construye un cliente extra |
 | `bff-mobile`, `api-gateway`, límite de tasa (cubeta de fichas 60 req/min) y presupuesto de plazo propagado (`X-Deadline-Ms`) (paso 11) | [ADR-0005](../docs/03-adr/ADR-0005-capa-de-clientes-bff.md), [ADR-0019](../docs/03-adr/ADR-0019-cache-camino-lectura-arranque-movil.md), [ADR-0020](../docs/03-adr/ADR-0020-contrapresion-y-sobrecarga.md), `contratos/openapi/bff-mobile.yaml`, `contratos/openapi/api-gateway.yaml` | Recorte del paso 11: para la demostración web y la Opción B alcanza con `bff-web` (ver «Para completar el 100 %») |
-| Módulo `proteccion` de `provider-sync`: mamparo de 50 conexiones, cortacircuitos de ventana deslizante (`≤ 25 s`), `cola_pendientes` persistente de 24 h y limitador de cuota al 80 % (paso 10) | [ADR-0024](../docs/03-adr/ADR-0024-cortacircuitos-reintentos-y-cuotas.md), [vista de adaptadores](../docs/04-vistas/vista-modulos-adaptadores.md) | Recorte del paso 10: el paso reducido construye el anfitrión `provider-sync`, el adaptador simulado, la suite de conformidad (`QA-10`) y la publicación de `ReservaObservada` y `DisrupcionDetectada` (ver «Para completar el 100 %») |
 | Historial SCD tipo 2 de `dim_proveedor` y trabajo quincenal de compactación física Parquet de fase 2 (paso 14) | [ADR-0016](../docs/03-adr/ADR-0016-modelo-dimensional-analitico.md), [ADR-0030](../docs/03-adr/ADR-0030-auditoria-y-supresion-datos-personales.md), `contratos/analitica/modelo-dimensional.sql` | Recorte del paso 14: `event-pipeline` instala `modelo-dimensional.sql`, retiene eventos crudos con seudónimo, materializa hechos/dimensiones, excluye al instante en `lista_supresion_analitica` y verifica el aislamiento de `QA-09` (ver «Para completar el 100 %») |
 
 ### Verificación del paso 9
