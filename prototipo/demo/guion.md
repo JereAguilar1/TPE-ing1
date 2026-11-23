@@ -79,7 +79,7 @@ existían, como preveía el punto de extensión de la iteración 4 (ADR-0034, CO
 
 ## 4. Pico de disrupción sin pérdidas — ASR-2 / QA-04 (1,5 min)
 
-- Mostrar en GitHub la salida del escenario de QA-04: 200 correos (cada uno dos veces) y 200
+- Mostrar en GitHub la salida del escenario de QA-04: 200 reenvíos (100 reservas, cada correo dos veces) y 200
   avisos del proveedor en desorden, mientras 6 lectores consultan el panel: cero actualizaciones
   perdidas, ninguna duplicada, el aviso viejo no pisa al nuevo, y el panel con p95 ≈ 130 ms
   (el objetivo con sobrecarga es ≤ 1.500 ms).
@@ -169,7 +169,7 @@ restart api-gateway`. El *gateway* no devuelve solo el tráfico a una región qu
 - **¿Y lo que llegó por correo si cae AM?** No está en EU: el prototipo no construye la replicación
   asíncrona continua. ADR-0018 lo acepta para la ingesta automática porque la fuente conserva el
   mensaje y la reconciliación lo vuelve a traer de forma idempotente; el `RPO = 0` es para lo que el
-  viajero confirmó a mano, y eso sí está.
+  viajero confirmó a mano, pero el escenario del prototipo solo verifica altas y bajas de reservas creadas manualmente. Una confirmación o edición de una reserva ingerida necesita además replicar su estado previo; esa garantía completa queda sin construir.
 - **¿Cómo se comparte un viaje (QA-12)?** `sharing` (paso 13): designados con cuenta e invitados con
   código de un solo uso, con la decisión ABAC en `identity-access` y un vale firmado de 60 s; todo
   acceso no permitido es el mismo `404` (ADR-0028).

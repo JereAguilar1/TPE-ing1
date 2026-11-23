@@ -17,12 +17,23 @@ from trotamundos.comun.errores import Problema
 def usuario_de_sesion(authorization: str | None, secreto: str) -> UUID:
     """El usuario de `Authorization: Bearer <token>`; `401` si falta, no valida o venció. Un
     token de invitado (ADR-0028) no es de un usuario con cuenta, y también responde `401`."""
+    try:
+        return UUID(sujeto_de_sesion(authorization, secreto))
+    except ValueError as error:
+        raise Problema(401, "No autenticado") from error
+
+
+def sujeto_de_sesion(authorization: str | None, secreto: str) -> str:
+    """Sujeto firmado de una sesión, incluso de invitado; no concede acceso a recursos."""
     if not authorization or not authorization.startswith("Bearer "):
         raise Problema(401, "No autenticado")
     token = authorization.removeprefix("Bearer ").strip()
     try:
         datos = jwt.decode(token, secreto, algorithms=["HS256"])
-        return UUID(str(datos["sub"]))
+        sujeto = datos["sub"]
+        if not isinstance(sujeto, str) or not sujeto:
+            raise ValueError("Falta el sujeto de la sesión")
+        return sujeto
     except (jwt.InvalidTokenError, KeyError, ValueError) as error:
         raise Problema(401, "No autenticado") from error
 

@@ -123,6 +123,39 @@ async def test_un_error_transitorio_se_reintenta_sin_perder_el_mensaje(bd, servi
     assert len(intentos) == 2 and intentos[0] == intentos[1]
 
 
+@pytest.mark.parametrize("conservar", [True, False])
+@pytest.mark.parametrize("valor,cabeceras", [
+    (b"no es json", [("usuarioId", b"-" * 36)]),
+    (b"{}", [("tipo", None), ("usuarioId", None)]),
+    (None, [("tipo", b"ReservaExtraida"), ("usuarioId", None)]),
+])
+async def test_un_mensaje_mal_formado_no_traba_la_particion(
+        bd, servidores, carriles, conservar, valor, cabeceras):
+    topico = carriles[Carril.P2][0]
+    productor = AIOKafkaProducer(bootstrap_servers=servidores)
+    await productor.start()
+    try:
+        await productor.send_and_wait(topico, valor, key=b"invalido", partition=0,
+                                       headers=cabeceras)
+        clave, valor, cabeceras = _conflicto(USUARIO_A, 1).a_kafka()
+        await productor.send_and_wait(topico, valor, key=clave, headers=cabeceras, partition=0)
+    finally:
+        await productor.stop()
+    vistos = []
+    consumidor = await _consumidor(bd, servidores, carriles, vistos.append,
+                                   conservar_contenido_rechazado=conservar)
+    try:
+        await _hasta_procesar(consumidor, 2)
+    finally:
+        await consumidor.detener()
+    assert len(vistos) == 1
+    with conectar(*bd) as conexion:
+        [rechazado] = conexion.execute("SELECT * FROM evento_rechazado").fetchall()
+    assert rechazado["usuario_id"] is None
+    if not conservar:
+        assert rechazado["cabeceras"] == {} and rechazado["valor"] is None
+
+
 async def test_p3_se_puede_pausar(bd, servidores, carriles):
     await _producir(servidores, carriles[Carril.P3][0], _conflicto(USUARIO_A, 3))
     pausado = {"si": True}

@@ -54,7 +54,7 @@ class Atras:
 @pytest.fixture
 def armado(contratos):
     atras, reloj = Atras(), Reloj()
-    gateway = ApiGateway(contratos=contratos, secreto_jwt=SECRETO, urls=URLS,
+    gateway = ApiGateway(contratos=contratos, secreto_jwt=SECRETO, urls=dict(URLS),
                          transporte=httpx.MockTransport(atras), reloj=reloj)
     with TestClient(gateway.app()) as cliente:
         yield cliente, atras, gateway, reloj
@@ -108,6 +108,41 @@ def test_propaga_plazo_traza_cuerpo_y_consulta(armado):
     cliente.get("/panel", headers={**sesion(), "traceparent": "inventada"})
     creada = atras.pedidos[-1].headers["traceparent"]
     assert creada != "inventada" and creada.startswith("00-") and len(creada) == 55
+
+
+def test_el_cliente_no_puede_imponer_el_plazo_ni_el_modo(armado):
+    cliente, atras, _, _ = armado
+    respuesta = cliente.get("/panel", headers={**sesion(), "x-deadline-ms": "999999",
+                                               "x-modo-operativo": "DisrupcionMasiva"})
+    assert respuesta.status_code == 200
+    assert atras.pedidos[-1].headers.get_list("x-deadline-ms") == ["800"]
+    assert atras.pedidos[-1].headers.get_list("x-modo-operativo") == ["Normal"]
+
+
+def test_el_invitado_pasa_a_sharing_pero_no_a_operaciones_de_usuario(armado):
+    cliente, atras, gateway, _ = armado
+    gateway._urls["sharing"] = "http://sharing"
+    cabeceras = sesion("invitado:designado@ejemplo.com")
+    respuesta = cliente.get(f"/comparticiones/{USUARIO}", headers=cabeceras)
+    assert respuesta.status_code == 200
+    assert atras.pedidos[-1].url.host == "sharing"
+    assert atras.pedidos[-1].headers["authorization"] == cabeceras["Authorization"]
+    for metodo, ruta in [("GET", "/panel"), ("GET", f"/viajes/{USUARIO}/comparticiones"),
+                          ("POST", "/reservas"), ("DELETE", "/privacidad/cuenta")]:
+        assert cliente.request(metodo, ruta, headers=cabeceras).status_code == 401
+    assert len(atras.pedidos) == 1
+
+
+@pytest.mark.parametrize("vencido,firma", [(True, SECRETO), (False, "otra-clave-de-prueba-32-bytes!!!!")])
+def test_un_token_de_invitado_invalido_no_llega_a_sharing(armado, vencido, firma):
+    cliente, atras, gateway, _ = armado
+    gateway._urls["sharing"] = "http://sharing"
+    token = jwt.encode({"sub": "invitado:designado@ejemplo.com",
+                        "exp": datetime.now(timezone.utc) + timedelta(hours=-1 if vencido else 1)},
+                       firma, algorithm="HS256")
+    assert cliente.get(f"/comparticiones/{USUARIO}",
+                       headers={"Authorization": f"Bearer {token}"}).status_code == 401
+    assert atras.pedidos == []
 
 
 def test_negocia_la_version_de_representacion(armado):

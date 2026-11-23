@@ -102,6 +102,8 @@ def test_cuenta_suprimida_se_particiona_por_seudonimo():
         (b"[]", [("tipo", b"CuentaSuprimida")]),  # JSON válido, pero no un objeto
         (b"\xff", [("tipo", b"ReservaExtraida")]),  # cuerpo que no es UTF-8
         (b"{}", [("tipo", b"\xff")]),  # cabecera que no es UTF-8
+        (b"{}", [("tipo", None)]),  # Kafka admite valores de cabecera nulos
+        (None, [("tipo", b"ReservaExtraida")]),  # tombstone de Kafka, no evento de dominio
     ],
 )
 def test_un_mensaje_mal_formado_se_rechaza(valor, cabeceras):

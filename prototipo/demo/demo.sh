@@ -13,7 +13,6 @@ PROTOTIPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROTOTIPO"
 PY=".venv/bin/python"
 BFF="http://localhost:18108"
-SERVICIOS="itinerary-escritura itinerary-lectura identity-access mail-ingest support-liaison virtual-assistant booking-extraction bff-web provider-sync event-pipeline app-web"
 
 titulo() { printf '\n\033[1;36m== %s ==\033[0m\n' "$1"; }
 pausa()  { read -r -p $'\033[2m[Enter para seguir]\033[0m ' _; }
@@ -36,7 +35,7 @@ echo "  correo: $CORREO   (con este correo se entra a http://localhost:18111)"
 pausa
 
 titulo "3. Llegan las reservas"
-echo "  Un vuelo, un hotel y la vuelta llegan por correo reenviado al alias del viajero"
+echo "  La ida y la vuelta llegan por correo reenviado al alias del viajero"
 echo "  (mail-ingest → booking-extraction → itinerary); el hotel se carga a mano por bff-web,"
 echo "  y el boleto de tren llega por correo y lo lee su propio extractor (QA-15)."
 "$PY" demo/cargar_viajes.py "$CORREO" | sed 's/^/  /'
@@ -107,6 +106,6 @@ pausa
 echo -e "\n  Abrí http://localhost:18111 e ingresá con $CORREO para ver el panel y la conversación."
 if [[ "${1:-}" == "--bajar" ]]; then
   titulo "Bajando solo los servicios (la base y el broker quedan)"
-  # shellcheck disable=SC2086
-  docker compose rm -sf $SERVICIOS
+  mapfile -t servicios < <(docker compose config --services | grep -vxE 'postgres|postgres-eu|broker')
+  docker compose rm -sf "${servicios[@]}"
 fi

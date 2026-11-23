@@ -117,13 +117,16 @@ class Evento:
         return self.clave_de_particion.encode(), valor, cabeceras
 
     @classmethod
-    def desde_kafka(cls, valor: bytes, cabeceras: list[tuple[str, bytes]]) -> "Evento":
+    def desde_kafka(cls, valor: bytes | None,
+                    cabeceras: list[tuple[str, bytes | None]]) -> "Evento":
         """Reconstruye el evento.
 
         Lanza `ErrorDeContrato` ante cualquier mensaje mal formado (sin `tipo`, con cabeceras que
         no son UTF-8 o con una carga que no es un objeto JSON), para que el consumidor lo descarte
         con un solo tipo de error en lugar de caerse.
         """
+        if any(v is None for k, v in cabeceras if k in _CABECERAS):
+            raise ErrorDeContrato(_REFERENCIA_SOBRE, ["una cabecera del sobre es nula"])
         try:
             sobre = {k: v.decode() for k, v in cabeceras if k in _CABECERAS}
         except UnicodeDecodeError as error:
@@ -132,7 +135,7 @@ class Evento:
             raise ErrorDeContrato(_REFERENCIA_SOBRE, ["el mensaje no trae la cabecera 'tipo'"])
         try:
             carga = json.loads(valor)
-        except ValueError as error:  # incluye UnicodeDecodeError
+        except (ValueError, TypeError) as error:  # incluye UTF-8 inválido y valor Kafka nulo
             raise ErrorDeContrato(_REFERENCIA_SOBRE, [f"la carga no es JSON: {error}"]) from error
         if not isinstance(carga, dict):
             raise ErrorDeContrato(_REFERENCIA_SOBRE, ["la carga no es un objeto JSON"])

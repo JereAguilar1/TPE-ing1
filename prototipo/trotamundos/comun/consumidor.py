@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from typing import Any, Callable, Mapping
+from uuid import UUID
 
 from aiokafka import AIOKafkaConsumer
 from psycopg.types.json import Jsonb
@@ -129,7 +129,7 @@ class ConsumidorConCarriles:
             self._rechazar(mensaje, cabeceras, str(error))
 
     def _rechazar(self, mensaje: Any, cabeceras: list, motivo: str) -> None:
-        legibles = {k: v.decode(errors="replace") for k, v in cabeceras}
+        legibles = {k: v.decode(errors="replace") if v is not None else None for k, v in cabeceras}
         usuario = legibles.get("usuarioId")
         valor = mensaje.value
         if not self._conservar_contenido_rechazado:
@@ -149,4 +149,9 @@ class ConsumidorConCarriles:
 
 
 def _es_uuid(texto: str | None) -> bool:
-    return bool(texto) and re.fullmatch(r"[0-9a-fA-F-]{36}", texto) is not None
+    if not texto:
+        return False
+    try:
+        return str(UUID(texto)) == texto.lower()
+    except ValueError:
+        return False

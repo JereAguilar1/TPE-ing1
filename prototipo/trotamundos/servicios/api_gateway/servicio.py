@@ -40,7 +40,7 @@ from fastapi.responses import Response
 
 from trotamundos.comun.contratos import Contratos, contratos_por_omision
 from trotamundos.comun.errores import Problema, instalar_manejadores, no_encontrado
-from trotamundos.comun.sesion import region_de_sesion, usuario_de_sesion
+from trotamundos.comun.sesion import region_de_sesion, sujeto_de_sesion, usuario_de_sesion
 from trotamundos.servicios.api_gateway import cubeta, modos, regiones, rutas
 
 MAXIMO_EN_CURSO = 50
@@ -67,6 +67,7 @@ _TRAZA = re.compile(r"^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
 _SALTO_A_SALTO = {"host", "content-length", "connection", "keep-alive", "transfer-encoding",
                   "te", "upgrade", "proxy-authorization", "proxy-authenticate", "trailer"}
 _NO_DEVOLVER = _SALTO_A_SALTO | {"content-encoding"}
+_FIJADAS_POR_GATEWAY = {"traceparent", "x-deadline-ms", "x-modo-operativo"}
 
 
 def _no_disponible(detalle: str, espera_s: int = 2) -> Problema:
@@ -155,6 +156,13 @@ class ApiGateway:
         usuario = None
         if destino.publica:
             clave = f"ip:{request.client.host if request.client else '-'}"
+        elif (destino.servicio == "sharing" and metodo == "GET"
+              and re.fullmatch(r"/comparticiones/[^/]+", ruta)):
+            # El contrato admite invitados sin UUID. Sharing pide la decisión ABAC y verifica
+            # el alcance; las demás operaciones siguen exigiendo un usuario con cuenta.
+            clave = sujeto_de_sesion(request.headers.get("Authorization"), self._secreto_jwt)
+            if not clave.startswith("invitado:"):
+                clave = str(usuario_de_sesion(request.headers.get("Authorization"), self._secreto_jwt))
         else:
             usuario = usuario_de_sesion(request.headers.get("Authorization"), self._secreto_jwt)
             clave = str(usuario)
@@ -178,7 +186,8 @@ class ApiGateway:
 
         plazo_ms = PLAZO_MS[modo]
         traza = _traza(request.headers.get("traceparent"))
-        cabeceras = {k: v for k, v in request.headers.items() if k.lower() not in _SALTO_A_SALTO}
+        cabeceras = {k: v for k, v in request.headers.items()
+                     if k.lower() not in _SALTO_A_SALTO | _FIJADAS_POR_GATEWAY}
         cabeceras.update({"traceparent": traza, "X-Deadline-Ms": str(plazo_ms),
                           "X-Modo-Operativo": modo})
         try:
