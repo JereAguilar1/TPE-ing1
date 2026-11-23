@@ -26,6 +26,10 @@ dev = [
     "pytest-asyncio==0.24.0",
     # Pruebas basadas en propiedades de la fusión (ADR-0010, ADR-0017).
     "hypothesis==6.122.3",
+    # Pruebas de contrato derivadas de OpenAPI (paso 17, ADR-0017, ADR-0036). hypothesis-jsonschema
+    # fijado en 0.23.1: la 0.23.2 pide una hypothesis más nueva que la de arriba.
+    "schemathesis==3.39.7",
+    "hypothesis-jsonschema==0.23.1",
 ]
 
 [build-system]
@@ -45,4 +49,11 @@ asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
     # Aviso interno de starlette.testclient con anyio reciente; no afecta al código del prototipo.
     "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+    # Avisos de desuso internos de Schemathesis 3.x (jsonschema.RefResolver y sus propios
+    # argumentos); no vienen del código del prototipo.
+    "ignore::DeprecationWarning:schemathesis.*",
+    "ignore:jsonschema.RefResolver is deprecated:DeprecationWarning",
+    "ignore:jsonschema.exceptions.RefResolutionError is deprecated:DeprecationWarning",
+    # tests/contratos_api/comun.py reemplaza a propósito la estrategia de `email`.
+    "ignore:Overriding standard format 'email':hypothesis.errors.HypothesisWarning",
 ]
