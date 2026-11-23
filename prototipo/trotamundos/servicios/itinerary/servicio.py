@@ -13,6 +13,10 @@ Con un *broker* configurado, el elemento también publica su *outbox* y consume 
 y `ReservaObservada` por carriles de prioridad (`comun.publicador`, `comun.consumidor`; ADR-0012,
 ADR-0014, ADR-0020).
 
+Con `TROTAMUNDOS_DSN_TESTIGO` (multirregión, paso 16), cada comando manual deja su entrada en el
+registro testigo de la región de respaldo antes de confirmarse, y antes de atender a un usuario
+se reproducen las entradas que otra región dejó para él en el testigo local (`testigo`, ADR-0018).
+
 `Reserva` y `Viaje` se coordinan por eventos internos (ADR-0010): cada `ReservaActualizada` queda
 también en `evento_interno`, en la misma transacción que el cambio, y `viajes` la procesa en una
 segunda transacción. Un comando espera a las dos para responder con el viaje (la mitigación que
@@ -24,10 +28,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import logging
+import os
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timezone
-from typing import Any, AsyncIterator, Callable, Iterator, Mapping
+from typing import Any, AsyncIterator, Callable, Iterator, Mapping, TypeVar
 from uuid import UUID, uuid4
 
 import psycopg
@@ -38,6 +44,7 @@ from trotamundos.comun.carriles import Carril, asegurar_topicos, carriles_posibl
 from trotamundos.comun.config import Configuracion
 from trotamundos.comun.consumidor import DDL_RECHAZADOS, ConsumidorConCarriles
 from trotamundos.comun.contratos import Contratos, contratos_por_omision
+from trotamundos.comun.errores import Problema
 from trotamundos.comun.eventos import Causa, Evento
 from trotamundos.comun.modelo import instante_a_texto
 from trotamundos.comun.persistencia import (
@@ -60,6 +67,7 @@ from trotamundos.servicios.itinerary import (
     ingesta,
     proyeccion_panel,
     publicacion,
+    testigo,
 )
 from trotamundos.servicios.itinerary.fusion.consolidacion import reconsolidar
 from trotamundos.servicios.itinerary.fusion.eventos import eventos_del_cambio
@@ -97,8 +105,24 @@ DDL = (
 PARA_VIAJES = frozenset({"ReservaActualizada"})
 GRUPO = "itinerary"  # grupo de consumidores en el broker
 PAUSA_DEL_PUBLICADOR_S = 0.5
+# Los comandos manuales que pasan por el testigo transregional (ADR-0018 §3), por operación.
+_MANUALES: dict[str, Callable[..., Any]] = {}
+
+
+def _manual(operacion: str) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """Marca un comando manual: se confirma recién con su entrada en el testigo."""
+    def decorar(metodo: Callable[..., T]) -> Callable[..., T]:
+        _MANUALES[operacion] = metodo
+
+        @functools.wraps(metodo)
+        def envuelto(self: "Itinerary", usuario_id: UUID, *argumentos: Any,
+                     traceparent: str | None = None) -> T:
+            return self._comando_manual(operacion, metodo, usuario_id, argumentos, traceparent)
+        return envuelto
+    return decorar
 
 _registro_de_errores = logging.getLogger(__name__)
+T = TypeVar("T")
 
 
 class Itinerary:
@@ -107,19 +131,31 @@ class Itinerary:
     def __init__(self, configuracion: Configuracion | None = None, *, esquema: str = ESQUEMA,
                  contratos: Contratos | None = None, registro: RegistroDeTipos | None = None,
                  reloj: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
-                 nuevo_id: Callable[[], UUID] = uuid4):
+                 nuevo_id: Callable[[], UUID] = uuid4,
+                 testigo_remoto: testigo.RegistroTestigo | None = None,
+                 testigo_local: testigo.RegistroTestigo | None = None):
         self._configuracion = configuracion or Configuracion.desde_entorno()
         self._esquema = esquema
         self._contratos = contratos or contratos_por_omision()
         self._registro = registro or registro_por_omision()
-        self._reloj = reloj
-        self._nuevo_id = nuevo_id
+        # Con la cinta del testigo, un comando graba lo que tomó y su reproducción lo repite.
+        self._reloj = testigo.reloj_con_cinta(reloj)
+        self._nuevo_id = testigo.ids_con_cinta(nuevo_id)
+        dsn_testigo = os.environ.get("TROTAMUNDOS_DSN_TESTIGO", "")
+        if testigo_remoto is None and dsn_testigo:
+            testigo_remoto = testigo.RegistroTestigo(dsn_testigo)
+            testigo_local = testigo_local or testigo.RegistroTestigo(
+                self._configuracion.dsn_postgres)
+        self._testigo_remoto, self._testigo_local = testigo_remoto, testigo_local
 
     def crear_esquema(self) -> None:
         crear_esquema(self._configuracion.dsn_postgres, self._esquema, DDL)
+        if self._testigo_local is not None:
+            self._testigo_local.crear_esquema()
 
     # --- comandos sobre reservas: la reserva y después sus viajes --------------------------
 
+    @_manual("crearReserva")
     def crear_reserva(self, usuario_id: UUID, clave: UUID, cuerpo: Mapping[str, Any], *,
                       traceparent: str | None = None) -> tuple[int, dict[str, Any]]:
         """Alta idempotente por `Idempotency-Key`: la misma clave con la misma solicitud devuelve
@@ -153,22 +189,26 @@ class Itinerary:
             reemplazar_respuesta(conexion, usuario_id, clave, respuesta)
         return 201, respuesta
 
+    @_manual("editarReserva")
     def editar_reserva(self, usuario_id: UUID, reserva_id: UUID, cuerpo: Mapping[str, Any], *,
                        traceparent: str | None = None) -> dict[str, Any]:
         return self._comando_de_reserva(usuario_id, traceparent,
                                         lambda ctx: gestion_manual.editar(ctx, reserva_id, cuerpo))
 
+    @_manual("eliminarReserva")
     def eliminar_reserva(self, usuario_id: UUID, reserva_id: UUID, *,
                          traceparent: str | None = None) -> int:
         return self._comando_de_reserva(
             usuario_id, traceparent, lambda ctx: gestion_manual.dar_de_baja(ctx, reserva_id)
         )["versionUsuario"]
 
+    @_manual("confirmarReserva")
     def confirmar_reserva(self, usuario_id: UUID, reserva_id: UUID, cuerpo: Mapping[str, Any], *,
                           traceparent: str | None = None) -> dict[str, Any]:
         return self._comando_de_reserva(usuario_id, traceparent,
                                         lambda ctx: gestion_manual.confirmar(ctx, reserva_id, cuerpo))
 
+    @_manual("resolverConflicto")
     def resolver_conflicto(self, usuario_id: UUID, reserva_id: UUID, conflicto_id: UUID,
                            cuerpo: Mapping[str, Any], *,
                            traceparent: str | None = None) -> dict[str, Any]:
@@ -177,17 +217,20 @@ class Itinerary:
 
     # --- comandos sobre viajes: una transacción, solo viajes -----------------------------
 
+    @_manual("moverReserva")
     def mover_reserva(self, usuario_id: UUID, viaje_id: UUID, reserva_id: UUID, *,
                       traceparent: str | None = None) -> int:
         return self._comando_de_viaje(
             usuario_id, traceparent,
             lambda sesion: gestion_manual.mover_reserva(sesion, reserva_id, viaje_id))
 
+    @_manual("archivarViaje")
     def archivar_viaje(self, usuario_id: UUID, viaje_id: UUID, *,
                        traceparent: str | None = None) -> int:
         return self._comando_de_viaje(
             usuario_id, traceparent, lambda sesion: gestion_manual.archivar_viaje(sesion, viaje_id))
 
+    @_manual("eliminarViaje")
     def eliminar_viaje(self, usuario_id: UUID, viaje_id: UUID, *,
                        traceparent: str | None = None) -> int:
         return self._comando_de_viaje(
@@ -196,14 +239,17 @@ class Itinerary:
     # --- lecturas (proyeccion_panel) -----------------------------------------------------
 
     def leer_panel(self, usuario_id: UUID) -> dict[str, Any]:
+        self._ponerse_al_dia(usuario_id)
         with self._lectura() as conexion:
             return proyeccion_panel.leer_panel(conexion, usuario_id)
 
     def leer_reserva(self, usuario_id: UUID, reserva_id: UUID) -> dict[str, Any] | None:
+        self._ponerse_al_dia(usuario_id)
         with self._lectura() as conexion:
             return proyeccion_panel.leer_reserva(conexion, usuario_id, reserva_id)
 
     def leer_viaje(self, usuario_id: UUID, viaje_id: UUID) -> dict[str, Any] | None:
+        self._ponerse_al_dia(usuario_id)
         with self._lectura() as conexion:
             return proyeccion_panel.leer_viaje(conexion, usuario_id, viaje_id)
 
@@ -214,6 +260,7 @@ class Itinerary:
 
     def leer_viajes(self, usuario_id: UUID, *, estado: str | None = None, cursor: str | None = None,
                     limite: int = 20) -> dict[str, Any]:
+        self._ponerse_al_dia(usuario_id)
         with self._lectura() as conexion:
             pagina, siguiente = proyeccion_panel.leer_viajes(
                 conexion, usuario_id, self._reloj(), estado=estado, cursor=cursor, limite=limite)
@@ -229,7 +276,11 @@ class Itinerary:
         del servicio, en una transacción. Devuelve cuántas borró (idempotente)."""
         with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
             bloquear_usuario(conexion, usuario_id)
-            return borrar_usuario(conexion, usuario_id)
+            borradas = borrar_usuario(conexion, usuario_id)
+        for registro in (self._testigo_remoto, self._testigo_local):
+            if registro is not None:
+                borradas += registro.borrar_usuario(usuario_id)
+        return borradas
 
     # --- eventos consumidos (ingesta) ----------------------------------------------------
 
@@ -393,6 +444,39 @@ class Itinerary:
                 await asyncio.to_thread(self.tareas_periodicas)
             except Exception:  # el trabajo sigue en la próxima vuelta
                 _registro_de_errores.exception("Falló el trabajo periódico de itinerary")
+
+    # --- testigo transregional (ADR-0018 §3 y §4) ---------------------------------------
+
+    def _comando_manual(self, operacion: str, metodo: Callable[..., T], usuario_id: UUID,
+                        argumentos: tuple[Any, ...], traceparent: str | None) -> T:
+        self._ponerse_al_dia(usuario_id)
+        if self._testigo_remoto is None:
+            return metodo(self, usuario_id, *argumentos, traceparent=traceparent)
+        with testigo.con_cinta(testigo.Cinta()) as cinta:
+            resultado = metodo(self, usuario_id, *argumentos, traceparent=traceparent)
+        try:
+            self._testigo_remoto.registrar(usuario_id, self._configuracion.region, operacion,
+                                           argumentos, cinta)
+        except testigo.RespaldoNoDisponible as error:
+            _registro_de_errores.error("El testigo de la región de respaldo no respondió: %s", error)
+            raise Problema(503, "Servicio no disponible",
+                           "No se pudo registrar el comando en la región de respaldo",
+                           cabeceras={"Retry-After": "2"}) from error
+        return resultado
+
+    def _ponerse_al_dia(self, usuario_id: UUID | str) -> None:
+        """Reproduce lo que la región primaria del usuario dejó en el testigo local. Solo hay
+        algo si esta región lo atiende porque aquella cayó."""
+        if self._testigo_local is None:
+            return
+        usuario = UUID(str(usuario_id))
+
+        def reproducir(entrada: testigo.Entrada) -> None:
+            with testigo.con_cinta(entrada.cinta):
+                _MANUALES[entrada.operacion](self, usuario, *entrada.argumentos)
+
+        self._testigo_local.aplicar_pendientes(
+            usuario, reproducir, lambda error: isinstance(error, gestion_manual.ErrorDeComando))
 
     # --- transacciones -------------------------------------------------------------------
 

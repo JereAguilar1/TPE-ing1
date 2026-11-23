@@ -25,3 +25,14 @@ def usuario_de_sesion(authorization: str | None, secreto: str) -> UUID:
         return UUID(str(datos["sub"]))
     except (jwt.InvalidTokenError, KeyError, ValueError) as error:
         raise Problema(401, "No autenticado") from error
+
+
+def region_de_sesion(authorization: str | None, secreto: str) -> str | None:
+    """La región primaria del usuario (`region_primaria` del token, ADR-0018 §1), o `None` si el
+    token no la trae. Se llama después de `usuario_de_sesion`, que ya validó el token."""
+    try:
+        token = (authorization or "").removeprefix("Bearer ").strip()
+        region = jwt.decode(token, secreto, algorithms=["HS256"]).get("region_primaria")
+    except jwt.InvalidTokenError:
+        return None
+    return str(region) if region else None
