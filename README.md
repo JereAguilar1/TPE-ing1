@@ -22,7 +22,7 @@ Punto de entrada: **[docs/Home.md](docs/Home.md)**.
 | [Proceso ADD](docs/02-proceso-add/) | Las 5 iteraciones de diseño, paso por paso (la 5ta, del asistente virtual de la 2da entrega) |
 | [ADRs](docs/03-adr/) | Decisiones arquitectónicas en formato MADR (`ADR-0001` a `ADR-0042`) |
 | [Vistas](docs/04-vistas/) | Vistas de contexto, módulos (N1/N2), C&C, secuencias de los casos de uso, despliegue (N1/N2) y seguridad/datos, más las del asistente virtual de la 2da entrega |
-| [Prototipo](prototipo/README.md) | Implementación de la 2da entrega: alcance, cómo correrlo, estado de cada ADR, matriz código ↔ ADR, lo diseñado y no construido, y el [guion de demostración](prototipo/demo/guion.md) |
+| [Prototipo](prototipo/README.md) | Implementación de la 2da entrega: alcance, cómo correrlo y plan; con el [estado de cada ADR](prototipo/docs/estado-de-los-adr.md), la [matriz código ↔ ADR](prototipo/docs/matriz-codigo-adr.md), lo [diseñado y no construido](prototipo/docs/disenado-y-no-construido.md) y el [guion de demostración](prototipo/demo/guion.md) |
 | [Contratos](contratos/README.md) | OpenAPI, AsyncAPI, contratos de complementos, descriptores de tipo de segmento y modelo dimensional (Spec-driven) |
 | [Integración continua](.github/workflows/pruebas.yml) | Corre todas las pruebas del prototipo, con PostgreSQL y Redpanda, y levanta todos los servicios para comprobar que arrancan y recorrer los escenarios de los ASR contra ellos, en cada cambio del código o de los contratos (ADR-0009, ADR-0017) |
 | [Análisis estático](.sonarcloud.properties) | Configuración de SonarCloud, que analiza el código en cada cambio |
@@ -33,4 +33,4 @@ Punto de entrada: **[docs/Home.md](docs/Home.md)**.
 | Entrega | Alcance | Estado |
 |---|---|---|
 | 1ra entrega | Análisis inicial + 4 iteraciones de ADD documentadas | ✅ Completa (iteraciones 1, 2, 3 y 4 cerradas; 58/58 drivers trazados) |
-| 2da entrega | Módulo avanzado (Opción B: asistente virtual) + prototipo trazable | ✅ Completa *(iteración 5 de ADD y los 21 pasos del [plan de construcción](prototipo/README.md#plan-de-construcción); entrega: lunes 23/11, 23:00)* |
+| 2da entrega | Módulo avanzado (Opción B: asistente virtual) + prototipo trazable | ✅ Completa *(iteración 5 de ADD y los 21 pasos del [plan de construcción](prototipo/README.md#plan-de-construcción))* |
