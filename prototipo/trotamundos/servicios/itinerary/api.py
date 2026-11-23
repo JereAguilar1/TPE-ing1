@@ -7,9 +7,10 @@ redefinirlos (ADR-0036), y todo error sale como `Problema` (`comun.errores`).
 
 Expone las operaciones del contrato: panel, viajes, reservas y tipos de segmento. Según el modo
 de despliegue (ADR-0021) registra solo las de lectura (`itinerary-lectura`), solo los comandos
-(`itinerary-escritura`) o todas; cada ruta se clasifica por su etiqueta en el contrato. El vale
-interno (ADR-0028) y `X-Deadline-Ms` (ADR-0020) llegan con los pasos que implementan esas
-decisiones (ver el plan en el README del prototipo).
+(`itinerary-escritura`) o todas; cada ruta se clasifica por su etiqueta en el contrato. No
+verifica el vale interno (ADR-0028) ni descuenta `X-Deadline-Ms` (ADR-0020): la llaman solo
+servicios internos, y el plazo lo hace cumplir quien llama (ver «Decisiones de implementación»
+en el README del prototipo).
 """
 
 from __future__ import annotations
