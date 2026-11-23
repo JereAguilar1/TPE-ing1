@@ -510,7 +510,7 @@ function dibujarDetalle() {
 function prepararAlta() {
   const tipos = $("alta-tipo");
   const iconos = t("iconos");
-  tipos.replaceChildren(...Object.keys(estado.esquemas).sort().map((tipo) => {
+  tipos.replaceChildren(...Object.keys(estado.esquemas).sort((a, b) => a.localeCompare(b)).map((tipo) => {
     const opcion = elemento("option", null, `${iconos[presentacion({ tipo }).icono] || iconos.otro} ${tipo}`);
     opcion.value = tipo;
     return opcion;

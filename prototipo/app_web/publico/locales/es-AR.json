@@ -90,6 +90,7 @@
     "alta": "Cargar una reserva"
   },
   "viaje": {
+    "titulo": "Viaje",
     "archivar": "Archivar",
     "eliminar": "Eliminar viaje",
     "confirmarEliminar": "¿Eliminar el viaje y todas sus reservas?",
