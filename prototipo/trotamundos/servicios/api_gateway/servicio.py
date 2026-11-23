@@ -166,7 +166,7 @@ class ApiGateway:
                            "La única representación es application/vnd.trotamundos.v1+json")
         usuario = None
         if destino.publica:
-            clave = f"ip:{self._direccion_del_cliente(request)}"
+            clave = f"ip:{await self._direccion_del_cliente(request)}"
         elif (destino.servicio == "sharing" and metodo == "GET"
               and re.fullmatch(r"/comparticiones/[^/]+", ruta)):
             # El contrato admite invitados sin UUID. Sharing pide la decisión ABAC y verifica
@@ -214,33 +214,36 @@ class ApiGateway:
         devueltas["X-Modo-Operativo"] = modo
         return Response(respuesta.content, status_code=respuesta.status_code, headers=devueltas)
 
-    def _direccion_del_cliente(self, request: Request) -> str:
+    async def _direccion_del_cliente(self, request: Request) -> str:
         """La del cliente; si llega por un proxy de confianza, la que el proxy dice en
         `X-Real-IP` (nginx la pisa: el cliente no la puede elegir)."""
         directa = request.client.host if request.client else "-"
         real = request.headers.get("X-Real-IP", "").strip()
-        if real and directa in self._confiables():
+        if real and directa in await self._confiables():
             try:
                 return str(ipaddress.ip_address(real))
             except ValueError:
                 pass
         return directa
 
-    def _confiables(self) -> frozenset[str]:
+    async def _confiables(self) -> frozenset[str]:
         """Los proxies por nombre o dirección, con los nombres resueltos (cada 30 s: el DNS de
-        Docker cambia la dirección si el contenedor se recrea)."""
+        Docker cambia la dirección si el contenedor se recrea). La resolución corre en un hilo:
+        un DNS lento no frena al resto de las peticiones."""
         resueltas_en, direcciones = self._direcciones_de_proxies
-        ahora = time.monotonic()
-        if ahora - resueltas_en >= 30:
-            direcciones = set(self._proxies)
-            for proxy in self._proxies:
-                try:
-                    direcciones |= {i[4][0] for i in socket.getaddrinfo(proxy, None)}
-                except OSError:
-                    pass
-            direcciones = frozenset(direcciones)
-            self._direcciones_de_proxies = (ahora, direcciones)
+        if time.monotonic() - resueltas_en >= 30:
+            direcciones = await asyncio.to_thread(self._resolver_proxies)
+            self._direcciones_de_proxies = (time.monotonic(), direcciones)
         return direcciones
+
+    def _resolver_proxies(self) -> frozenset[str]:
+        direcciones = set(self._proxies)
+        for proxy in self._proxies:
+            try:
+                direcciones |= {i[4][0] for i in socket.getaddrinfo(proxy, None)}
+            except OSError:
+                pass
+        return frozenset(direcciones)
 
     async def comprobar_regiones(self, http: httpx.AsyncClient) -> None:
         """Una ronda de la comprobación de salud de cada región (su `bff-web`)."""
