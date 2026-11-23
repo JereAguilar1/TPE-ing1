@@ -9,8 +9,8 @@ Expone las operaciones del contrato: panel, viajes, reservas y tipos de segmento
 de despliegue (ADR-0021) registra solo las de lectura (`itinerary-lectura`), solo los comandos
 (`itinerary-escritura`) o todas; cada ruta se clasifica por su etiqueta en el contrato. No
 verifica el vale interno (ADR-0028) ni descuenta `X-Deadline-Ms` (ADR-0020): la llaman solo
-servicios internos, y el plazo lo hace cumplir quien llama (ver «Decisiones de implementación»
-en el README del prototipo).
+servicios internos, y el plazo lo hace cumplir quien llama (ver
+`prototipo/docs/decisiones-de-implementacion.md`).
 """
 
 from __future__ import annotations

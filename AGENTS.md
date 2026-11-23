@@ -23,13 +23,14 @@ Proyecto: TPE de Ingeniería de Software I (UNICEN), grupo 15, **Trotamundos**. 
 ## Cómo se decide
 
 - El prototipo se basa **solo** en lo que ya está decidido: los ADR de `docs/03-adr`, las vistas,
-  los contratos de `contratos/` y `prototipo/README.md`. Cuando un contrato y el código no
+  los contratos de `contratos/` y la documentación del prototipo (`prototipo/README.md` y
+  `prototipo/docs/`). Cuando un contrato y el código no
   coinciden, el error está en el código.
 - **Si algo no está decidido en la documentación, preguntar antes de inventarlo.** Las decisiones
-  menores que se tomen se registran en «Decisiones de implementación» de `prototipo/README.md`.
-- El plan de pasos y el estado de cada ADR están en `prototipo/README.md`. Al empezar un paso, leer
-  los ADR de su fila; al terminarlo, marcarlo como hecho y actualizar la tabla «Estado de las
-  decisiones de arquitectura».
+  menores que se tomen se registran en `prototipo/docs/decisiones-de-implementacion.md`.
+- El plan de pasos está en `prototipo/README.md` y el estado de cada ADR, en
+  `prototipo/docs/estado-de-los-adr.md`. Al empezar un paso, leer los ADR de su fila; al
+  terminarlo, marcarlo como hecho y actualizar el estado de los ADR.
 
 ## Alcance de la entrega
 
@@ -56,9 +57,9 @@ Proyecto: TPE de Ingeniería de Software I (UNICEN), grupo 15, **Trotamundos**. 
   columna «Responsable» del plan (`prototipo/README.md`) con los commits del paso. Antes de empezar
   un paso, mirar esa columna y el grupo: si ya es de otro integrante, ese paso no se empieza.
 - **Al terminar un paso**, además de marcarlo hecho:
-  - agregar sus filas a la «Matriz código ↔ ADR» de `prototipo/README.md` (qué código implementa
-    qué ADR o contrato, y qué prueba lo verifica), y a «Diseñado y no construido» lo que haya
-    quedado afuera. Así el cierre del lunes no arranca de cero;
+  - agregar sus filas a `prototipo/docs/matriz-codigo-adr.md` (qué código implementa qué ADR o
+    contrato, y qué prueba lo verifica), y a `prototipo/docs/disenado-y-no-construido.md` lo que
+    haya quedado afuera. Así el cierre del lunes no arranca de cero;
   - agregar una fila en `docs/00-gestion/bitacora.md` con la fecha, el hito, lo producido y quien
     lo hizo (el enunciado pide mostrar la evolución y el trabajo de cada integrante). El grupo
     autoriza estas filas sin consulta previa; cualquier otro cambio en `docs/00-gestion` sigue
@@ -104,7 +105,7 @@ recorre los caminos entre servicios. Antes de cerrar un paso que agrega o cambia
 - Se trabaja en paralelo: `git pull` antes de empezar y *push* al terminar cada paso (o el día),
   no todo junto al final. Después de cada `git pull`, desde `prototipo/`: `make instalar` si cambió
   `pyproject.toml` (dependencias nuevas) y siempre `make infra-arriba`, que levanta la base y el
-  *broker* si no están y agrega al `.env` los secretos nuevos sin tocar los que ya hay. `prototipo/README.md`, `docker-compose.yml` y `tests/test_arquitectura.py`
+  *broker* si no están y agrega al `.env` los secretos nuevos sin tocar los que ya hay. `prototipo/README.md`, `prototipo/docs/`, `docker-compose.yml` y `tests/test_arquitectura.py`
   los tocan todos: cambios chicos, agregando filas o bloques sin reescribir los de otros.
 - Después del *push*, los tres checks de GitHub tienen que quedar en verde: `pruebas` (todas las
   pruebas), `servicios` (todos los contenedores arrancan) y SonarCloud.

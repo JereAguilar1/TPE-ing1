@@ -86,7 +86,7 @@ def _zona(nombre: str) -> ZoneInfo | timezone:
 def limites_del_extremo(extremo: Mapping[str, Any]) -> tuple[datetime, datetime]:
     """El intervalo que cubre un extremo (con la forma de `Extremo` del contrato). Con
     `precision: dia` (boleto abierto) es el día local entero; el instante es la medianoche UTC de
-    esa fecha (ver el README del prototipo)."""
+    esa fecha (ver `prototipo/docs/decisiones-de-implementacion.md`)."""
     instante = instante_desde_texto(extremo["instante"])
     if extremo["precision"] != Precision.DIA:
         return instante, instante

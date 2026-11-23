@@ -137,9 +137,10 @@ en Python con FastAPI, PostgreSQL y Redpanda ([ADR-0036](03-adr/ADR-0036-tecnolo
 |---|---|
 | [Qué se construye y qué no](../prototipo/README.md#qué-se-construye-y-qué-no) | El alcance y su criterio |
 | [Cómo correrlo](../prototipo/README.md#cómo-correrlo) | Instalación, pruebas, servicios y la interfaz web |
-| [Estado de las decisiones de arquitectura](../prototipo/README.md#estado-de-las-decisiones-de-arquitectura) | Qué parte de cada ADR está en código (✅ / 🟨 / ➖) |
+| [Estado de las decisiones de arquitectura](../prototipo/docs/estado-de-los-adr.md) | Qué parte de cada ADR está en código (✅ / 🟨 / ➖) |
 | [Plan de construcción](../prototipo/README.md#plan-de-construcción) | Los 21 pasos, el recorte y quién hizo cada uno |
-| [Matriz código ↔ ADR](../prototipo/README.md#matriz-código--adr) | Qué código implementa cada decisión y qué prueba lo verifica (QA-16) |
-| [Decisiones de implementación](../prototipo/README.md#decisiones-de-implementación) | Lo que los ADR no fijaban y se decidió al construir |
-| [Diseñado y no construido](../prototipo/README.md#diseñado-y-no-construido) | Lo que queda solo en el diseño, dónde está diseñado y por qué |
+| [Matriz código ↔ ADR](../prototipo/docs/matriz-codigo-adr.md) | Qué código implementa cada decisión y qué prueba lo verifica (QA-16) |
+| [Decisiones de implementación](../prototipo/docs/decisiones-de-implementacion.md) | Lo que los ADR no fijaban y se decidió al construir |
+| [Diseñado y no construido](../prototipo/docs/disenado-y-no-construido.md) | Lo que queda solo en el diseño, dónde está diseñado y por qué |
+| [Estructura del código](../prototipo/docs/estructura.md) | Qué hay en cada carpeta y las reglas de arquitectura que verifican las pruebas |
 | [Guion de demostración](../prototipo/demo/guion.md) | El recorrido de la defensa |

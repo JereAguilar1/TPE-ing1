@@ -5,7 +5,7 @@ Carga los descriptores de `contratos/tipos-de-segmento/` y los ofrece a quien lo
 su salida, QA-10 y QA-11), `notification` (`camposRelevantes`), los BFF (`presentacion`) y el plano
 analítico (`dimension`). En la vista de módulos de adaptadores, los descriptores son un artefacto
 común transversal; por eso el registro vive en `comun` y no dentro de un servicio. La vista N2 lo
-ubica en `itinerary`; ver «Decisiones de implementación» en el README del prototipo.
+ubica en `itinerary`; ver `prototipo/docs/decisiones-de-implementacion.md`.
 
 **Ningún tipo concreto aparece en este código.** Agregar un tipo es agregar su descriptor: el
 registro lo descubre al arrancar (guía de extensión de la iteración 4).

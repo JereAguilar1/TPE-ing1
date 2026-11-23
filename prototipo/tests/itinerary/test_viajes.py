@@ -250,7 +250,7 @@ def test_planificado_en_curso_completado_archivado(mundo):
 
 
 def test_un_boleto_abierto_vale_hasta_el_fin_del_dia_local(mundo):
-    # Medianoche UTC del 5 = el 5 en Buenos Aires (convención del README del prototipo).
+    # Medianoche UTC del 5 = el 5 en Buenos Aires (convención de `prototipo/docs/decisiones-de-implementacion.md`).
     tren = reserva(1, segmento("tren", dia(5, 0), dia(5, 0), AEP, MDZ, precision="dia"))
     viaje = mundo.aplicar(tren)
 

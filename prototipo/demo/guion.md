@@ -18,7 +18,7 @@ make servicios-arriba          # todos los contenedores, sanos (las dos regiones
 
 - Abrir **http://localhost:18111** e ingresar con `ana@ejemplo.com`: el panel ya tiene un viaje.
 - Tener abiertas en otras pestañas: el repositorio en GitHub (pestaña **Actions**, última corrida
-  en verde, con el trabajo `servicios` abierto), `prototipo/README.md` en la «Matriz código ↔ ADR»
+  en verde, con el trabajo `servicios` abierto), `prototipo/docs/matriz-codigo-adr.md`
   y una terminal en `prototipo/`.
 - Opcional: el celular en la misma red, con `http://<IP de la computadora>:18111`.
 
@@ -130,13 +130,13 @@ existían, como preveía el punto de extensión de la iteración 4 (ADR-0034, CO
 
 ## 8. Trazabilidad y especificaciones — QA-16 (2 min)
 
-- Mostrar la «Matriz código ↔ ADR» del README: cada decisión con el código que la implementa y la
-  prueba que la verifica, y el «Estado de las decisiones de arquitectura»: qué parte de cada ADR
+- Mostrar la matriz código ↔ ADR (`docs/matriz-codigo-adr.md`): cada decisión con el código que la implementa y la
+  prueba que la verifica, y el estado de los ADR (`docs/estado-de-los-adr.md`): qué parte de cada ADR
   está en código.
 - Mostrar un contrato (`contratos/openapi/bff-web.yaml`) y decir que cada servicio se prueba contra
   su contrato con pedidos generados (Schemathesis, `tests/contratos_api/`), y que la página misma
   usa solo sus operaciones (*spec-driven*, ADR-0009, ADR-0017).
-- Mostrar «Diseñado y no construido»: lo que el recorte dejó afuera está justificado, no es un
+- Mostrar `docs/disenado-y-no-construido.md`: lo que el recorte dejó afuera está justificado, no es un
   faltante.
 
 ## Comandos de apoyo
