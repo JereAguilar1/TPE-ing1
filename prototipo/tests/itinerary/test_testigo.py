@@ -8,6 +8,7 @@ saltean.
 import copy
 import dataclasses
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID, uuid4
 
 import psycopg
@@ -140,3 +141,17 @@ def test_la_supresion_borra_tambien_el_testigo(am, alta, dsn, esquemas):
     am.suprimir_usuario(USUARIO)
 
     assert _testigo(dsn, esquemas) == []
+
+
+def test_los_comandos_simultaneos_llegan_al_testigo_en_el_orden_en_que_se_aplicaron(am, eu, alta):
+    """Sin ese orden, la región de respaldo los reproduciría con otros ids y otras versiones."""
+    def alta_de(numero: int):
+        cuerpo = copy.deepcopy(alta)
+        cuerpo["identificadores"][0]["codigo"] = f"ORD{numero:03d}"
+        cuerpo["segmentos"][0]["referencia"] = f"ORD{numero:03d}"
+        return am.crear_reserva(USUARIO, uuid4(), cuerpo)
+
+    with ThreadPoolExecutor(max_workers=6) as hilos:
+        list(hilos.map(alta_de, range(12)))
+
+    assert eu.leer_panel(USUARIO) == am.leer_panel(USUARIO)

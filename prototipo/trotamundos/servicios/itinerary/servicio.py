@@ -452,16 +452,20 @@ class Itinerary:
         self._ponerse_al_dia(usuario_id)
         if self._testigo_remoto is None:
             return metodo(self, usuario_id, *argumentos, traceparent=traceparent)
-        with testigo.con_cinta(testigo.Cinta()) as cinta:
-            resultado = metodo(self, usuario_id, *argumentos, traceparent=traceparent)
-        try:
-            self._testigo_remoto.registrar(usuario_id, self._configuracion.region, operacion,
-                                           argumentos, cinta)
-        except testigo.RespaldoNoDisponible as error:
-            _registro_de_errores.error("El testigo de la región de respaldo no respondió: %s", error)
-            raise Problema(503, "Servicio no disponible",
-                           "No se pudo registrar el comando en la región de respaldo",
-                           cabeceras={"Retry-After": "2"}) from error
+        # Los comandos del mismo usuario llegan al testigo en el orden en que se aplicaron aquí:
+        # la región de respaldo los reproduce en ese orden y obtiene los mismos ids y versiones.
+        with testigo.en_orden(self._configuracion.dsn_postgres, usuario_id):
+            with testigo.con_cinta(testigo.Cinta()) as cinta:
+                resultado = metodo(self, usuario_id, *argumentos, traceparent=traceparent)
+            try:
+                self._testigo_remoto.registrar(usuario_id, self._configuracion.region, operacion,
+                                               argumentos, cinta)
+            except testigo.RespaldoNoDisponible as error:
+                _registro_de_errores.error("El testigo de la región de respaldo no respondió: %s",
+                                           error)
+                raise Problema(503, "Servicio no disponible",
+                               "No se pudo registrar el comando en la región de respaldo",
+                               cabeceras={"Retry-After": "2"}) from error
         return resultado
 
     def _ponerse_al_dia(self, usuario_id: UUID | str) -> None:

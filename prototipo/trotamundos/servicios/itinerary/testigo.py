@@ -122,6 +122,20 @@ def ids_con_cinta(real: Callable[[], UUID]) -> Callable[[], UUID]:
     return nuevo_id
 
 
+@contextmanager
+def en_orden(dsn: str, usuario_id: UUID | str) -> Iterator[None]:
+    """Serializa, en la región primaria, cada comando manual del usuario junto con su entrada en
+    el testigo. Es un bloqueo consultivo de sesión con otra clave que el de las transacciones de
+    `itinerary` (que dura solo cada transacción) y que el de la reproducción."""
+    clave = f"testigo-orden:{usuario_id}"
+    with psycopg.connect(dsn, autocommit=True) as conexion:
+        conexion.execute("SELECT pg_advisory_lock(hashtextextended(%s, 0))", (clave,))
+        try:
+            yield
+        finally:
+            conexion.execute("SELECT pg_advisory_unlock(hashtextextended(%s, 0))", (clave,))
+
+
 def a_json(argumentos: Sequence[Any]) -> list[Any]:
     """Los argumentos de un comando: ids (como texto) y cuerpos JSON."""
     return [str(a) if isinstance(a, UUID) else a for a in argumentos]
