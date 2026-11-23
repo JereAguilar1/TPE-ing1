@@ -104,8 +104,14 @@ Correr desde `prototipo/`, con el correo usado en la página (`CORREO=ana@ejempl
   intérprete es intercambiable: el modelo de lenguaje está diseñado como complemento (ADR-0037),
   con redacción de datos personales, y no se construyó para que el prototipo sea determinista y
   sin costo por mensaje.
-- **¿Dónde está la multirregión (ASR-3)?** Diseñada (ADR-0002, ADR-0018) y no construida: es el
-  paso más caro y el recorte de ADR-0034 la dejó afuera; está justificada en el README.
+- **¿Dónde está la multirregión (ASR-3)?** Construida en versión mínima (paso 16): dos regiones,
+  AM y EU, cada una con su base, su `itinerary` y su `bff-web`; testigo síncrono de los comandos
+  manuales y conmutación en `api-gateway` (ADR-0002, ADR-0018). El escenario de QA-05
+  (`tests/escenarios/test_qa05_perdida_de_region.py`, en el trabajo `servicios`) tira la región AM
+  y mide: el viajero vuelve a tener servicio desde EU en unos 7 s, con lo confirmado intacto.
+  La página web no conmuta (habla con el `bff-web` de AM por nginx): QA-05 se muestra con el
+  escenario o por `api-gateway`. La tercera región y la replicación de lo ingerido, en
+  «Diseñado y no construido».
 - **¿Y la app móvil?** Diseñada (ADR-0005, ADR-0019, ADR-0033); la página web se adapta al celular.
 - **¿Cómo saben que el código respeta la arquitectura?** Reglas en `tests/test_arquitectura.py`
   (ningún servicio importa a otro, dependencias internas por vista de módulos, ningún tipo de
