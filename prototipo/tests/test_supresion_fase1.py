@@ -111,7 +111,7 @@ def test_support_liaison_y_el_asistente_borran_los_datos_del_usuario(dsn, esquem
 # --- identity-access ordena y reintenta ---------------------------------------------------------
 
 class EjecutorDePrueba:
-    servicios = ["itinerary", "preferences", "support-liaison", "virtual-assistant"]
+    servicios = ["itinerary", "preferences", "sharing", "support-liaison", "virtual-assistant"]
 
     def __init__(self):
         self.caidos: set[str] = set()
@@ -135,7 +135,8 @@ def test_identity_access_ordena_el_borrado_y_reintenta_lo_que_falla(dsn, esquema
     respuesta = cliente.delete("/privacidad/cuenta", headers={
         "Authorization": f"Bearer {token}", "Idempotency-Key": str(uuid4())})
     assert respuesta.status_code == 202
-    assert sorted(s for s, _ in ejecutor.recibidas) == ["itinerary", "preferences", "virtual-assistant"]
+    assert sorted(s for s, _ in ejecutor.recibidas) == ["itinerary", "preferences", "sharing",
+                                                         "virtual-assistant"]
     with conectar(dsn, esquema) as conexion:
         (pendiente,) = conexion.execute("SELECT * FROM orden_de_borrado").fetchall()
     assert (pendiente["servicio"], pendiente["usuario_id"], pendiente["intentos"]) == (

@@ -39,7 +39,10 @@ API_GATEWAY = "http://localhost:18114"
 PUERTOS = {"itinerary-escritura": 18101, "itinerary-lectura": 18102, "identity-access": 18103,
            "mail-ingest": 18104, "booking-extraction": 18107, "bff-web": 18108,
            "provider-sync": 18109, "app-web": 18111, "preferences": 18112,
-           "notification": 18113, "api-gateway": 18114, "bff-mobile": 18115}
+           "notification": 18113, "api-gateway": 18114, "bff-mobile": 18115,
+           "sharing": 18116,
+           # región EU de la multirregión simulada (paso 16)
+           "itinerary-escritura-eu": 18121, "itinerary-lectura-eu": 18122, "bff-web-eu": 18128}
 ADAPTADOR = "adaptador-aerolinea-simulada"
 REMITENTE = "reservas@aerolinea.example"  # lo reconoce el extractor de ejemplo del paso 9
 SONDEO_S = 0.05

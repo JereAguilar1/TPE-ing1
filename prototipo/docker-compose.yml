@@ -21,6 +21,22 @@ services:
       timeout: 3s
       retries: 10
 
+  postgres-eu:
+    # Multirregión simulada (paso 16, ADR-0002, ADR-0018): la base de la región EU, con el esquema
+    # de itinerary de EU y el registro testigo de los comandos manuales de los usuarios de AM.
+    image: postgres:16.4
+    environment:
+      POSTGRES_USER: trotamundos
+      POSTGRES_DB: trotamundos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta .env, correr make infra-arriba}
+    ports:
+      - "127.0.0.1:55433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trotamundos"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   broker:
     # Broker de eventos con API de Kafka (protocolo del contrato AsyncAPI, ADR-0001).
     image: redpandadata/redpanda:v24.2.7
@@ -54,10 +70,15 @@ services:
       TROTAMUNDOS_BROKER: broker:9092
       TROTAMUNDOS_REGION: AM
       TROTAMUNDOS_MODO: escritura
+      # Testigo transregional (paso 16, ADR-0018 §3): los comandos manuales se confirman recién
+      # con su entrada en la región de respaldo (EU).
+      TROTAMUNDOS_DSN_TESTIGO: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres-eu:5432/trotamundos
     ports:
       - "18101:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      postgres-eu:
         condition: service_healthy
       broker:
         condition: service_healthy
@@ -107,6 +128,7 @@ services:
       TROTAMUNDOS_URL_SUPPORT_LIAISON: http://support-liaison:8000
       TROTAMUNDOS_URL_VIRTUAL_ASSISTANT: http://virtual-assistant:8000
       TROTAMUNDOS_URL_PREFERENCES: http://preferences:8000
+      TROTAMUNDOS_URL_SHARING: http://sharing:8000
     ports:
       - "18103:8000"
     depends_on:
@@ -252,6 +274,78 @@ services:
       timeout: 3s
       retries: 20
 
+  # --- Región EU (paso 16, multirregión simulada; ADR-0002, ADR-0018, QA-05) -------------------
+  # itinerary y bff-web de la región EU, sobre postgres-eu. Atienden a los usuarios con región
+  # primaria EU y, si AM cae, a los de AM (api-gateway conmuta). No se conectan al broker: la
+  # ingesta corre solo en AM, y así las dos regiones no se reparten los mismos eventos. El resto de
+  # los servicios es común a las dos regiones.
+  itinerary-escritura-eu:
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.itinerary.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment: &entorno_itinerary_eu
+      TROTAMUNDOS_DSN: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres-eu:5432/trotamundos
+      TROTAMUNDOS_BROKER: ""
+      TROTAMUNDOS_REGION: EU
+      TROTAMUNDOS_MODO: escritura
+      TROTAMUNDOS_DSN_TESTIGO: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres:5432/trotamundos
+    ports:
+      - "18121:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-eu:
+        condition: service_healthy
+      itinerary-escritura:  # la imagen la construye itinerary-escritura
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  itinerary-lectura-eu:
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.itinerary.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *entorno_itinerary_eu
+      TROTAMUNDOS_MODO: lectura
+    ports:
+      - "18122:8000"
+    depends_on:
+      itinerary-escritura-eu:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/tipos-de-segmento')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  bff-web-eu:
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.bff_web.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TROTAMUNDOS_URL_ITINERARY_LECTURA: http://itinerary-lectura-eu:8000
+      TROTAMUNDOS_URL_ITINERARY_ESCRITURA: http://itinerary-escritura-eu:8000
+      TROTAMUNDOS_URL_VIRTUAL_ASSISTANT: http://virtual-assistant:8000
+      TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
+    ports:
+      - "18128:8000"
+    depends_on:
+      itinerary-lectura-eu:
+        condition: service_healthy
+      itinerary-escritura-eu:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/tipos-de-segmento')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   bff-mobile:
     # Composición para app-movil (paso 11 completo, ADR-0005, ADR-0019): las operaciones de
     # itinerario de bff-web (comun.bff) y GET /panel/resumen (≤ 15 KB). Sin estado ni base propios.
@@ -290,11 +384,17 @@ services:
       TROTAMUNDOS_URL_SUPPORT_LIAISON: http://support-liaison:8000
       TROTAMUNDOS_URL_PREFERENCES: http://preferences:8000
       TROTAMUNDOS_URL_MAIL_INGEST: http://mail-ingest:8000
+      TROTAMUNDOS_URL_SHARING: http://sharing:8000
       TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
+      # Multirregión (paso 16): bff-web de cada región; si la primaria del usuario cae, conmuta.
+      TROTAMUNDOS_REGION: AM
+      TROTAMUNDOS_URL_BFF_WEB_EU: http://bff-web-eu:8000
     ports:
       - "18114:8000"
     depends_on:
       bff-web:
+        condition: service_healthy
+      bff-web-eu:
         condition: service_healthy
       bff-mobile:
         condition: service_healthy
@@ -303,6 +403,30 @@ services:
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8000/tipos-de-segmento')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  sharing:
+    # Compartir un viaje con designados y publicar su resumen (paso 13, RF-11, RF-13, ADR-0028).
+    # La decisión ABAC la toma identity-access (vale de 60 s); sharing lo verifica.
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.sharing.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TROTAMUNDOS_DSN: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres:5432/trotamundos
+      TROTAMUNDOS_REGION: AM
+      TROTAMUNDOS_URL_ITINERARY_LECTURA: http://itinerary-lectura:8000
+      TROTAMUNDOS_URL_IDENTITY_ACCESS: http://identity-access:8000
+      TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
+      TROTAMUNDOS_VALE_SECRETO: ${TROTAMUNDOS_VALE_SECRETO}
+    ports:
+      - "18116:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2)"]
       interval: 5s
       timeout: 3s
       retries: 20

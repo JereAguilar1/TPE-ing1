@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — sharing
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Compartición de un viaje con personas designadas (RF-11, QA-12) y publicación de un resumen en
     redes sociales (RF-13). En la iteración 2 este contrato era un borrador; se completó en la
@@ -13,6 +13,12 @@ info:
     - La revocación surte efecto en 60 s o menos (vales de 60 s e invalidación de caché en < 5 s).
     - `ResumenPublicable` solo admite cuatro atributos (`additionalProperties: false`): los
       localizadores, horarios exactos, precios, direcciones y correos son irrepresentables.
+
+    Versiones:
+    - `1.1.0`: operaciones internas (`x-interna`, no se publican en `api-gateway`):
+      `GET /interno/comparticiones/{cid}`, los atributos que `identity-access` necesita para la
+      evaluación ABAC y el código de invitado (ADR-0028), y `DELETE /interno/usuarios/{usuarioId}`,
+      la orden de borrado de la fase 1 (ADR-0030, ADR-0042). Cambio compatible (ADR-0027).
 servers:
   - url: https://api.trotamundos.app
 security:
@@ -141,10 +147,51 @@ paths:
               schema: { $ref: '#/components/schemas/ResumenPublicable' }
         '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
 
+  /interno/comparticiones/{cid}:
+    parameters:
+      - { name: cid, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    get:
+      operationId: atributosDeComparticion
+      summary: Atributos de la compartición para la evaluación ABAC de `identity-access` (ADR-0028)
+      x-interna: true
+      security: [{ mtls: [] }]
+      responses:
+        '200':
+          description: Atributos del recurso. `estado` ya contempla el vencimiento.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [propietarioId, viajeId, estado, designados, expiraEn]
+                properties:
+                  propietarioId: { $ref: 'comun.yaml#/components/schemas/Id' }
+                  viajeId: { $ref: 'comun.yaml#/components/schemas/Id' }
+                  estado: { type: string, enum: [Activa, Revocada, Vencida] }
+                  designados:
+                    type: array
+                    items: { type: string, format: email }
+                  expiraEn: { type: string, format: date-time }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
+  /interno/usuarios/{usuarioId}:
+    parameters:
+      - { name: usuarioId, in: path, required: true, schema: { $ref: 'comun.yaml#/components/schemas/Id' } }
+    delete:
+      operationId: suprimirDatosDeUsuario
+      summary: Orden de borrado de la fase 1 de la supresión (ADR-0030, ADR-0042)
+      x-interna: true
+      security: []
+      responses:
+        '204': { description: Borradas las comparticiones y publicaciones del usuario (idempotente). }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
+
 components:
   securitySchemes:
     oidc:
       $ref: 'comun.yaml#/components/securitySchemes/oidc'
+    mtls:
+      type: mutualTLS
+      description: Certificado de cliente de `identity-access` (ADR-0029).
   schemas:
     Comparticion:
       type: object

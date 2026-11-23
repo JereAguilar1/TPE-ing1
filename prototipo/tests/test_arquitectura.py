@@ -141,10 +141,12 @@ DEPENDENCIAS_DE_ITINERARY = {
     "proyeccion_panel": set(),             # I3: no importa lógica de dominio
     "publicacion": set(),                  # I3
     "api": {"gestion_manual", "proyeccion_panel"},
+    # Testigo transregional (paso 16, ADR-0018): graba y reproduce comandos; no conoce el dominio.
+    "testigo": set(),
     # No es un módulo de la vista: es el punto de armado del elemento, que define las
     # transacciones y por eso conoce a todos. Ningún módulo lo importa a él.
     "servicio": {"reservas", "fusion", "viajes", "gestion_manual", "ingesta",
-                 "proyeccion_panel", "publicacion", "api"},
+                 "proyeccion_panel", "publicacion", "api", "testigo"},
 }
 
 
@@ -201,10 +203,12 @@ DEPENDENCIAS_DE_IDENTITY_ACCESS = {
     "autenticacion_oidc": {"auditoria_y_revocacion"},
     "consentimiento_buzones": {"custodia_boveda", "auditoria_y_revocacion"},
     "motor_autorizacion_abac": {"auditoria_y_revocacion"},
+    "consultor_sharing": {"motor_autorizacion_abac"},
     "ordenes_de_borrado": set(),
     "publicacion": set(),
     "api": set(),
     "servicio": {
+        "consultor_sharing",
         "ordenes_de_borrado",
         "auditoria_y_revocacion",
         "custodia_boveda",
@@ -372,11 +376,22 @@ def test_bff_web_no_tiene_persistencia_ni_logica_de_dominio():
 
 
 
+# --- `sharing` (paso 13; ADR-0028) ------------------------------------------------------------
+
+DEPENDENCIAS_DE_SHARING = {"comparticiones": set(), "resumen": set(), "puertos": set(),
+                           "complementos": set(), "api": set(),
+                           "servicio": {"comparticiones", "resumen", "puertos", "complementos",
+                                        "api"}}
+
+
+def test_los_modulos_de_sharing_respetan_sus_dependencias():
+    assert violaciones_internas(PAQUETE, "sharing", DEPENDENCIAS_DE_SHARING) == []
+
 # --- `bff_mobile` y `api_gateway` (paso 11 completo; ADR-0005, ADR-0020) --------------------
 
 DEPENDENCIAS_DE_BFF_MOBILE = {"resumen": set(), "api": set(), "servicio": {"resumen", "api"}}
-DEPENDENCIAS_DE_API_GATEWAY = {"cubeta": set(), "modos": set(), "rutas": set(),
-                               "servicio": {"cubeta", "modos", "rutas"}}
+DEPENDENCIAS_DE_API_GATEWAY = {"cubeta": set(), "modos": set(), "rutas": set(), "regiones": set(),
+                               "servicio": {"cubeta", "modos", "rutas", "regiones"}}
 
 
 def test_los_modulos_de_bff_mobile_y_api_gateway_respetan_sus_dependencias():

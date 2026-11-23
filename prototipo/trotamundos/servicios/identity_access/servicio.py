@@ -44,6 +44,7 @@ from trotamundos.servicios.identity_access import (
     auditoria_y_revocacion,
     autenticacion_oidc,
     consentimiento_buzones,
+    consultor_sharing,
     custodia_boveda,
     motor_autorizacion_abac,
     ordenes_de_borrado,
@@ -111,10 +112,15 @@ class IdentityAccess:
         self._proveedor_oidc = proveedor_oidc or autenticacion_oidc.ProveedorOidcSimulado(
             self._configuracion.region
         )
-        self._consultor_designados = consultor_designados or autenticacion_oidc.ConsultorNulo()
+        # Con `sharing` configurado (paso 13), sus comparticiones; si no, se deniega todo.
+        url_sharing = os.environ.get("TROTAMUNDOS_URL_SHARING")
+        de_sharing = (consultor_sharing.ConsultorDeSharingHttp(url_sharing, self._configuracion.region)
+                      if url_sharing else None)
+        self._consultor_designados = (consultor_designados or de_sharing
+                                      or autenticacion_oidc.ConsultorNulo())
         self._enviador_otp = enviador_otp or autenticacion_oidc.EnviadorOtpEnMemoria()
         self._consultor_recursos = (
-            consultor_recursos or motor_autorizacion_abac.ConsultorDeRecursosNulo()
+            consultor_recursos or de_sharing or motor_autorizacion_abac.ConsultorDeRecursosNulo()
         )
         # El p99 de tokens por minuto de una réplica de mail-ingest es un supuesto a calibrar
         # (ADR-0029): pasar 3 veces ese valor bloquea la réplica.

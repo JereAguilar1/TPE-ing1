@@ -68,10 +68,11 @@ jobs:
       - name: Instalar dependencias
         run: make instalar PYTHON=python
 
-      - name: Escenarios QA-01 (frescura) y QA-04 (ráfaga) e interfaz web contra los contenedores
+      # QA-05 va al final: tira la región AM y la vuelve a levantar (paso 16).
+      - name: Escenarios QA-01 (frescura), QA-04 (ráfaga), QA-05 (pérdida de región) e interfaz web contra los contenedores
         env:
           TROTAMUNDOS_EXIGIR_CONTENEDORES: "1"
-        run: .venv/bin/python -m pytest -q -s tests/escenarios/test_qa01_frescura.py tests/escenarios/test_qa04_rafaga.py tests/escenarios/test_rf07_agrupacion.py tests/escenarios/test_qa15_tren_por_correo.py tests/escenarios/test_supresion_contenedores.py tests/escenarios/test_rf10_avisos_contenedores.py tests/escenarios/test_gateway_contenedores.py tests/escenarios/test_hotel_por_correo.py tests/app_web
+        run: .venv/bin/python -m pytest -q -s tests/escenarios/test_qa01_frescura.py tests/escenarios/test_qa04_rafaga.py tests/escenarios/test_rf07_agrupacion.py tests/escenarios/test_qa15_tren_por_correo.py tests/escenarios/test_supresion_contenedores.py tests/escenarios/test_rf10_avisos_contenedores.py tests/escenarios/test_gateway_contenedores.py tests/escenarios/test_hotel_por_correo.py tests/escenarios/test_comparticion_contenedores.py tests/app_web tests/escenarios/test_qa05_perdida_de_region.py
 
       - name: Estado y registros de los contenedores (si algo falló)
         if: failure()

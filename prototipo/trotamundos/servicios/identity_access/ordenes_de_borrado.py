@@ -24,8 +24,9 @@ ESPERA_MAXIMA = timedelta(minutes=15)
 PLAZO_DE_LA_FASE_1 = timedelta(hours=24)
 
 # Los servicios del plano operacional que guardan datos por usuario y reciben la orden (ADR-0030;
-# el asistente, por ADR-0040). `sharing` no está construido.
+# el asistente, por ADR-0040; `sharing`, desde el paso 13).
 SERVICIOS = {
+    "sharing": ("TROTAMUNDOS_URL_SHARING", "http://localhost:18116"),
     "preferences": ("TROTAMUNDOS_URL_PREFERENCES", "http://localhost:18112"),
     "itinerary": ("TROTAMUNDOS_URL_ITINERARY_ESCRITURA", "http://localhost:18101"),
     "support-liaison": ("TROTAMUNDOS_URL_SUPPORT_LIAISON", "http://localhost:18105"),
