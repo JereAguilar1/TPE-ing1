@@ -94,6 +94,12 @@ Correr desde `prototipo/`, con el correo usado en la página (`CORREO=ana@ejempl
   `tests/escenarios/contenedores.py`; el localizador de la ida es el que imprimió `cargar_viajes.py`.
 - **Disrupción y agencia preferida (momento 3.4):** la etapa 7 de `demo/demo.sh` publica
   `PreferenciasActualizadas` y `DisrupcionDetectada` para el viajero.
+- **Pérdida de la región AM (QA-05):** `TROTAMUNDOS_EXIGIR_CONTENEDORES=1 .venv/bin/python -m
+  pytest -s tests/escenarios/test_qa05_perdida_de_region.py` tira AM, mide la redirección y la
+  vuelve a levantar. Si se tira AM a mano (`docker compose kill itinerary-escritura
+  itinerary-lectura bff-web`), después: `docker compose up -d --wait itinerary-escritura
+  itinerary-lectura bff-web && docker compose restart api-gateway`. El *gateway* no devuelve
+  solo el tráfico a una región que volvió (ADR-0018 §4).
 
 > Pendiente para el cierre: dejar estos dos comandos como scripts de una línea en `demo/`, y
 > repartir quién presenta cada momento.
@@ -109,9 +115,8 @@ Correr desde `prototipo/`, con el correo usado en la página (`CORREO=ana@ejempl
   manuales y conmutación en `api-gateway` (ADR-0002, ADR-0018). El escenario de QA-05
   (`tests/escenarios/test_qa05_perdida_de_region.py`, en el trabajo `servicios`) tira la región AM
   y mide: el viajero vuelve a tener servicio desde EU en unos 7 s, con lo confirmado intacto.
-  La página web no conmuta (habla con el `bff-web` de AM por nginx): QA-05 se muestra con el
-  escenario o por `api-gateway`. La tercera región y la replicación de lo ingerido, en
-  «Diseñado y no construido».
+  La página también conmuta: nginx la manda por `api-gateway`. La tercera región y la
+  replicación de lo ingerido, en «Diseñado y no construido».
 - **¿Y la app móvil?** Diseñada (ADR-0005, ADR-0019, ADR-0033); la página web se adapta al celular.
 - **¿Cómo saben que el código respeta la arquitectura?** Reglas en `tests/test_arquitectura.py`
   (ningún servicio importa a otro, dependencias internas por vista de módulos, ningún tipo de

@@ -57,8 +57,10 @@ enunciado.
 | Iteración 3 — refinamiento para rendimiento, disponibilidad y escalabilidad | Vista de despliegue N2, análisis de presupuestos, modelo de costo, ADRs 0018–0026 y especificación ejecutable de pruebas de carga y SLOs | ✅ Completa |
 | Iteración 4 — refinamiento para interoperabilidad, seguridad y evolucionabilidad | Vista de módulos de adaptadores, vista de seguridad y datos, guías de extensión (`tren` / proveedor / región), contratos versionados y ADRs 0027–0035 | ✅ Completa |
 | Cierre de 1ra entrega | Revisión de consistencia entre vistas, verificación en papel de Opción A y B (`CON-06`) y matriz de trazabilidad al 100 % (`0` drivers en `⬜`) | ✅ Completa |
-| Iteración 5 — diseño de la Opción B (asistente virtual) | ADRs nuevos y contrato del asistente en `iteracion-5/` | Pendiente *(paso 18 del [plan](../../prototipo/README.md#plan-de-construcción))* |
-| 2da entrega | Módulo avanzado (Opción B: asistente virtual) + prototipo ejecutable trazable | En curso *(ver [plan de construcción](../../prototipo/README.md#plan-de-construcción))* |
+| Iteración 5 — diseño de la Opción B (asistente virtual) | Diseño en `iteracion-5/`, ADRs 0037–0041 y contrato `virtual-assistant.yaml` (paso 18 del [plan](../../prototipo/README.md#plan-de-construcción)) | ✅ Completa |
+| Construcción del prototipo | Pasos 1 a 20 del [plan](../../prototipo/README.md#plan-de-construcción): los servicios de la tajada vertical, el asistente virtual, la interfaz web y los escenarios de los ASR contra los contenedores, incluidos los pasos 13 y 16 que el recorte había dejado afuera | ✅ Completa *(congelamiento: lunes 23/11, 03:00)* |
+| Cierre del prototipo | Paso 21: revisión de la matriz código ↔ ADR, README final, «Diseñado y no construido» y guion de demostración; ensayo de la defensa | Pendiente *(lunes 23/11, después del congelamiento)* |
+| 2da entrega | Módulo avanzado (Opción B: asistente virtual) + prototipo ejecutable trazable | En curso *(entrega: lunes 23/11, 23:00)* |
 
 ## Cambios a drivers después de fijados
 
