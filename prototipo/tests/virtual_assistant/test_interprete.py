@@ -115,6 +115,11 @@ def test_el_viaje_por_su_titulo(interprete, contexto):
     ("ahora sale a las 7 y media de la tarde", None, time(19, 30)),
     ("lo movieron al 3/12/202", date(2026, 12, 3), None),  # un año de 3 cifras no es un año
     ("lo movieron al 2/1", date(2027, 1, 2), None),  # sin año, la próxima vez que llega
+    ("me lo pasaron a las 12 de la noche", None, time(0, 0)),  # la medianoche, no el mediodía
+    ("me lo pasaron a las 12 de la tarde", None, time(12, 0)),
+    ("me lo pasaron al 5.12", date(2026, 12, 5), None),  # con punto, después de «al», es fecha
+    ("me lo pasaron al 5.12 a las 7.45", date(2026, 12, 5), time(7, 45)),
+    ("ahora sale 07.45 hs", None, time(7, 45)),
 ])
 def test_fechas_y_horas_relativas(interprete, contexto, texto, fecha, hora):
     resultado = interprete.interpretar(texto, contexto)

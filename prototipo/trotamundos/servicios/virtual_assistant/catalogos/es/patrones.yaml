@@ -82,6 +82,8 @@ entidades:
   # es mañana) y suman horas a una hora de 1 a 11 («a las 9 de la noche» son las 21).
   franjas_del_dia:
     - { patron: '\b(de|por|a) la manana\b', suma: 0 }
-    - { patron: '\b(de|por|a) la (tarde|noche)\b', suma: 12 }
+    - { patron: '\b(de|por|a) la tarde\b', suma: 12 }
+    # «las 12 de la noche» es la medianoche: `doce` es la hora que corresponde a las 12.
+    - { patron: '\b(de|por|a) la noche\b', suma: 12, doce: 0 }
   dias_de_la_semana: [lunes, martes, miercoles, jueves, viernes, sabado, domingo]
   meses: [enero, febrero, marzo, abril, mayo, junio, julio, agosto, septiembre, octubre, noviembre, diciembre]

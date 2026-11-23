@@ -535,6 +535,7 @@ function extremo(nombre) {
 
 async function guardarAlta(evento) {
   evento.preventDefault();
+  if (estado.guardandoAlta) return;  // un doble clic no manda dos altas
   $("error-alta").hidden = true;
   const detalle = {};
   for (const control of $("alta-detalle").querySelectorAll("[data-campo]")) {
@@ -553,8 +554,15 @@ async function guardarAlta(evento) {
   }
   const referencia = $("alta-referencia").value.trim();
   if (referencia) segmento.referencia = referencia;
+  // La misma Idempotency-Key hasta que el alta se guarda o se rechaza (4xx, no queda nada): si
+  // la respuesta se pierde, reintentar no crea una segunda reserva.
+  estado.claveAlta ??= uuid();
+  estado.guardandoAlta = true;
+  const boton = $("form-alta").querySelector("button[type=submit]");
+  if (boton) boton.disabled = true;
   try {
-    await llamar("POST", "/reservas", { cuerpo: { segmentos: [segmento] }, clave: uuid() });
+    await llamar("POST", "/reservas", { cuerpo: { segmentos: [segmento] }, clave: estado.claveAlta });
+    estado.claveAlta = null;
     $("form-alta").reset();
     prepararAlta();
     avisar(t("alta.guardada"));
@@ -562,8 +570,12 @@ async function guardarAlta(evento) {
     mostrarVista("panel");
     await actualizarPanel();
   } catch (error) {
+    if (error.estadoHttp >= 400 && error.estadoHttp < 500) estado.claveAlta = null;
     $("error-alta").textContent = t("alta.error", { motivo: error.message });
     $("error-alta").hidden = false;
+  } finally {
+    estado.guardandoAlta = false;
+    if (boton) boton.disabled = false;
   }
 }
 

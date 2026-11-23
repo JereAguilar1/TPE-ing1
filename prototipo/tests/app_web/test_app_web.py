@@ -89,6 +89,16 @@ def test_todo_id_en_una_ruta_de_la_api_se_valida_y_se_codifica():
     assert 'sessionStorage.setItem(clave, valor)' in JS and "if (!valido(clave, valor)) return;" in JS
 
 
+def test_un_doble_clic_o_un_reintento_no_crea_dos_reservas():
+    """La carga manual reusa su `Idempotency-Key` hasta que el alta se guarda o se rechaza, e
+    ignora un segundo envío mientras el primero está en curso (ADR-0014)."""
+    alta = JS[JS.index("async function guardarAlta"):JS.index("// --- asistente")]
+    assert "if (estado.guardandoAlta) return;" in alta
+    assert "estado.claveAlta ??= uuid();" in alta and "clave: estado.claveAlta" in alta
+    assert "clave: uuid()" not in alta
+    assert alta.count("estado.claveAlta = null") == 2  # al guardarse y ante un 4xx
+
+
 def test_el_catalogo_tiene_icono_y_etiquetas_para_cada_tipo_registrado():
     """Un tipo nuevo se ve con su ícono y sus filas agregando entradas al catálogo, sin tocar el
     código de la página (QA-15, elemento 2 de la guía de extensión: recursos de presentación)."""

@@ -120,7 +120,7 @@ class InterpretePorReglas:
         # Los relativos más largos primero: «pasado mañana» antes que «mañana».
         self._relativos = sorted(entidades["dias_relativos"].items(), key=lambda r: -len(r[0]))
         self._dias = entidades["dias_de_la_semana"]
-        self._franjas = [(re.compile(f["patron"]), int(f["suma"]))
+        self._franjas = [(re.compile(f["patron"]), int(f["suma"]), f.get("doce"))
                          for f in entidades["franjas_del_dia"]]
         self._meses = entidades["meses"]
 
@@ -139,7 +139,7 @@ class InterpretePorReglas:
         hoy = contexto.ahora.astimezone(zona).date()
         dia_del_tramo = _instante(segmento["inicio"]["instante"]).astimezone(zona).date() \
             if segmento else None
-        sin_franjas, franja = self._franja(normal)
+        sin_franjas, franja, doce = self._franja(normal)
         return Interpretacion(
             intencion, confianza,
             reserva_id=reserva["id"] if reserva else None,
@@ -147,7 +147,7 @@ class InterpretePorReglas:
             por_referencia=por_referencia, tipo=tipo,
             viaje_id=self._viaje(normal, contexto),
             fecha=self._fecha(sin_franjas, hoy, dia_del_tramo),
-            hora=self._hora(sin_franjas, franja), entidades=entidades)
+            hora=self._hora(sin_franjas, franja, doce), entidades=entidades)
 
     # --- intención ---------------------------------------------------------------------------
 
@@ -191,19 +191,24 @@ class InterpretePorReglas:
                 return viaje["id"]
         return None
 
-    def _franja(self, normal: str) -> tuple[str, int]:
+    def _franja(self, normal: str) -> tuple[str, int, int | None]:
         """Saca del texto la franja del día («de la mañana», «de la noche»), para que «mañana» no
-        se lea como el día siguiente, y devuelve cuántas horas suma a una hora de 1 a 11."""
-        for patron, suma in self._franjas:
+        se lea como el día siguiente, y devuelve cuántas horas suma a una hora de 1 a 11 y, si la
+        franja lo dice, qué hora son las 12 («las 12 de la noche» son las 0)."""
+        for patron, suma, doce in self._franjas:
             if patron.search(normal):
-                return patron.sub(" ", normal), suma
-        return normal, 0
+                return patron.sub(" ", normal), suma, None if doce is None else int(doce)
+        return normal, 0, None
 
     def _fecha(self, normal: str, hoy: date, dia_del_tramo: date | None) -> date | None:
         for nombre, dias in self._relativos:
             if re.search(rf"\b{nombre}\b", normal):
                 return hoy + timedelta(days=int(dias))
         if (m := re.search(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{4}|\d{2}))?\b", normal)):
+            return self._dia_del_mes(hoy, int(m[1]), int(m[2]), m[3])
+        # «al 5.12»: con punto es una fecha solo después de «el», «al» o «del» («a las 7.45» es
+        # una hora, la lee `_hora`).
+        if (m := re.search(r"\b(?:el|al|del) (\d{1,2})\.(\d{1,2})(?:\.(\d{4}|\d{2}))?\b", normal)):
             return self._dia_del_mes(hoy, int(m[1]), int(m[2]), m[3])
         if (m := re.search(rf"\b(\d{{1,2}}) de ({'|'.join(self._meses)})\b", normal)):
             return self._dia_del_mes(hoy, int(m[1]), self._meses.index(m[2]) + 1, None)
@@ -237,8 +242,12 @@ class InterpretePorReglas:
             return None
 
     @staticmethod
-    def _hora(normal: str, franja: int = 0) -> time | None:
-        if (m := re.search(r"\b(\d{1,2})[:.](\d{2})\b", normal)):
+    def _hora(normal: str, franja: int = 0, doce: int | None = None) -> time | None:
+        # Con dos puntos siempre es una hora; con punto, solo «a las 7.45» o «7.45 hs»: «al 5.12»
+        # es una fecha.
+        if (m := re.search(r"\b(\d{1,2}):(\d{2})\b", normal)
+                or re.search(r"\ba las (\d{1,2})\.(\d{2})\b", normal)
+                or re.search(r"\b(\d{1,2})\.(\d{2}) ?(?:hs|h)\b", normal)):
             hora, minutos = int(m[1]), int(m[2])
         elif (m := re.search(r"\ba las (\d{1,2})( y media| y cuarto)?\b", normal)) \
                 or (m := re.search(r"\b(\d{1,2}) ?(hs|h)\b", normal)):
@@ -248,4 +257,6 @@ class InterpretePorReglas:
             return None
         if 1 <= hora <= 11:
             hora += franja  # «a las 9 de la noche» son las 21
+        elif hora == 12 and doce is not None:
+            hora = doce  # «a las 12 de la noche» son las 0
         return time(hora, minutos) if hora < 24 and minutos < 60 else None
