@@ -98,6 +98,17 @@ def test_el_catalogo_tiene_icono_y_etiquetas_para_cada_tipo_registrado():
     assert sorted(filas - set(TEXTOS["campos"])) == []
 
 
+def test_la_carga_manual_tiene_etiqueta_para_cada_campo_de_detalle():
+    """El formulario de carga manual se arma con el `esquemaDeDetalle` de cada descriptor: un tipo
+    nuevo se carga a mano agregando sus etiquetas al catálogo, sin tocar el código (QA-15)."""
+    esquemas = [d["esquemaDeDetalle"] for d in registro_por_omision().documentos()]
+    campos = {campo for e in esquemas for campo in e["properties"]}
+    assert sorted(campos - set(TEXTOS["campos"])) == []
+    valores = {v for e in esquemas for p in e["properties"].values() for v in p.get("enum", [])}
+    assert sorted(valores - set(TEXTOS["valores"])) == []
+    assert "esquemaDeDetalle" in JS and "aUtc(" in JS  # horas del lugar a UTC (ADR-0032)
+
+
 # --- contra los contenedores ------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
@@ -142,3 +153,43 @@ def test_el_recorrido_de_la_pagina_por_nginx(cliente):
                              headers={**cabeceras, **medio, "Idempotency-Key": str(uuid4())})
     assert respuesta.status_code == 200, respuesta.text
     assert respuesta.json()["mensajes"] == ["No tenés viajes activos."]
+
+
+def test_las_pantallas_nuevas_por_nginx(cliente):
+    """Lo que hacen las pantallas del paso 20 completo: la carga manual (como la arma el formulario,
+    con las horas del lugar en UTC), el detalle del viaje, los viajes anteriores y eliminar."""
+    correo = f"web-{uuid4().hex[:8]}@ejemplo.com"
+    sesion = cliente.post("/api/ia/sesiones", json={
+        "codigo": f"oidc:{correo}:AM", "verificadorPkce": "v" * 43, "uriRedireccion": f"{URL}/"})
+    cabeceras = {"Authorization": f"Bearer {sesion.json()['tokenAcceso']}",
+                 "Accept": "application/vnd.trotamundos.v1+json",
+                 "Content-Type": "application/vnd.trotamundos.v1+json"}
+    tipo = next(d for d in cliente.get("/api/bff/tipos-de-segmento").json()
+                if "habitaciones" in d["esquemaDeDetalle"]["properties"])
+    lugar = {"nombre": "Mendoza", "pais": "AR", "zonaHoraria": "America/Argentina/Mendoza"}
+    alta = {"segmentos": [{
+        "tipo": tipo["tipo"], "operador": "Posada del Sol",
+        "inicio": {"instante": "2027-03-10T17:00:00Z", "precision": "instante",
+                   "zonaHoraria": lugar["zonaHoraria"], "lugar": lugar},
+        "fin": {"instante": "2027-03-12T13:00:00Z", "precision": "instante",
+                "zonaHoraria": lugar["zonaHoraria"], "lugar": lugar},
+        "detalle": {"habitaciones": 1, "huespedes": 2, "regimen": "desayuno"}}]}
+    creada = cliente.post("/api/bff/reservas", content=json.dumps(alta),
+                          headers={**cabeceras, "Idempotency-Key": str(uuid4())})
+    assert creada.status_code == 201, creada.text
+    version = creada.json()["versionUsuario"]
+
+    panel = cliente.get("/api/bff/panel", headers={**cabeceras, "X-Min-Version": str(version)})
+    (viaje,) = panel.json()["viajesActivos"]
+    detalle = cliente.get(f"/api/bff/viajes/{viaje['id']}", headers=cabeceras)
+    assert detalle.status_code == 200
+    (reserva,) = detalle.json()["reservas"]
+    assert reserva["fuentes"] == ["manual"] and reserva["segmentos"][0]["detalle"]["huespedes"] == 2
+
+    for estado in ("Completado", "Archivado"):
+        anteriores = cliente.get("/api/bff/viajes", params={"estado": estado, "limite": 100},
+                                 headers=cabeceras)
+        assert anteriores.status_code == 200 and anteriores.json()["viajes"] == []
+
+    assert cliente.delete(f"/api/bff/viajes/{viaje['id']}", headers=cabeceras).status_code == 204
+    assert cliente.get(f"/api/bff/viajes/{viaje['id']}", headers=cabeceras).status_code == 404

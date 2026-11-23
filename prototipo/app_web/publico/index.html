@@ -35,16 +35,84 @@
 
     <div id="aplicacion" class="columnas" hidden>
       <section class="tarjeta" aria-labelledby="titulo-panel">
-        <div class="encabezado">
-          <h2 id="titulo-panel" data-texto="panel.titulo">Mis viajes</h2>
-          <div>
-            <span id="actualizado" class="sutil"></span>
-            <button id="actualizar" class="secundario" data-texto="panel.actualizar">Actualizar</button>
+        <nav class="pestanas">
+          <button id="ir-panel" class="secundario" data-texto="navegacion.panel">Mis viajes</button>
+          <button id="ir-anteriores" class="secundario" data-texto="navegacion.anteriores">Viajes anteriores</button>
+          <button id="ir-alta" class="secundario" data-texto="navegacion.alta">Cargar una reserva</button>
+        </nav>
+        <p id="aviso" class="aviso-accion" role="status" hidden></p>
+
+        <div id="vista-panel">
+          <div class="encabezado">
+            <h2 id="titulo-panel" data-texto="panel.titulo">Mis viajes</h2>
+            <div>
+              <span id="actualizado" class="sutil"></span>
+              <button id="actualizar" class="secundario" data-texto="panel.actualizar">Actualizar</button>
+            </div>
           </div>
+          <p id="error-panel" class="error" hidden></p>
+          <div id="viajes"></div>
+          <div id="por-confirmar"></div>
         </div>
-        <p id="error-panel" class="error" hidden></p>
-        <div id="viajes"></div>
-        <div id="por-confirmar"></div>
+
+        <div id="vista-viaje" hidden>
+          <div class="encabezado">
+            <h2 id="titulo-viaje"></h2>
+            <div>
+              <button id="archivar-viaje" class="secundario" data-texto="viaje.archivar">Archivar</button>
+              <button id="eliminar-viaje" class="peligro" data-texto="viaje.eliminar">Eliminar viaje</button>
+            </div>
+          </div>
+          <p id="resumen-viaje" class="sutil"></p>
+          <div id="reservas-del-viaje"></div>
+        </div>
+
+        <div id="vista-anteriores" hidden>
+          <h2 data-texto="anteriores.titulo">Viajes anteriores</h2>
+          <p class="sutil" data-texto="anteriores.ayuda">Los viajes completados y archivados no aparecen en el panel.</p>
+          <div id="lista-anteriores"></div>
+        </div>
+
+        <div id="vista-alta" hidden>
+          <h2 data-texto="alta.titulo">Cargar una reserva</h2>
+          <p class="sutil" data-texto="alta.ayuda">Para lo que no llega por correo ni por el proveedor. Las horas son las del lugar.</p>
+          <form id="form-alta" class="formulario">
+            <label for="alta-tipo" data-texto="alta.tipo">Tipo</label>
+            <select id="alta-tipo" required></select>
+            <label for="alta-operador" data-texto="alta.operador">Empresa</label>
+            <input id="alta-operador" required maxlength="80">
+            <label for="alta-referencia" data-texto="alta.referencia">Número o referencia (opcional)</label>
+            <input id="alta-referencia" maxlength="40">
+            <fieldset>
+              <legend data-texto="alta.inicio">Desde</legend>
+              <label for="alta-inicio-lugar" data-texto="alta.lugar">Lugar</label>
+              <input id="alta-inicio-lugar" required maxlength="80">
+              <label for="alta-inicio-pais" data-texto="alta.pais">País (código de dos letras)</label>
+              <input id="alta-inicio-pais" required pattern="[A-Za-z]{2}" maxlength="2">
+              <label for="alta-inicio-zona" data-texto="alta.zona">Zona horaria</label>
+              <input id="alta-inicio-zona" required list="zonas">
+              <label for="alta-inicio-hora" data-texto="alta.hora">Fecha y hora</label>
+              <input id="alta-inicio-hora" type="datetime-local" required>
+            </fieldset>
+            <fieldset>
+              <legend data-texto="alta.fin">Hasta</legend>
+              <label for="alta-fin-lugar" data-texto="alta.lugar">Lugar</label>
+              <input id="alta-fin-lugar" required maxlength="80">
+              <label for="alta-fin-pais" data-texto="alta.pais">País (código de dos letras)</label>
+              <input id="alta-fin-pais" required pattern="[A-Za-z]{2}" maxlength="2">
+              <label for="alta-fin-zona" data-texto="alta.zona">Zona horaria</label>
+              <input id="alta-fin-zona" required list="zonas">
+              <label for="alta-fin-hora" data-texto="alta.hora">Fecha y hora</label>
+              <input id="alta-fin-hora" type="datetime-local" required>
+            </fieldset>
+            <fieldset id="alta-detalle">
+              <legend data-texto="alta.detalle">Detalle</legend>
+            </fieldset>
+            <datalist id="zonas"></datalist>
+            <button type="submit" data-texto="alta.guardar">Guardar reserva</button>
+            <p id="error-alta" class="error" hidden></p>
+          </form>
+        </div>
       </section>
 
       <section class="tarjeta chat" aria-labelledby="titulo-chat">

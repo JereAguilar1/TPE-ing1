@@ -15,13 +15,14 @@
     "actualizado": "Actualizado {hora}",
     "sinViajes": "Todavía no tenés viajes. Reenviá una confirmación a tu alias o cargala a mano.",
     "porConfirmar": "Por confirmar",
-    "porConfirmarAyuda": "Llegaron por correo con datos dudosos: confirmalas o descartalas desde el asistente.",
+    "porConfirmarAyuda": "Llegaron por correo con datos dudosos: confirmalas o descartalas.",
     "conflictos": "{cantidad, plural, one {# dato en conflicto} other {# datos en conflicto}}",
     "reservas": "{cantidad, plural, one {# reserva} other {# reservas}}",
     "desdeHasta": "{desde} – {hasta}",
     "horaLocal": "hora de {ciudad}",
     "todoElDia": "todo el día",
-    "error": "No pudimos leer tu panel. Probá de nuevo en un rato."
+    "error": "No pudimos leer tu panel. Probá de nuevo en un rato.",
+    "verViaje": "Ver el viaje"
   },
   "estadosDeViaje": {
     "Planificado": "Planificado",
@@ -47,7 +48,12 @@
     "vence": "La propuesta vence a las {hora}.",
     "realizada": "Hecho",
     "error": "El asistente no respondió. Probá de nuevo.",
-    "sugerencias": ["¿Cómo viene mi viaje?", "¿A qué hora sale mi vuelo?", "¿Tengo reservas por confirmar?", "Quiero hablar con mi agencia"]
+    "sugerencias": [
+      "¿Cómo viene mi viaje?",
+      "¿A qué hora sale mi vuelo?",
+      "¿Tengo reservas por confirmar?",
+      "Quiero hablar con mi agencia"
+    ]
   },
   "iconos": {
     "vuelo": "✈️",
@@ -70,6 +76,85 @@
     "regimen": "Régimen",
     "categoria": "Categoría",
     "kilometraje": "Kilometraje",
-    "cobertura": "Cobertura"
+    "cobertura": "Cobertura",
+    "aerolinea": "Aerolínea",
+    "numeroDeVuelo": "Número de vuelo",
+    "numeroDeTren": "Número de tren",
+    "habitaciones": "Habitaciones",
+    "politicaDeCancelacion": "Cancelación",
+    "servicio": "Servicio"
+  },
+  "navegacion": {
+    "panel": "Mis viajes",
+    "anteriores": "Viajes anteriores",
+    "alta": "Cargar una reserva"
+  },
+  "viaje": {
+    "archivar": "Archivar",
+    "eliminar": "Eliminar viaje",
+    "confirmarEliminar": "¿Eliminar el viaje y todas sus reservas?",
+    "archivado": "Viaje archivado.",
+    "eliminado": "Viaje eliminado.",
+    "eliminarReserva": "Eliminar reserva",
+    "confirmarEliminarReserva": "¿Eliminar esta reserva?",
+    "reservaEliminada": "Reserva eliminada.",
+    "codigos": "Códigos: {codigos}",
+    "fuentes": "Llegó por: {fuentes}"
+  },
+  "anteriores": {
+    "titulo": "Viajes anteriores",
+    "ayuda": "Los viajes completados y archivados no aparecen en el panel.",
+    "ninguno": "No tenés viajes anteriores."
+  },
+  "alta": {
+    "titulo": "Cargar una reserva",
+    "ayuda": "Para lo que no llega por correo ni por el proveedor. Las horas son las del lugar.",
+    "tipo": "Tipo",
+    "operador": "Empresa",
+    "referencia": "Número o referencia (opcional)",
+    "inicio": "Desde",
+    "fin": "Hasta",
+    "lugar": "Lugar",
+    "pais": "País (código de dos letras)",
+    "zona": "Zona horaria",
+    "hora": "Fecha y hora",
+    "detalle": "Detalle",
+    "guardar": "Guardar reserva",
+    "guardada": "Reserva guardada.",
+    "error": "No pudimos guardar la reserva: {motivo}",
+    "sinElegir": "—"
+  },
+  "porConfirmar": {
+    "confirmar": "Confirmar",
+    "descartar": "Descartar",
+    "confirmada": "Reserva confirmada.",
+    "descartada": "Reserva descartada."
+  },
+  "conflictos": {
+    "titulo": "Datos en conflicto",
+    "campo": "{campo}: ¿con cuál te quedás?",
+    "elegir": "Quedarme con {valor} ({fuente})",
+    "resuelto": "Conflicto resuelto."
+  },
+  "fuentes": {
+    "correo": "correo",
+    "proveedor": "proveedor",
+    "manual": "carga manual"
+  },
+  "accion": {
+    "error": "No se pudo hacer: {motivo}"
+  },
+  "valores": {
+    "soloAlojamiento": "Solo alojamiento",
+    "desayuno": "Desayuno",
+    "mediaPension": "Media pensión",
+    "pensionCompleta": "Pensión completa",
+    "todoIncluido": "Todo incluido",
+    "economica": "Económica",
+    "ejecutiva": "Ejecutiva",
+    "ilimitado": "Ilimitado",
+    "limitado": "Limitado",
+    "premium": "Premium",
+    "primera": "Primera"
   }
 }
