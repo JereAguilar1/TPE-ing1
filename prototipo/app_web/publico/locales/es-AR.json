@@ -5,7 +5,6 @@
     "titulo": "Ingresá a tu panel",
     "correo": "Tu correo",
     "boton": "Ingresar",
-    "aclaracion": "Prototipo: el inicio de sesión OIDC está simulado por identity-access.",
     "error": "No pudimos iniciar la sesión. Revisá el correo e intentá de nuevo."
   },
   "salir": "Salir",
