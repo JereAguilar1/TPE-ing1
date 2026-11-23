@@ -21,6 +21,13 @@ arquitectónica se revisa entre los cuatro antes de pasar un ADR a estado `acept
 | Iteración 2 | Modelo canónico y ciclo de vida del viaje | Persistencia y particionamiento | Extracción y normalización de reservas | Diagramas de secuencia de los casos primarios |
 | Iteración 3 | Revisión de consistencia y kanban de drivers | Tácticas de rendimiento y escalabilidad | Backpressure y cuotas de terceros | Tácticas de disponibilidad y degradación |
 | Iteración 4 | Guía de extensión y trazabilidad final | Residencia de datos y multirregión | Versionado de contratos y nuevos transportes | Cifrado, bóveda de tokens, auditoría |
+| Iteración 5 | Decisiones D37 a D41 (ADR-0037 a ADR-0041) | Responsable de la iteración: plan, alternativas, ADR, contrato `virtual-assistant.yaml` y vistas del asistente; decisiones D37 a D41 | Decisiones D37 a D41 | Decisiones D37 a D41 |
+| Prototipo (2da entrega) | Paso 7: `identity-access` (sesiones, buzones, bóveda, ABAC y auditoría) | Pasos 1 a 6, 8, 12, 13 y 15 a 21; la versión completa de los pasos 9, 10, 11 y 14; revisión y correcciones de los pasos 1 a 7 | Paso 9 (recorte): `booking-extraction` | Pasos 10, 11 y 14 (recorte): `provider-sync`, `bff-web` y `event-pipeline` |
+
+La tecnología del prototipo ([ADR-0036](../03-adr/ADR-0036-tecnologia-del-prototipo.md)) la
+decidieron los cuatro. El detalle de cada paso del prototipo, con quién lo hizo, está en la columna
+«Responsable» del [plan de construcción](../../prototipo/README.md#plan-de-construcción) y en la
+[bitácora](bitacora.md); los commits de cada integrante, en el historial del repositorio.
 
 ## Convenciones de trabajo
 

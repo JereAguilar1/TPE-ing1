@@ -4,6 +4,10 @@ El enunciado exige **un mínimo de 4 iteraciones** del proceso ADD (§4). Este p
 de cada una siguiendo el orden del método de Cervantes & Kazman, de modo que cada iteración se
 apoye en las estructuras que dejó la anterior.
 
+La 1ra entrega cerró con las cuatro. Para la 2da se sumó una **quinta**, que el profesor aprobó el
+2026-11-16: diseña el interior del módulo avanzado elegido (Opción B, asistente virtual), dentro de
+la frontera que la iteración 4 ya había dejado verificada ([ADR-0034](../03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md)).
+
 ## Por qué este orden y no otro
 
 ADD no permite elegir el orden de las iteraciones a gusto. Las tácticas de atributos de calidad se
@@ -23,14 +27,16 @@ flowchart LR
     I1["Iteración 1<br/>Estructura general"] --> I2
     I2["Iteración 2<br/>Funcionalidad primaria"] --> I3
     I3["Iteración 3<br/>Rendimiento · Disponibilidad · Escalabilidad"] --> I4
-    I4["Iteración 4<br/>Interoperabilidad · Seguridad · Evolucionabilidad"] --> E2
-    E2["2da entrega<br/>Módulo avanzado + prototipo"]
+    I4["Iteración 4<br/>Interoperabilidad · Seguridad · Evolucionabilidad"] --> I5
+    I5["Iteración 5 (2da entrega)<br/>Módulo avanzado: asistente virtual"] --> E2
+    E2["Prototipo (2da entrega)<br/>Tajada vertical + módulo avanzado"]
 
     style I1 fill:#2d6a4f,color:#fff
     style I2 fill:#2d6a4f,color:#fff
     style I3 fill:#2d6a4f,color:#fff
     style I4 fill:#2d6a4f,color:#fff
-    style E2 stroke-dasharray: 5 5
+    style I5 fill:#2d6a4f,color:#fff
+    style E2 fill:#2d6a4f,color:#fff
 ```
 
 ## Tabla resumen
@@ -41,6 +47,7 @@ flowchart LR
 | **2** | Identificar las estructuras que soportan la funcionalidad primaria | `itinerary`, `mail-ingest`, `booking-extraction`, `provider-sync`, `preferences` | RF-01…RF-03, RF-05…RF-10, RF-14, RF-15; CRN-06 | Modelo de dominio canónico; vista de módulos N2; diagramas de secuencia UC-1…UC-7; ADR sobre persistencia, deduplicación e idempotencia | ✅ [Completa](../02-proceso-add/iteracion-2/README.md) |
 | **3** | Refinar las estructuras para alcanzar los objetivos de rendimiento, disponibilidad y escalabilidad | Plano de lectura, plano de ingesta, plano de datos, infraestructura de despliegue | QA-01…QA-09; CRN-03, CRN-04, CRN-08, CRN-09, CRN-12, CRN-13 | Vista de despliegue N2; verificación de los presupuestos de latencia, frescura y error; especificación ejecutable de pruebas de carga y SLOs; ADR-0018…ADR-0026 | ✅ [Completa](../02-proceso-add/iteracion-3/README.md) |
 | **4** | Refinar para interoperabilidad, seguridad y privacidad, evolucionabilidad y uso internacional | Capa de anticorrupción, `identity-access`, `sharing`, `analytics-plane`, capa de clientes | QA-10…QA-18; CON-05, CON-06, CON-07, CON-08, CON-10; CRN-05, CRN-07, CRN-10, CRN-14, CRN-15 | Vista de módulos de adaptadores; vista de seguridad y datos con catálogo de PII; guías de extensión (`tren` / proveedor / región); verificación en papel de Opción A y B; ADR-0027…ADR-0035 | ✅ [Completa](../02-proceso-add/iteracion-4/README.md) |
+| **5** | Diseñar el interior del módulo avanzado elegido (Opción B, asistente virtual) sin cambios estructurales | El elemento nº 14, `virtual-assistant` | RF-B1, RF-B2; CON-04, CON-05, CON-06, CON-10; QA-14 | ADR-0037…ADR-0041; contrato `virtual-assistant.yaml`; vistas de módulos, C&C y despliegue del asistente y sus secuencias | ✅ [Completa](../02-proceso-add/iteracion-5/README.md) |
 
 ## Criterio de cierre de cada iteración
 
