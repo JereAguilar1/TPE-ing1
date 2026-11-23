@@ -22,6 +22,7 @@ _CONTRATO = "openapi/virtual-assistant.yaml"
 _CUERPO_SESION = (f"{_CONTRATO}#/paths/~1asistente~1sesiones/post/requestBody/content/"
                   "application~1json/schema")
 _CUERPO_MENSAJE = f"{_CONTRATO}#/components/schemas/MensajeDelViajero"
+MODO_REDUCIDO = "DisrupcionMasiva"
 
 
 class AsistenteApi(Protocol):
@@ -34,6 +35,8 @@ class AsistenteApi(Protocol):
 
     def enviar_mensaje(self, usuario_id: UUID, authorization: str, sesion_id: UUID, clave: UUID,
                        cuerpo: Mapping[str, Any]) -> dict[str, Any]: ...
+
+    def responder_en_modo_reducido(self, usuario_id: UUID, sesion_id: UUID) -> dict[str, Any]: ...
 
     def suprimir_usuario(self, usuario_id: UUID) -> int: ...
 
@@ -70,9 +73,13 @@ def crear_app(servicio: AsistenteApi, contratos: Contratos, secreto_jwt: str,
     @app.post("/asistente/sesiones/{sesion_id}/mensajes")
     def enviar_mensaje(sesion_id: UUID, cuerpo: dict[str, Any] = Body(...),
                        clave: UUID = Header(alias="Idempotency-Key"),
-                       authorization: str | None = Header(default=None)) -> JSONResponse:
+                       authorization: str | None = Header(default=None),
+                       modo: str | None = Header(default=None, alias="X-Modo-Operativo")
+                       ) -> JSONResponse:
         usuario_id = usuario_de_sesion(authorization, secreto_jwt)
         _validar(contratos, _CUERPO_MENSAJE, cuerpo)
+        if modo == MODO_REDUCIDO:  # ADR-0040 §6: carga de prioridad 2/3
+            return JSONResponse(servicio.responder_en_modo_reducido(usuario_id, sesion_id))
         return JSONResponse(servicio.enviar_mensaje(usuario_id, authorization, sesion_id, clave,
                                                     cuerpo))
 

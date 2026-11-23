@@ -8,6 +8,8 @@ import ast
 import sys
 from pathlib import Path
 
+import pytest
+
 from trotamundos.comun.tipos_de_segmento import registro_por_omision
 
 PAQUETE = Path(__file__).resolve().parents[1] / "trotamundos"
@@ -368,6 +370,33 @@ def test_bff_web_no_tiene_persistencia_ni_logica_de_dominio():
     ]
     assert encontradas == []
 
+
+
+# --- `bff_mobile` y `api_gateway` (paso 11 completo; ADR-0005, ADR-0020) --------------------
+
+DEPENDENCIAS_DE_BFF_MOBILE = {"resumen": set(), "api": set(), "servicio": {"resumen", "api"}}
+DEPENDENCIAS_DE_API_GATEWAY = {"cubeta": set(), "modos": set(), "rutas": set(),
+                               "servicio": {"cubeta", "modos", "rutas"}}
+
+
+def test_los_modulos_de_bff_mobile_y_api_gateway_respetan_sus_dependencias():
+    assert violaciones_internas(PAQUETE, "bff_mobile", DEPENDENCIAS_DE_BFF_MOBILE) == []
+    assert violaciones_internas(PAQUETE, "api_gateway", DEPENDENCIAS_DE_API_GATEWAY) == []
+
+
+@pytest.mark.parametrize("servicio", ["bff_mobile", "api_gateway"])
+def test_bff_mobile_y_api_gateway_no_tienen_persistencia_ni_logica_de_dominio(servicio):
+    """R4 y vista C&C N1: sin estado propio; solo componen o reenvían por HTTP."""
+    carpeta = PAQUETE / "servicios" / servicio
+    prohibidas = {"psycopg", "aiokafka", "trotamundos.comun.persistencia", "trotamundos.comun.modelo",
+                  "trotamundos.comun.publicador", "trotamundos.comun.consumidor"}
+    encontradas = [
+        f"{archivo.relative_to(carpeta)} importa {nombre}"
+        for archivo in carpeta.rglob("*.py")
+        for nombre in _importaciones(PAQUETE, archivo)
+        if nombre in prohibidas or nombre.split(".")[0] in prohibidas
+    ]
+    assert encontradas == []
 
 # --- `provider_sync` (iteración 2 §5.5; vista de adaptadores §1; ADR-0006, QA-10) -----------
 

@@ -161,6 +161,14 @@ class VirtualAssistant:
             return sesiones.a_dict(fila, sesiones.turnos(conexion, usuario_id, sesion_id),
                                    self._reloj())
 
+    def responder_en_modo_reducido(self, usuario_id: UUID, sesion_id: UUID) -> dict[str, Any]:
+        """En `DisrupcionMasiva` (ADR-0020, ADR-0040 §6): un mensaje de servicio reducido, sin
+        interpretar, sin registrar el turno y sin consultar a `itinerary`."""
+        with self._lectura() as conexion:
+            if sesiones.obtener(conexion, usuario_id, sesion_id) is None:
+                raise no_encontrado()
+        return {"intencion": "ayuda", "mensajes": [self._mensajes.texto("servicio_reducido")]}
+
     def enviar_mensaje(self, usuario_id: UUID, authorization: str, sesion_id: UUID, clave: UUID,
                        cuerpo: Mapping[str, Any]) -> dict[str, Any]:
         """`POST /asistente/sesiones/{sid}/mensajes`: la `Respuesta` del asistente a ese turno."""

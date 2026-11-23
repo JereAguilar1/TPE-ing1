@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — API pública (api-gateway)
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Superficie HTTP pública completa que `api-gateway` publica para `app-web` y `app-movil`.
     Este documento no redefine operaciones: referencia las de cada servicio, de modo que hay una
@@ -15,6 +15,12 @@ info:
     - Propaga o crea `traceparent`.
     - Negocia la versión de representación con `Accept: application/vnd.trotamundos.v{N}+json`
       (por omisión `v1`) y anuncia retiros con `Deprecation` y `Sunset`.
+    - Calcula el modo operativo (`Normal`, `PicoElevado`, `DisrupcionMasiva`), lo envía a los
+      servicios en `X-Modo-Operativo` y lo devuelve en la respuesta con la misma cabecera.
+
+    Versiones:
+    - `1.1.0`: publica las rutas del asistente virtual (`/asistente/sesiones*`, de `bff-web.yaml`
+      1.1.0, ADR-0034) y la cabecera `X-Modo-Operativo` (ADR-0020, ADR-0040 §6).
 
     Los webhooks entrantes de terceros no pasan por este gateway: tienen su propio dominio
     (`mail-ingest-webhooks.yaml`, `provider-sync-webhooks.yaml`). Las operaciones internas
@@ -47,6 +53,13 @@ paths:
     $ref: 'bff-web.yaml#/paths/~1reservas~1{id}~1conflictos~1{cid}~1resolucion'
   /tipos-de-segmento:
     $ref: 'bff-web.yaml#/paths/~1tipos-de-segmento'
+  # bff-web (asistente virtual, Opción B)
+  /asistente/sesiones:
+    $ref: 'bff-web.yaml#/paths/~1asistente~1sesiones'
+  /asistente/sesiones/{sid}:
+    $ref: 'bff-web.yaml#/paths/~1asistente~1sesiones~1{sid}'
+  /asistente/sesiones/{sid}/mensajes:
+    $ref: 'bff-web.yaml#/paths/~1asistente~1sesiones~1{sid}~1mensajes'
   # identity-access
   /sesiones:
     $ref: 'identity-access.yaml#/paths/~1sesiones'
@@ -98,6 +111,7 @@ x-backend:
   /viajes*: bff-web | bff-mobile → itinerary
   /reservas*: bff-web | bff-mobile → itinerary-escritura
   /tipos-de-segmento: bff-web | bff-mobile → itinerary-lectura (cacheado en edge)
+  /asistente*: bff-web → virtual-assistant
   /sesiones*: identity-access
   /buzones*: identity-access
   /privacidad*: identity-access

@@ -10,6 +10,7 @@ no_entendido: "No te entendí. ¿Me lo decís de otra forma? Por ejemplo: «¿a 
 no_entendido_otra_vez: "Sigo sin entenderte. Si querés, le paso tu consulta a tu agencia."
 itinerario_no_disponible: "Ahora no puedo leer tu itinerario. Probá de nuevo en un rato."
 servicio_no_disponible: "Ahora no puedo hacerlo. Probá de nuevo en un rato; no cambié nada."
+servicio_reducido: "Hay muchos cambios en los viajes en este momento y estoy funcionando en modo reducido. Tu panel y tus avisos siguen al día; volvé a escribirme en unos minutos."
 
 # Viajes y tramos
 sin_viajes: "No tenés viajes activos."

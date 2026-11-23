@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — virtual-assistant
-  version: 1.1.0
+  version: 1.2.0
   description: |
     Asistente virtual de primer nivel (Opción B de la 2da entrega, RF-B1 y RF-B2): atiende consultas
     de estado, corrige el itinerario cuando el viajero ya cambió una reserva y deriva a la agencia
@@ -22,6 +22,9 @@ info:
 
     - `1.1.0`: `DELETE /interno/usuarios/{usuarioId}`, la orden de borrado de la fase 1 de la
       supresión: el asistente se suma a la lista de ADR-0030, como pide ADR-0040 (ADR-0042).
+    - `1.2.0`: cabecera opcional `X-Modo-Operativo` en `enviarMensaje`: en `DisrupcionMasiva`
+      (ADR-0020) el asistente responde con un mensaje de servicio reducido, sin consultar a
+      `itinerary` (ADR-0040 §6).
 servers:
   - url: https://virtual-assistant.interno
     description: Solo para los BFF (las rutas públicas las expone `bff-web`, ADR-0005)
@@ -84,8 +87,15 @@ paths:
         Un mensaje lleva `texto`, `confirmacion` o los dos. Antes de cambiar el itinerario o de
         derivar un caso, el asistente **propone** la acción y espera una `confirmacion` explícita
         con el `accionId` de esa propuesta (ADR-0038). Una propuesta vence a los 10 minutos.
+        En el modo `DisrupcionMasiva` responde un mensaje de servicio reducido, sin registrar el
+        turno ni consultar el itinerario (ADR-0040 §6).
       parameters:
         - $ref: 'comun.yaml#/components/parameters/IdempotencyKey'
+        - name: X-Modo-Operativo
+          in: header
+          required: false
+          description: El modo operativo que fijó `api-gateway` y reenvía el BFF (ADR-0020).
+          schema: { type: string, enum: [Normal, PicoElevado, DisrupcionMasiva] }
       requestBody:
         required: true
         content:

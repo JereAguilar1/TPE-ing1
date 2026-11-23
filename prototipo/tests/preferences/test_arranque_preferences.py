@@ -6,7 +6,6 @@ from __future__ import annotations
 import dataclasses
 import json
 import time
-from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient

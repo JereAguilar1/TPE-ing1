@@ -252,6 +252,61 @@ services:
       timeout: 3s
       retries: 20
 
+  bff-mobile:
+    # Composición para app-movil (paso 11 completo, ADR-0005, ADR-0019): las operaciones de
+    # itinerario de bff-web (comun.bff) y GET /panel/resumen (≤ 15 KB). Sin estado ni base propios.
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.bff_mobile.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TROTAMUNDOS_URL_ITINERARY_LECTURA: http://itinerary-lectura:8000
+      TROTAMUNDOS_URL_ITINERARY_ESCRITURA: http://itinerary-escritura:8000
+      TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
+    ports:
+      - "18115:8000"
+    depends_on:
+      itinerary-lectura:
+        condition: service_healthy
+      itinerary-escritura:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/tipos-de-segmento')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api-gateway:
+    # Puerta de entrada pública (paso 11 completo, api-gateway.yaml, ADR-0020, ADR-0027): sesión,
+    # cubeta de fichas por usuario, X-Deadline-Ms según el modo operativo, traceparent y versión.
+    # Elige bff-web o bff-mobile con X-Tipo-Cliente. Sin estado ni base propios.
+    image: trotamundos-prototipo:local
+    command: ["uvicorn", "--factory", "trotamundos.servicios.api_gateway.servicio:crear_app",
+              "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      TROTAMUNDOS_URL_BFF_WEB: http://bff-web:8000
+      TROTAMUNDOS_URL_BFF_MOBILE: http://bff-mobile:8000
+      TROTAMUNDOS_URL_IDENTITY_ACCESS: http://identity-access:8000
+      TROTAMUNDOS_URL_SUPPORT_LIAISON: http://support-liaison:8000
+      TROTAMUNDOS_URL_PREFERENCES: http://preferences:8000
+      TROTAMUNDOS_URL_MAIL_INGEST: http://mail-ingest:8000
+      TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
+    ports:
+      - "18114:8000"
+    depends_on:
+      bff-web:
+        condition: service_healthy
+      bff-mobile:
+        condition: service_healthy
+      identity-access:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/tipos-de-segmento')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   provider-sync:
     # Sincronización con proveedores de viaje como complementos (paso 10, ADR-0006, QA-10):
     # seguimiento desde ReservaActualizada/ReservaCancelada, webhooks, sondeo y publicación de
