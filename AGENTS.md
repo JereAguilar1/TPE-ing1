@@ -39,8 +39,9 @@ Proyecto: TPE de Ingeniería de Software I (UNICEN), grupo 15, **Trotamundos**. 
   si sobra), no por número de paso.
 - Los pasos 13 (`sharing`) y 16 (multirregión) **no se empiezan** salvo que todo lo prioritario
   esté terminado; en ese caso se sigue el orden de «Para completar el 100 % del contenido».
-- **Congelamiento: domingo 22 de noviembre, 23:00** (24 h antes de la entrega). El lunes 23, hasta
-  la entrega, es para el cierre (paso 21) y el ensayo de la defensa. Desde el congelamiento:
+- **Congelamiento: lunes 23 de noviembre, 03:00** (20 h antes de la entrega; se extendió desde el
+  domingo 22 a las 23:00). El lunes 23, desde el congelamiento hasta la entrega, es para el cierre
+  (paso 21) y el ensayo de la defensa. Desde el congelamiento:
   - **Se puede:** corregir errores de lo ya construido, arreglar pruebas o checks en rojo y hacer el
     cierre (matriz, README, «Diseñado y no construido», guion de demostración).
   - **No se puede:** empezar pasos nuevos, sumar funcionalidades a pasos terminados ni refactorizar:
