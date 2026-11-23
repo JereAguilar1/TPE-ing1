@@ -10,15 +10,16 @@ import random
 import threading
 
 CAPACIDAD = 20
-POR_SEGUNDO = 60 / 60
+POR_MINUTO = 60
+SEGUNDOS_POR_MINUTO = 60.0
 ESPERA_MINIMA_S, ESPERA_MAXIMA_S = 2, 8
 
 
 class CubetaDeFichas:
-    def __init__(self, capacidad: int = CAPACIDAD, por_segundo: float = POR_SEGUNDO,
+    def __init__(self, capacidad: int = CAPACIDAD, por_minuto: float = POR_MINUTO,
                  azar: random.Random | None = None):
         self._capacidad = capacidad
-        self._por_segundo = por_segundo
+        self._por_segundo = por_minuto / SEGUNDOS_POR_MINUTO
         self._azar = azar or random.Random()
         self._fichas: dict[str, tuple[float, float]] = {}  # clave → (fichas, instante)
         self._candado = threading.Lock()
