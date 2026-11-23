@@ -125,3 +125,21 @@ de segmento y modelo dimensional analítico ([ADR-0009](03-adr/ADR-0009-contrato
 ## 6. Trazabilidad
 
 [Matriz driver → decisión → vista → ADR (58/58 drivers · 100 %)](05-trazabilidad/matriz-drivers-decisiones.md)
+
+## 7. Prototipo (2da entrega)
+
+[Prototipo ejecutable](../prototipo/README.md): la tajada vertical que fija
+[ADR-0034](03-adr/ADR-0034-punto-de-extension-modulo-avanzado.md) (los caminos de los 5 ASR, un
+adaptador y un extractor de ejemplo, el aislamiento analítico y el asistente virtual de la Opción B),
+en Python con FastAPI, PostgreSQL y Redpanda ([ADR-0036](03-adr/ADR-0036-tecnologia-del-prototipo.md)).
+
+| Sección del prototipo | Contenido |
+|---|---|
+| [Qué se construye y qué no](../prototipo/README.md#qué-se-construye-y-qué-no) | El alcance y su criterio |
+| [Cómo correrlo](../prototipo/README.md#cómo-correrlo) | Instalación, pruebas, servicios y la interfaz web |
+| [Estado de las decisiones de arquitectura](../prototipo/README.md#estado-de-las-decisiones-de-arquitectura) | Qué parte de cada ADR está en código (✅ / 🟨 / ➖) |
+| [Plan de construcción](../prototipo/README.md#plan-de-construcción) | Los 21 pasos, el recorte y quién hizo cada uno |
+| [Matriz código ↔ ADR](../prototipo/README.md#matriz-código--adr) | Qué código implementa cada decisión y qué prueba lo verifica (QA-16) |
+| [Decisiones de implementación](../prototipo/README.md#decisiones-de-implementación) | Lo que los ADR no fijaban y se decidió al construir |
+| [Diseñado y no construido](../prototipo/README.md#diseñado-y-no-construido) | Lo que queda solo en el diseño, dónde está diseñado y por qué |
+| [Guion de demostración](../prototipo/demo/guion.md) | El recorrido de la defensa |

@@ -41,6 +41,7 @@ prototipo/
 │   │   ├── persistencia.py     # PostgreSQL: outbox, bandeja de entrada, Idempotency-Key (ADR-0012, ADR-0014)
 │   │   ├── publicador.py       # de la outbox al broker, al menos una vez     (ADR-0012)
 │   │   ├── bff.py              # lo que comparten bff-web y bff-mobile: clientes, rutas y plazo (ADR-0005, ADR-0020)
+│   │   ├── catalogo_extractores.py # catálogo de remitentes y extractores (.yaml), sin importar complementos (ADR-0006, RF-04)
 │   │   ├── sesion.py           # sesión OIDC de las operaciones públicas      (ADR-0007)
 │   │   └── tipos_de_segmento.py # registro de descriptores de tipo           (ADR-0011, ADR-0027)
 │   └── servicios/              # un subpaquete por servicio; ninguno importa a otro (ADR-0036)
@@ -55,6 +56,7 @@ prototipo/
 │           ├── ingesta.py           # ReservaExtraida y ReservaObservada con bandeja de entrada (ADR-0014)
 │           ├── publicacion.py       # outbox (ADR-0012)
 │           ├── proyeccion_panel.py  # lecturas de reserva, viaje y panel, mantenidas por eventos internos
+│           ├── testigo.py           # registro testigo transregional de los comandos manuales (paso 16, ADR-0018)
 │           ├── api.py               # API interna (openapi/itinerary.yaml)
 │           └── servicio.py          # arma los módulos y define las transacciones
 │       ├── identity_access/         # identidad, buzones, bóveda, ABAC y auditoría (paso 7)
@@ -64,6 +66,7 @@ prototipo/
 │           ├── custodia_boveda.py        # único módulo con KMS/AES-GCM (regla R5, ADR-0029)
 │           ├── motor_autorizacion_abac.py# políticas ABAC y vales JWS de 60 s (ADR-0028)
 │           ├── ordenes_de_borrado.py     # órdenes de borrado de la fase 1 a cada servicio (ADR-0042)
+│           ├── consultor_sharing.py      # atributos de una compartición, leídos de sharing (fail-closed, ADR-0028)
 │           ├── publicacion.py            # outbox: EstadoDeBuzonCambiado y CuentaSuprimida
 │           ├── api.py                    # API (openapi/identity-access.yaml)
 │           └── servicio.py               # arma los módulos y define las transacciones
@@ -83,11 +86,13 @@ prototipo/
 │           ├── api.py                # webhooks y filtros (mail-ingest-*.yaml)
 │           └── servicio.py           # arma los módulos y define las transacciones
 │       ├── booking_extraction/     # extractor, bandas, calidad e inbox/outbox (paso 9)
+│       │   ├── interfaz_de_extractor.py # puerto Extractor v1.x (plugins/extractor.yaml)
 │       │   ├── complementos/        # extractores simulados: vuelos, boletos de tren y reservas de hotel
 │       │   ├── registro_de_extractores.py # carga por manifiesto y coordina la extracción
 │       │   ├── validador_canonico.py # estructura y descriptor del segmento
 │       │   ├── evaluador_de_confianza.py # mínimo de campos obligatorios y bandas
 │       │   ├── observabilidad_de_calidad.py # huellas y disyuntor local
+│       │   ├── publicacion.py       # outbox: ReservaExtraida y ExtraccionNoReconocida
 │       │   └── servicio.py         # inbox/outbox, broker y fábrica de Uvicorn
 │       └── support_liaison/         # casos de soporte derivados a la agencia (paso 12, UC-7)
 │           ├── casos.py              # el caso: instantánea, estados y reintento de derivación
@@ -141,6 +146,7 @@ prototipo/
 │           ├── rutas.py              # qué se publica y a qué servicio va, desde api-gateway.yaml
 │           ├── cubeta.py             # cubeta de fichas por usuario (60 por minuto, ráfaga 20)
 │           ├── modos.py              # Normal, PicoElevado y DisrupcionMasiva, con histéresis
+│           ├── regiones.py           # salud por región y conmutación por usuario (paso 16, ADR-0002, ADR-0018)
 │           └── servicio.py           # sesión, versión, plazo, traza, cola acotada y reenvío
 │       ├── provider_sync/           # sincronización con proveedores de viaje (paso 10, ADR-0006, QA-10)
 │           ├── interfaz_de_adaptador.py      # puerto AdaptadorDeProveedor v1.x (plugins/adaptador.yaml)
@@ -161,10 +167,10 @@ prototipo/
 │           ├── modelo_dimensional.py         # esquema en estrella (modelo-dimensional.sql), reconstrucción y QA-15
 │           └── servicio.py                   # consumidor hacia analytics_store y fábrica de Uvicorn
 ├── app_web/                # interfaz web (paso 20): página estática y nginx.conf
-├── demo/                   # demostración: demo.sh, cargar_viajes.py y el guion de la defensa
+├── demo/                   # demostración: demo.sh, cargar_viajes.py, apoyo.py y el guion de la defensa
 ├── tests/
 ├── Dockerfile              # una imagen para todos los servicios (se construye desde la raíz)
-├── docker-compose.yml      # PostgreSQL, broker y servicios
+├── docker-compose.yml      # PostgreSQL de las dos regiones, broker y servicios (región EU, paso 16)
 └── Makefile
 ```
 
@@ -175,9 +181,15 @@ prototipo/
 | Regla | Origen |
 |---|---|
 | Ningún servicio importa a otro; solo comparten `trotamundos.comun` | ADR-0036, ADR-0001 |
+| `comun` no importa ningún servicio: si lo hiciera, ese servicio pasaría a ser dependencia de todos | ADR-0036 |
 | `comun/modelo.py` solo usa la biblioteca estándar | R7, vista de módulos N1 |
 | Ningún módulo menciona un tipo de segmento concreto (`vuelo`, `tren`…). Solo pueden hacerlo los complementos (adaptadores y extractores), que van en carpetas `complementos/` | I4, vista de módulos N2; ADR-0011 |
 | Dentro de `itinerary`, cada módulo importa solo los módulos que la vista N2 le permite (`reservas` no conoce a `fusion` ni a `viajes`; `ingesta` solo conoce a `fusion`; `api` solo a `gestion_manual` y `proyeccion_panel`; `proyeccion_panel` y `publicacion` no importan dominio). La excepción declarada es `servicio`, el punto de armado, que ningún módulo importa. Un módulo que no está en la tabla hace fallar la prueba | I1, I3, I5, vista de módulos N2 |
+| Dentro de `identity_access`, cada módulo importa solo lo que permite la vista de adaptadores, y **ningún módulo del prototipo fuera de `custodia_boveda` usa `cryptography`** | R5-estricto, vista de módulos de adaptadores §2-4; ADR-0029, QA-13 |
+| Dentro de `mail_ingest`, cada módulo hace un paso del flujo de la vista y no conoce al siguiente (lo arma `servicio`); los complementos de proveedor de correo solo conocen `interfaz_de_correo` | Vista de módulos N2 §3; ADR-0004, ADR-0006 |
+| Dentro de `booking_extraction`, cada módulo respeta la vista N2, y cada extractor de `complementos/` es puro: no importa otro complemento ni clientes de red | R2, R3, vista de módulos N2 §2; ADR-0006, ADR-0015 |
+| Dentro de `support_liaison`, `sharing`, `preferences` y `notification`, cada módulo importa solo lo que permite su tabla en la prueba (los complementos, solo su interfaz) | ADR-0006; vistas de módulos N1 y N2 |
+| Dentro de `bff_mobile` y `api_gateway`, ningún módulo tiene persistencia propia ni lógica de dominio: solo componen o reenvían por HTTP | R4, vista de módulos N1; ADR-0005, ADR-0020 |
 | Dentro de `virtual_assistant`, cada módulo importa solo lo que permite la vista de módulos del asistente, y solo `contexto`, `acciones` y `derivacion` hablan con otros servicios. Solo `interprete` usa los patrones, los módulos que le responden al viajero no tienen frases en el código y cada clave de mensaje usada existe en el catálogo | ADR-0037; vista de módulos del asistente |
 | Dentro de `bff_web`, ningún módulo tiene persistencia propia ni lógica de dominio: solo compone respuestas de `itinerary-lectura`, `itinerary-escritura` y `virtual-assistant` por HTTP | R4, vista de módulos N1; ADR-0005, ADR-0034 |
 | Dentro de `provider_sync`, cada módulo respeta las dependencias de la vista de adaptadores y ningún complemento en `complementos/` importa a otro complemento | R2, R3, vista de módulos de adaptadores §1; ADR-0006, QA-10 |
@@ -351,14 +363,15 @@ Requisitos: Python 3.12, Docker con Compose.
 ```bash
 cd prototipo
 make instalar        # crea .venv e instala dependencias
-make infra-arriba    # levanta PostgreSQL (puerto 55432) y el broker (puerto 19092)
+make infra-arriba    # levanta PostgreSQL (puerto 55432; la región EU, 55433) y el broker (19092)
 make pruebas         # corre las pruebas (las de PostgreSQL se saltean si no está arriba)
 make servicios-arriba # además construye la imagen y levanta los servicios;
                       # la interfaz web queda en http://localhost:18111
 .venv/bin/python demo/cargar_viajes.py ana@ejemplo.com  # viajes de ejemplo para ese correo
 bash demo/demo.sh     # el recorrido completo de la demostración, por terminal
                       # con los servicios arriba, make pruebas también recorre los escenarios
-                      # de QA-01 y QA-04 (tests/escenarios); sin ellos, se saltean
+                      # contra los contenedores (tests/escenarios: QA-01, QA-04, QA-05, QA-15 y
+                      # otros) y la interfaz web; sin ellos, se saltean
 make infra-abajo
 ```
 
@@ -368,7 +381,10 @@ con el mismo `docker-compose.yml` y corre todas las pruebas. Ahí se define
 `TROTAMUNDOS_EXIGIR_INFRA=1`: sin base o sin broker, las pruebas fallan en lugar de saltearse. En
 paralelo, el trabajo `servicios` construye la imagen y levanta todo el compose (`make
 servicios-arriba`): si algún servicio no arranca, falla aunque sus pruebas estén en verde, y muestra
-los registros de los contenedores.
+los registros de los contenedores. Con los contenedores sanos, corre los escenarios de
+`tests/escenarios` que los usan y las pruebas de `tests/app_web` con `TROTAMUNDOS_EXIGIR_CONTENEDORES=1`: si un
+contenedor no está, fallan en lugar de saltearse. El de QA-05 va último porque tira la región AM y la
+vuelve a levantar.
 
 **Contraseña de la base local.** No está en el código: `make infra-arriba` la genera al azar la
 primera vez y la guarda en `prototipo/.env`, que git ignora. Docker Compose y las pruebas la leen
@@ -516,7 +532,7 @@ implementa. La columna «Prioridad» ordena lo que falta según el recorte acord
 | 18 | Iteración 5 de ADD: diseño de la Opción B (ADRs y contrato) | CON-06 | Sí o sí | ✅ | Francisco Lozano |
 | 19 | `virtual-assistant`: intenciones y derivación a la agencia | RF-B1, RF-B2 | Sí o sí | ✅ | Francisco Lozano |
 | 20 | Interfaz web mínima de demostración | RF-09 | Debería (reducido) | ✅ completo: el panel y el chat, más el detalle del viaje, los viajes anteriores, confirmar o descartar, resolver conflictos y la carga manual | Francisco Lozano |
-| 21 | Matriz código ↔ ADR, guion de demostración y README final | QA-16 | Sí o sí | ⬜ |  |
+| 21 | Matriz código ↔ ADR, guion de demostración y README final | QA-16 | Sí o sí | ✅ matriz verificada contra el código (cada ruta existe; todo módulo y toda prueba aparecen), README y wiki al día, guion con los cinco ASR y comandos de apoyo en `demo/apoyo.py`. Quedan el reparto de la presentación y el ensayo, del grupo | Francisco Lozano |
 
 ### Recorte para la entrega
 
