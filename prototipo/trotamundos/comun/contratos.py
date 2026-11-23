@@ -112,10 +112,15 @@ class Contratos:
         return self._validadores[referencia]
 
     def errores(self, referencia: str, instancia: Any) -> list[str]:
-        """Lista de errores (vacía si la instancia cumple el contrato)."""
+        """Lista de errores (vacía si la instancia cumple el contrato).
+
+        Además del esquema, rechaza el carácter nulo (`\\u0000`) en cualquier texto o clave:
+        JSON lo admite, pero PostgreSQL no lo puede guardar (ni en `text` ni en `jsonb`), y un
+        pedido así terminaría en un `500` en lugar de un `400`.
+        """
         errores = sorted(self.validador(referencia).iter_errors(instancia),
                          key=lambda e: (e.json_path, e.message))
-        return [f"{e.json_path}: {e.message}" for e in errores]
+        return [f"{e.json_path}: {e.message}" for e in errores] + _nulos(instancia, "$")
 
     def validar(self, referencia: str, instancia: Any) -> None:
         """Lanza `ErrorDeContrato` si la instancia no cumple el esquema."""
@@ -165,3 +170,17 @@ class Contratos:
 def contratos_por_omision() -> Contratos:
     """Contratos de la carpeta configurada (`TROTAMUNDOS_CONTRATOS` o `<repo>/contratos`)."""
     return Contratos(Configuracion.desde_entorno().ruta_contratos)
+
+
+def _nulos(instancia: Any, ruta: str) -> list[str]:
+    """Las rutas de los textos (o claves) que contienen el carácter nulo."""
+    if isinstance(instancia, str):
+        return [f"{ruta}: no puede contener el carácter nulo"] if "\x00" in instancia else []
+    if isinstance(instancia, dict):
+        return [error for clave, valor in instancia.items()
+                for error in ([f"{ruta}: no puede contener el carácter nulo"]
+                              if isinstance(clave, str) and "\x00" in clave else [])
+                + _nulos(valor, f"{ruta}.{clave}")]
+    if isinstance(instancia, list):
+        return [error for i, valor in enumerate(instancia) for error in _nulos(valor, f"{ruta}[{i}]")]
+    return []

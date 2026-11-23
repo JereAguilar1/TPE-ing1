@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — identity-access
-  version: 1.2.0
+  version: 1.2.1
   description: |
     Identidad, consentimiento de buzones, custodia de tokens delegados, autorización y derechos
     sobre datos personales.
@@ -14,6 +14,9 @@ info:
     - Exportación y supresión de datos personales: ADR-0030.
 
     Las operaciones marcadas `x-interna: true` no se publican en `api-gateway`.
+
+    - `1.2.1`: `emitirTokenEfimeroDeBuzon` declara el `404` que ya devolvía para un buzón que no
+      existe (lo encontraron las pruebas de contrato del paso 17). Cambio compatible (ADR-0027).
 servers:
   - url: https://api.trotamundos.app
     description: Operaciones públicas, a través de api-gateway
@@ -218,6 +221,7 @@ paths:
                 properties:
                   token: { type: string }
                   expiraEn: { type: string, format: date-time, description: 15 minutos o menos }
+        '404': { $ref: 'comun.yaml#/components/responses/NoEncontrado' }
         '409':
           description: El buzón no está `Activo` (por ejemplo, `RequiereReautorizacion`).
 

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — itinerary (API interna)
-  version: 1.2.0
+  version: 1.2.1
   description: |
     API REST interna del núcleo del dominio, servida por el módulo `api` de `itinerary`
     (vista de módulos N2). La consumen los BFF y `support-liaison`; no se expone en `api-gateway`.
@@ -20,6 +20,8 @@ info:
       (ADR-0027).
     - `1.2.0`: `DELETE /interno/usuarios/{usuarioId}`, la orden de borrado de la fase 1 de la
       supresión (ADR-0030, ADR-0042). Agregar una operación es un cambio compatible (ADR-0027).
+    - `1.2.1`: `listarViajes` declara el `400` que ya devolvía ante un `cursor` que no emitió el
+      servicio, como `bff-web.yaml` (lo encontraron las pruebas de contrato del paso 17).
 servers:
   - url: https://itinerary.interno
 security:
@@ -72,6 +74,7 @@ paths:
                     type: array
                     items: { $ref: 'comun.yaml#/components/schemas/ViajeResumen' }
                   siguienteCursor: { type: [string, 'null'] }
+        '400': { $ref: 'comun.yaml#/components/responses/SolicitudInvalida' }
 
   /viajes/{id}:
     parameters:

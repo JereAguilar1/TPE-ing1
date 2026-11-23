@@ -19,4 +19,6 @@ def firma(cuerpo: bytes, secreto: str) -> str:
 
 def firma_valida(cuerpo: bytes, recibida: str | None, secreto: str) -> bool:
     """Comparación en tiempo constante: la firma no se puede adivinar de a un carácter."""
-    return recibida is not None and hmac.compare_digest(firma(cuerpo, secreto), recibida.strip())
+    # En bytes: una cabecera con caracteres no ASCII es una firma inválida, no un error.
+    return recibida is not None and hmac.compare_digest(
+        firma(cuerpo, secreto).encode("utf-8"), recibida.strip().encode("utf-8", "replace"))

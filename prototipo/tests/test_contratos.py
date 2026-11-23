@@ -113,3 +113,17 @@ def test_los_errores_indican_la_ruta_del_campo(contratos):
     reserva = reserva_valida()
     reserva["segmentos"][0]["estado"] = "perdido"
     assert any(e.startswith("$.segmentos[0].estado:") for e in contratos.errores(RESERVA, reserva))
+
+
+def test_el_caracter_nulo_se_rechaza_en_textos_y_claves(contratos):
+    """PostgreSQL no guarda `\\u0000` ni en `text` ni en `jsonb`: sin este rechazo, un pedido así
+    terminaba en `500` (lo encontraron las pruebas de contrato del paso 17)."""
+    preferencias = "openapi/preferences.yaml#/components/schemas/Preferencias"
+    validas = {"idioma": "es-AR", "zonaHoraria": "UTC", "region": "AM"}
+    assert contratos.errores(preferencias, validas) == []
+    assert contratos.errores(preferencias, {**validas, "idioma": "es\x00"}) == [
+        "$.idioma: no puede contener el carácter nulo"]
+    assert contratos.errores(preferencias, {**validas, "\x00": [1]}) == [
+        "$: no puede contener el carácter nulo"]
+    assert contratos.errores(preferencias, {**validas, "otros": [{"a": "\x00"}]}) == [
+        "$.otros[0].a: no puede contener el carácter nulo"]
