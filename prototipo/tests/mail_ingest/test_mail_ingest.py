@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import threading
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from uuid import UUID, uuid4
@@ -253,6 +254,28 @@ def test_la_suscripcion_se_renueva_antes_de_vencer(mail):
     assert mail.adaptadores["oauth"].suscripcion_de(str(buzon_id)) == antes["suscripcion_id"]
 
 
+def test_mientras_se_lee_el_proveedor_el_viajero_puede_seguir_escribiendo(mail):
+    """El token y las descargas no se piden con el usuario bloqueado: guardar sus filtros termina
+    aunque `identity-access` todavía no haya respondido."""
+    _permitir(mail, "*@aerolinea.com")
+    buzon_id = _activar(mail)
+    mail.adaptadores["oauth"].entregar(str(buzon_id), _correo("reservas@aerolinea.com"))
+    emisor, a_tiempo = mail._emisor, []
+
+    class EmisorLento:
+        def token(self, buzon):
+            escritura = threading.Thread(target=lambda: _permitir(mail, "*@aerolinea.com"))
+            escritura.start()
+            escritura.join(3)
+            a_tiempo.append(not escritura.is_alive())
+            return emisor.token(buzon)
+
+    mail._emisor = EmisorLento()
+    mail.procesar_cola()
+    assert a_tiempo and all(a_tiempo)
+    assert [p["buzonId"] for p in _publicados(mail)] == [str(buzon_id)]
+
+
 def test_un_buzon_que_falla_no_frena_la_cola(mail):
     _permitir(mail, "*@aerolinea.com")
     roto, sano = _activar(mail), _activar(mail)
@@ -391,7 +414,8 @@ def test_un_reenvio_autenticado_del_titular_se_publica(mail):
 
     # Reenvío automático: el From es la aerolínea y el ARC sobrevive al reenvío. No hace falta
     # que el remitente esté permitido: reenviar ya es una elección del usuario.
-    automatico = _reenviado(autenticacion="ingesta.trotamundos.app; dkim=pass; spf=fail; arc=pass")
+    automatico = _reenviado(autenticacion="ingesta.trotamundos.app; dkim=pass header.d="
+                                          f"{TITULAR.partition('@')[2]}; spf=fail; arc=pass")
     assert _reenviar(cliente, automatico).status_code == 202
     # Reenvío manual: el From es el propio titular.
     assert _reenviar(cliente, _reenviado(remitente=TITULAR)).status_code == 202
@@ -415,10 +439,17 @@ def test_un_reenvio_que_no_se_autentica_se_descarta_y_se_audita(mail):
     assert _reenviar(cliente, _reenviado(autenticacion="ingesta.trotamundos.app; dkim=fail; "
                                                        "spf=pass")).status_code == 403
     assert _reenviar(cliente, _reenviado(reenvia="otra@persona.com")).status_code == 403
+    # Solo por ARC: la firma DKIM tiene que ser del dominio del titular, no de uno cualquiera.
+    assert _reenviar(cliente, _reenviado(autenticacion="ingesta.trotamundos.app; dkim=pass "
+                                                       "header.d=atacante.example; spf=fail; "
+                                                       "arc=pass")).status_code == 403
+    assert _reenviar(cliente, _reenviado(autenticacion="ingesta.trotamundos.app; dkim=pass; "
+                                                       "spf=fail; arc=pass")).status_code == 403
 
     assert _publicados(mail) == []
     assert _rechazos(mail) == ["aliasDesconocido", "autenticacionFallida",
-                               "autenticacionFallida", "remitenteNoAutorizado"]
+                               "autenticacionFallida", "remitenteNoAutorizado",
+                               "autenticacionFallida", "autenticacionFallida"]
 
 
 def test_un_reenvio_de_un_remitente_bloqueado_no_se_publica(mail):

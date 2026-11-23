@@ -29,7 +29,7 @@ from fastapi import FastAPI
 
 from trotamundos.comun.catalogo_extractores import remitentes
 from trotamundos.comun.carriles import Carril, asegurar_topicos, carriles_posibles, topico
-from trotamundos.comun.config import Configuracion
+from trotamundos.comun.config import Configuracion, _variable
 from trotamundos.comun.consumidor import DDL_RECHAZADOS, ConsumidorConCarriles
 from trotamundos.comun.contratos import Contratos, ErrorDeContrato, contratos_por_omision
 from trotamundos.comun.errores import Problema
@@ -96,10 +96,10 @@ class MailIngest:
         self._emisor = emisor_de_tokens or descargador.EmisorDeTokensHttp(
             os.environ.get("TROTAMUNDOS_URL_IDENTITY_ACCESS", "http://localhost:18103"))
         self._secreto_webhook = (secreto_webhook
-                                 or os.environ.get("TROTAMUNDOS_SECRETO_WEBHOOK_CORREO")
+                                 or _variable("TROTAMUNDOS_SECRETO_WEBHOOK_CORREO")
                                  or secrets.token_hex(32))
         # Para verificar la sesión OIDC de la API de filtros (`comun.sesion`).
-        self._secreto_jwt = (secreto_jwt or os.environ.get("TROTAMUNDOS_JWT_SECRETO")
+        self._secreto_jwt = (secreto_jwt or _variable("TROTAMUNDOS_JWT_SECRETO")
                              or secrets.token_hex(32))
         self._intervalos = dict(intervalos) if intervalos is not None else {
             True: reconciliador.INTERVALO_CON_PUSH, False: reconciliador.INTERVALO_SIN_PUSH}
@@ -197,8 +197,7 @@ class MailIngest:
                 return atendidos
             vistos.add(reclamado["buzon_id"])
             try:
-                with self._transaccion(reclamado["usuario_id"]) as conexion:
-                    self._atender(conexion, reclamado["buzon_id"])
+                self._atender(reclamado["usuario_id"], reclamado["buzon_id"])
             except Exception:
                 _registro_de_errores.exception("No se pudo atender el buzón %s",
                                                reclamado["buzon_id"])
@@ -207,30 +206,40 @@ class MailIngest:
             atendidos += 1
         return atendidos
 
-    def _atender(self, conexion: psycopg.Connection, buzon_id: UUID) -> None:
-        buzon = suscripciones.obtener(conexion, buzon_id)
-        adaptador = self.adaptador_para(buzon.via, buzon.proveedor) if buzon else None
-        if buzon is None or not buzon.activo or adaptador is None:
-            return
+    def _atender(self, usuario_id: UUID, buzon_id: UUID) -> None:
+        """Lee un buzón en tres partes: su estado y filtros; las llamadas de afuera (el token a
+        `identity-access`, las novedades y las descargas del proveedor), sin transacción ni el
+        usuario bloqueado; y una transacción corta que publica y avanza el cursor. Si algo falla
+        antes, no queda nada a medias: el cursor no avanzó y el buzón vuelve a la cola."""
+        with self._lectura() as conexion:
+            buzon = suscripciones.obtener(conexion, buzon_id)
+            adaptador = self.adaptador_para(buzon.via, buzon.proveedor) if buzon else None
+            if buzon is None or not buzon.activo or adaptador is None:
+                return
+            lista = filtros.de_usuario(conexion, buzon.usuario_id)
         try:
             token = self._emisor.token(buzon_id)
         except descargador.BuzonNoDisponible:
             return  # ya no está Activo: llegará su EstadoDeBuzonCambiado
-        ahora = self._reloj()
         novedades = adaptador.novedades(str(buzon_id), token, buzon.cursor)
-        lista = filtros.de_usuario(conexion, buzon.usuario_id)
-        for metadatos in novedades.mensajes:
-            if deduplicador.ya_recibido(conexion, buzon_id, metadatos.id_de_mensaje):
-                continue
-            if not filtros.admite(lista, metadatos.remitente,
-                                  (e["patron"] for e in self.catalogo_de_remitentes())):
-                deduplicador.registrar(conexion, buzon_id, buzon.usuario_id,
-                                       metadatos.id_de_mensaje, ahora, descartado="filtrado")
-                continue
-            crudo = adaptador.descargar(str(buzon_id), token, metadatos.id_de_mensaje)
-            self._publicar_mensaje(conexion, buzon, metadatos.id_de_mensaje, crudo,
-                                   metadatos.recibido_en, ahora)
-        suscripciones.guardar_cursor(conexion, buzon_id, novedades.cursor)
+        with self._lectura() as conexion:
+            nuevos = [m for m in novedades.mensajes
+                      if not deduplicador.ya_recibido(conexion, buzon_id, m.id_de_mensaje)]
+        catalogo = [e["patron"] for e in self.catalogo_de_remitentes()]
+        bajados = [(m, adaptador.descargar(str(buzon_id), token, m.id_de_mensaje)
+                    if filtros.admite(lista, m.remitente, catalogo) else None) for m in nuevos]
+        with self._transaccion(usuario_id) as conexion:
+            ahora = self._reloj()
+            for metadatos, crudo in bajados:
+                if deduplicador.ya_recibido(conexion, buzon_id, metadatos.id_de_mensaje):
+                    continue  # lo registró otro camino mientras se descargaba
+                if crudo is None:
+                    deduplicador.registrar(conexion, buzon_id, buzon.usuario_id,
+                                           metadatos.id_de_mensaje, ahora, descartado="filtrado")
+                    continue
+                self._publicar_mensaje(conexion, buzon, metadatos.id_de_mensaje, crudo,
+                                       metadatos.recibido_en, ahora)
+            suscripciones.guardar_cursor(conexion, buzon_id, novedades.cursor)
 
     def _publicar_mensaje(self, conexion: psycopg.Connection, buzon: suscripciones.Buzon,
                           id_de_mensaje: str, crudo: bytes, recibido_en: datetime | None,

@@ -25,6 +25,7 @@ from trotamundos.servicios.provider_sync.registro_de_adaptadores import (
     RegistroDeAdaptadores,
     entradas_configuradas,
 )
+from trotamundos.servicios.provider_sync import servicio as servicio_de_provider_sync
 from trotamundos.servicios.provider_sync.servicio import ProviderSync
 
 USUARIO_1 = UUID("00000000-0000-4000-8000-000000000101")
@@ -417,3 +418,25 @@ def test_recorrido_uc2_y_uc5_con_itinerary_y_virtual_assistant(provider_sync, co
     reserva_panel = panel["viajesActivos"][0]["reservas"][0]
     assert reserva_panel["segmentos"][0]["detalle"]["puerta"] == "14"
     assert "proveedor" in reserva_panel["fuentes"]
+
+
+def test_los_usuarios_afectados_se_bloquean_siempre_en_el_mismo_orden(provider_sync, monkeypatch):
+    """El webhook y el sondeo bloquean a todos los afectados antes de procesar y en el mismo
+    orden: dos transacciones que se cruzan no se interbloquean."""
+    provider_sync.consumir(_evento_reserva_actualizada(USUARIO_1, RESERVA_1, "ABC123"))
+    provider_sync.consumir(_evento_reserva_actualizada(USUARIO_2, RESERVA_2, "XYZ789"))
+    cuerpo = GRABACIONES[2]["notificacion"]
+    [cambio] = [c for c in provider_sync.registro.traducir_notificacion(ADAPTADOR_ID, {}, cuerpo)
+                if c["referencia"] == "ABC123"]
+    otro = copy.deepcopy(cambio)
+    otro["referencia"] = "XYZ789"
+    otro["observacion"]["idDeFuente"] += "-xyz"
+    bloqueados = []
+    monkeypatch.setattr(servicio_de_provider_sync, "bloquear_usuario",
+                        lambda conexion, usuario: bloqueados.append(str(usuario)))
+
+    primero = max(str(USUARIO_1), str(USUARIO_2))
+    cambios = [otro, cambio] if primero == str(USUARIO_2) else [cambio, otro]
+    with conectar(provider_sync._configuracion.dsn_postgres, provider_sync._esquema) as conexion:
+        provider_sync._procesar_cambios(conexion, ADAPTADOR_ID, cambios, AHORA)
+    assert bloqueados == sorted([str(USUARIO_1), str(USUARIO_2)])

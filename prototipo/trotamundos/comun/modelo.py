@@ -116,6 +116,7 @@ class Lugar:
     codigo: str | None = None
     esquema_de_codigo: str | None = None
     coordenadas: Coordenadas | None = None
+    ciudad: str | None = None  # opcional (comun.yaml 1.1.0): para el título del viaje
 
     @classmethod
     def desde_dict(cls, datos: Mapping[str, Any]) -> Lugar:
@@ -127,11 +128,13 @@ class Lugar:
             codigo=datos.get("codigo"),
             esquema_de_codigo=datos.get("esquemaDeCodigo"),
             coordenadas=Coordenadas(coordenadas["lat"], coordenadas["lon"]) if coordenadas else None,
+            ciudad=datos.get("ciudad"),
         )
 
     def a_dict(self) -> dict[str, Any]:
         return _sin_nulos({
             "nombre": self.nombre,
+            "ciudad": self.ciudad,
             "codigo": self.codigo,
             "esquemaDeCodigo": self.esquema_de_codigo,
             "pais": self.pais,

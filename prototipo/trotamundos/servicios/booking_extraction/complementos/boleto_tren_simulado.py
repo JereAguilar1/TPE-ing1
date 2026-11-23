@@ -28,6 +28,9 @@ _ESTACIONES = {
     'ATO': ('Madrid Atocha', 'ES', 'Europe/Madrid', 40.4066, -3.6892),
     'BCN': ('Barcelona Sants', 'ES', 'Europe/Madrid', 41.3793, 2.1404),
 }
+# La ciudad de cada estación, para el título del viaje (comun.yaml 1.1.0).
+_CIUDADES = {'RET': 'Buenos Aires', 'CON': 'Buenos Aires', 'MDQ': 'Mar del Plata',
+             'ROS': 'Rosario', 'ATO': 'Madrid', 'BCN': 'Barcelona'}
 _OBLIGATORIOS = ('Localizador', 'Operador', 'Tren', 'Origen', 'Destino', 'Emitido')
 _OPCIONALES = ('Salida', 'Llegada', 'Fecha', 'Coche', 'Asiento', 'Anden')
 _DETALLE = {'Coche': 'coche', 'Asiento': 'asiento', 'Anden': 'anden'}
@@ -42,7 +45,8 @@ def _instante(valor):
 
 def _lugar(codigo):
     nombre, pais, zona, lat, lon = _ESTACIONES[codigo]
-    return zona, {'nombre': nombre, 'pais': pais, 'zonaHoraria': zona, 'codigo': codigo,
+    return zona, {'nombre': nombre, 'ciudad': _CIUDADES[codigo], 'pais': pais,
+                  'zonaHoraria': zona, 'codigo': codigo,
                   'esquemaDeCodigo': 'interno', 'coordenadas': {'lat': lat, 'lon': lon}}
 
 

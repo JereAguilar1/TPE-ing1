@@ -135,6 +135,55 @@ def test_el_drenaje_de_atrasos_usa_como_mucho_la_mitad_de_la_cuota():
     assert _intentar(protector, T0, lambda: "ok", "vivo") == "ok"  # el tráfico nuevo sigue pasando
 
 
+def _lentas(protector, cantidad, instante):
+    """`cantidad` llamadas que quedan adentro hasta que se suelta `liberar`."""
+    liberar, adentro = threading.Event(), threading.Semaphore(0)
+
+    def lenta():
+        adentro.release()
+        liberar.wait(5)
+        return "ok"
+
+    hilos = [threading.Thread(target=_intentar, args=(protector, instante, lenta))
+             for _ in range(cantidad)]
+    for hilo in hilos:
+        hilo.start()
+    for _ in range(cantidad):
+        assert adentro.acquire(timeout=5)
+    return liberar, hilos
+
+
+def test_semiabierto_deja_pasar_solo_las_tres_sondas():
+    """ADR-0024: en semiabierto salen 3 sondas, no todo el tráfico que espera al proveedor."""
+    protector = _protector(cuota=10_000)
+    for i in range(5):
+        _intentar(protector, T0 + timedelta(seconds=i))
+    semiabierto = T0 + timedelta(seconds=40)
+    liberar, hilos = _lentas(protector, 3, semiabierto)
+    try:
+        assert isinstance(_intentar(protector, semiabierto, lambda: "ok"),
+                          proteccion.CortacircuitosAbierto)
+    finally:
+        liberar.set()
+        for hilo in hilos:
+            hilo.join(5)
+    assert protector.estado(PROVEEDOR) == proteccion.CERRADO
+
+
+def test_con_el_mamparo_lleno_no_se_gasta_cuota():
+    protector = _protector(cuota=10_000)
+    liberar, hilos = _lentas(protector, proteccion.MAMPARO, T0)
+    try:
+        usadas = sum(protector._cuotas[PROVEEDOR].usadas.values())
+        for _ in range(5):
+            assert isinstance(_intentar(protector, T0, lambda: "ok"), proteccion.MamparoLleno)
+        assert sum(protector._cuotas[PROVEEDOR].usadas.values()) == usadas
+    finally:
+        liberar.set()
+        for hilo in hilos:
+            hilo.join(5)
+
+
 def test_el_mamparo_admite_50_llamadas_simultaneas():
     protector = _protector(cuota=10_000)
     liberar, adentro = threading.Event(), threading.Semaphore(0)

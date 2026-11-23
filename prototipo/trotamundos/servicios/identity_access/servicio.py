@@ -24,7 +24,7 @@ from fastapi import FastAPI
 from psycopg.types.json import Jsonb
 
 from trotamundos.comun.carriles import asegurar_topicos, carriles_posibles, topico
-from trotamundos.comun.config import Configuracion
+from trotamundos.comun.config import Configuracion, _variable
 from trotamundos.comun.contratos import Contratos, contratos_por_omision
 from trotamundos.comun.errores import Problema, no_encontrado
 from trotamundos.comun.eventos import Evento
@@ -105,7 +105,7 @@ class IdentityAccess:
         self._borrado = ejecutor_de_borrado or ordenes_de_borrado.EjecutorHttp()
         self._esquema = esquema
         self._contratos = contratos or contratos_por_omision()
-        semilla_kms = os.environ.get("TROTAMUNDOS_KMS_SECRETO")
+        semilla_kms = _variable("TROTAMUNDOS_KMS_SECRETO")
         self._kms = kms or custodia_boveda.KmsLocal(
             hashlib.sha256(semilla_kms.encode("utf-8")).digest() if semilla_kms else None
         )
@@ -127,10 +127,10 @@ class IdentityAccess:
         self._detector = detector_anomalias or auditoria_y_revocacion.DetectorDeAnomalias(
             int(os.environ.get("TROTAMUNDOS_P99_TOKENS_POR_MINUTO", "20")))
         self._secreto_jwt = (
-            secreto_jwt or os.environ.get("TROTAMUNDOS_JWT_SECRETO") or secrets.token_hex(32)
+            secreto_jwt or _variable("TROTAMUNDOS_JWT_SECRETO") or secrets.token_hex(32)
         )
         self._secreto_vale = (
-            secreto_vale or os.environ.get("TROTAMUNDOS_VALE_SECRETO") or secrets.token_hex(32)
+            secreto_vale or _variable("TROTAMUNDOS_VALE_SECRETO") or secrets.token_hex(32)
         )
         self._reloj = reloj
         self._nuevo_id = nuevo_id
@@ -308,6 +308,7 @@ class IdentityAccess:
         buckets_arrendados: set[int] | None,
     ) -> dict[str, Any]:
         bloqueada: consentimiento_buzones.InstanciaBloqueada | None = None
+        sin_secreto: custodia_boveda.ErrorDeBoveda | None = None
         token: dict[str, Any] = {}
         with transaccion(self._configuracion.dsn_postgres, self._esquema) as con:
             try:
@@ -325,10 +326,15 @@ class IdentityAccess:
                 bloqueada = exc
             except consentimiento_buzones.BuzonNoEncontrado as exc:
                 raise no_encontrado() from exc
-            except (consentimiento_buzones.ConflictoDeBuzon, custodia_boveda.ErrorDeBoveda) as exc:
+            except consentimiento_buzones.ConflictoDeBuzon as exc:
                 raise Problema(409, str(exc)) from exc
+            except custodia_boveda.ErrorDeBoveda as exc:
+                # También se confirma: la bóveda ya auditó el intento fallido (ADR-0029, 100 %).
+                sin_secreto = exc
         if bloqueada is not None:
             raise Problema(403, "Prohibido")
+        if sin_secreto is not None:
+            raise Problema(409, str(sin_secreto)) from sin_secreto
         return token
 
     # --- Autorización ABAC -------------------------------------------------------------------

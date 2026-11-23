@@ -28,7 +28,7 @@ from uuid import UUID, uuid4
 from fastapi import FastAPI
 
 from trotamundos.comun.carriles import Carril, asegurar_topicos, carriles_posibles, topico
-from trotamundos.comun.config import Configuracion
+from trotamundos.comun.config import Configuracion, _variable
 from trotamundos.comun.consumidor import DDL_RECHAZADOS, ConsumidorConCarriles
 from trotamundos.comun.contratos import Contratos, ErrorDeContrato, contratos_por_omision
 from trotamundos.comun.errores import Problema, no_encontrado
@@ -92,7 +92,7 @@ class VirtualAssistant:
             os.environ.get("TROTAMUNDOS_URL_ITINERARY_ESCRITURA", "http://localhost:18101"))
         abridor = abridor or derivacion.AbridorDeCasosHttp(
             os.environ.get("TROTAMUNDOS_URL_SUPPORT_LIAISON", "http://localhost:18105"))
-        self._secreto_jwt = (secreto_jwt or os.environ.get("TROTAMUNDOS_JWT_SECRETO")
+        self._secreto_jwt = (secreto_jwt or _variable("TROTAMUNDOS_JWT_SECRETO")
                              or secrets.token_hex(32))
         self._reloj = reloj
         self._nuevo_id = nuevo_id

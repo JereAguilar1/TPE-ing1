@@ -118,6 +118,15 @@ def test_la_primera_reserva_arma_un_viaje_planificado(mundo):
     assert armado.tipo == "ViajeArmado" and armado.carga["reservaIds"] == [str(UUID(int=1))]
 
 
+def test_con_la_ciudad_del_lugar_el_titulo_dice_adonde_se_va(mundo):
+    """`Lugar.ciudad` (comun.yaml 1.1.0): «Viaje a Mendoza», no el nombre del aeropuerto. Sin
+    ella, como antes, el nombre del lugar (prueba anterior). `ViajeArmado` lo valida el contrato."""
+    viaje = mundo.aplicar(reserva(1, segmento("vuelo", dia(1, 10), dia(1, 12), AEP,
+                                              {**MDZ, "ciudad": "Mendoza"})))
+    assert viaje.derivados["titulo"] == "Viaje a Mendoza"
+    assert viaje.derivados["destinoPrincipal"]["ciudad"] == "Mendoza"
+
+
 def test_un_alojamiento_en_la_ciudad_de_llegada_se_une(mundo):
     viaje = mundo.aplicar(ida())
     assert mundo.aplicar(hotel()) is viaje  # a 7 km del aeropuerto, dentro del margen

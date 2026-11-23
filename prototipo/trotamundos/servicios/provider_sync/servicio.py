@@ -11,7 +11,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import os
 import secrets
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Callable, Iterable, Mapping
@@ -91,7 +90,6 @@ class ProviderSync:
             for adaptador_id in self.registro.ids()})
         self._secreto_webhook = (
             secreto_webhook
-            or os.environ.get("TROTAMUNDOS_SECRETO_WEBHOOK_PROVEEDOR")
             or _variable("TROTAMUNDOS_SECRETO_WEBHOOK_PROVEEDOR")
             or secrets.token_hex(32)
         )
@@ -169,12 +167,15 @@ class ProviderSync:
     # --- Sondeo programado ---------------------------------------------------------------
 
     def sondear_proveedores(self) -> int:
+        """Una transacción por adaptador: la llamada a un proveedor nunca espera con usuarios de
+        otro adaptador bloqueados, y lo de un adaptador no se deshace por otro."""
         ahora = self._reloj()
         emitidos = 0
-        with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
-            for adaptador_id, cambios in programador.sondear_todos(conexion, self.registro, ahora,
-                                                                   self.protector):
-                emitidos += self._procesar_cambios(conexion, adaptador_id, cambios, ahora)
+        for adaptador in self.registro.adaptadores_con_sondeo():
+            with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
+                for adaptador_id, cambios in programador.sondear_todos(
+                        conexion, self.registro, ahora, self.protector, solo=adaptador.id):
+                    emitidos += self._procesar_cambios(conexion, adaptador_id, cambios, ahora)
         return emitidos
 
     def _procesar_cambios(self, conexion: psycopg.Connection, adaptador_id: str,
@@ -202,14 +203,20 @@ class ProviderSync:
             )
             salidas.append((evento_disrupcion, Carril.P1))
 
-        for cambio in lista_cambios:
+        seguidas_por_cambio = [seguimiento.resolver(conexion, adaptador_id, str(c["referencia"]))
+                               for c in lista_cambios]
+        # Todos los usuarios afectados, bloqueados en el mismo orden por el webhook y el sondeo:
+        # dos transacciones que se cruzan esperan una a la otra en lugar de interbloquearse.
+        for usuario_id in sorted({s.usuario_id for seguidas in seguidas_por_cambio
+                                  for s in seguidas}):
+            bloquear_usuario(conexion, usuario_id)
+        for cambio, seguidas in zip(lista_cambios, seguidas_por_cambio, strict=True):
             referencia = str(cambio["referencia"])
             observacion = cambio["observacion"]
             id_de_fuente = str(observacion["idDeFuente"])
             causa_id = causas_por_ref.get(referencia)
 
-            for seguida in seguimiento.resolver(conexion, adaptador_id, referencia):
-                bloquear_usuario(conexion, seguida.usuario_id)
+            for seguida in seguidas:
                 nueva = conexion.execute(
                     """
                     INSERT INTO observacion_emitida (adaptador_id, usuario_id, id_de_fuente, emitida_en)

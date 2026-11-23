@@ -7,7 +7,6 @@ misma composición que `bff-web` (`comun.bff`) y arma el panel compacto (`resume
 
 from __future__ import annotations
 
-import os
 import secrets
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -20,6 +19,7 @@ from trotamundos.comun.bff import (
     EscritorDeItinerario,
     LectorDeItinerario,
 )
+from trotamundos.comun.config import _variable
 from trotamundos.comun.contratos import Contratos, contratos_por_omision
 from trotamundos.servicios.bff_mobile import api, resumen
 
@@ -32,7 +32,7 @@ class BffMobile(ComposicionDeItinerarioHttp):
                  reloj: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
         super().__init__(lector=lector, escritor=escritor)
         self._contratos = contratos or contratos_por_omision()
-        self._secreto_jwt = (secreto_jwt or os.environ.get("TROTAMUNDOS_JWT_SECRETO")
+        self._secreto_jwt = (secreto_jwt or _variable("TROTAMUNDOS_JWT_SECRETO")
                              or secrets.token_hex(32))
         self._reloj = reloj
 

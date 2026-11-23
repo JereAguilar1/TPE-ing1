@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import threading
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
@@ -82,6 +83,25 @@ def _abrir(soporte, cuerpo: dict | None = None, clave: str | None = None, usuari
 
 
 AGENCIA = {"id": "agencia-del-sur", "nombre": "Agencia del Sur"}
+
+
+def test_mientras_la_agencia_atiende_el_viajero_puede_seguir_escribiendo(soporte):
+    """La llamada a la agencia no tiene bloqueado al usuario: otra escritura suya (acá, sus
+    preferencias) termina aunque la agencia todavía no haya respondido."""
+    _preferencias(soporte, AGENCIA)
+    agencia, a_tiempo = soporte.adaptador, []
+
+    class AgenciaLenta:
+        def derivar(self, agencia_id, caso):
+            escritura = threading.Thread(target=lambda: _preferencias(soporte, AGENCIA))
+            escritura.start()
+            escritura.join(3)
+            a_tiempo.append(not escritura.is_alive())  # terminó antes de que la agencia responda
+            return agencia.derivar(agencia_id, caso)
+
+    soporte.adaptador = AgenciaLenta()
+    assert _abrir(soporte).json()["estado"] == "Derivado"
+    assert a_tiempo == [True]
 
 
 def test_sin_agencia_preferida_el_caso_no_se_abre(soporte):

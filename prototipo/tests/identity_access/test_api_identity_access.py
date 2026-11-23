@@ -451,6 +451,21 @@ def test_la_supresion_de_cuenta_publica_la_revocacion_de_cada_buzon(dsn, esquema
     assert [f["carril"] for f in filas if f["tipo"] == "CuentaSuprimida"] == ["P3"]
 
 
+def test_el_pedido_de_token_de_un_buzon_sin_secreto_queda_auditado(dsn, esquema, contratos):
+    """ADR-0029 (auditoría del 100 %): el `409` no deshace la fila de auditoría del intento. Un
+    buzón por reenvío está `Activo` y no guarda ningún secreto en la bóveda."""
+    cliente, _, _ = _armar(dsn, esquema, contratos)
+    token, _ = _iniciar_sesion(cliente)
+    buzon = cliente.post("/buzones", headers={"Authorization": f"Bearer {token}",
+                                              "Idempotency-Key": str(uuid4())},
+                         json={"via": "reenvio"}).json()["id"]
+
+    assert cliente.post(f"/buzones/{buzon}/token-efimero", headers=_MAIL_INGEST).status_code == 409
+    assert _filas(dsn, esquema, "SELECT resultado, motivo FROM registro_auditoria "
+                                f"WHERE accion = 'emitir_token_efimero' AND recurso_id = '{buzon}'") \
+        == [{"resultado": "error", "motivo": "secreto_inexistente"}]
+
+
 def test_cuenta_suprimida_lleva_el_seudonimo_con_que_event_pipeline_guardo_los_eventos(
     dsn, esquema, contratos
 ):

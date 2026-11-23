@@ -15,6 +15,7 @@ from uuid import UUID
 from fastapi import FastAPI
 
 from trotamundos.comun.bff import ComposicionDeItinerarioHttp
+from trotamundos.comun.config import _variable
 from trotamundos.comun.contratos import Contratos, contratos_por_omision
 from trotamundos.servicios.bff_web import api, clientes
 
@@ -38,7 +39,7 @@ class BffWeb(ComposicionDeItinerarioHttp):
         )
         self._secreto_jwt = (
             secreto_jwt
-            or os.environ.get("TROTAMUNDOS_JWT_SECRETO")
+            or _variable("TROTAMUNDOS_JWT_SECRETO")
             or secrets.token_hex(32)
         )
 

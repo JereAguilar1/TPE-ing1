@@ -27,6 +27,9 @@ _AEROPUERTOS: dict[str, tuple[str, str, str]] = {
     "COR": ("Ingeniero Ambrosio Taravella", "AR", "America/Argentina/Cordoba"),
     "MAD": ("Adolfo Suárez Madrid-Barajas", "ES", "Europe/Madrid"),
 }
+# La ciudad de cada aeropuerto: el título del viaje dice adónde se va (comun.yaml 1.1.0).
+_CIUDADES: dict[str, str] = {"EZE": "Buenos Aires", "AEP": "Buenos Aires", "MDZ": "Mendoza",
+                             "BRC": "Bariloche", "COR": "Córdoba", "MAD": "Madrid"}
 # Coordenadas de cada aeropuerto: con ellas `itinerary` reconoce la misma ciudad que un hotel o un
 # traslado de otra fuente, que no traen código IATA (criterio de «misma ciudad», iteración 2 §5.1).
 _COORDENADAS: dict[str, tuple[float, float]] = {
@@ -60,6 +63,7 @@ def _extremo(codigo: Any, instante: Any) -> dict[str, Any]:
         "zonaHoraria": zona,
         "lugar": {
             "nombre": nombre,
+            "ciudad": _CIUDADES[codigo],
             "codigo": codigo,
             "esquemaDeCodigo": "IATA",
             "pais": pais,

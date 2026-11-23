@@ -27,7 +27,7 @@ import psycopg
 from fastapi import FastAPI
 
 from trotamundos.comun.carriles import Carril, asegurar_topicos, carriles_posibles, topico
-from trotamundos.comun.config import Configuracion
+from trotamundos.comun.config import Configuracion, _variable
 from trotamundos.comun.consumidor import DDL_RECHAZADOS, ConsumidorConCarriles
 from trotamundos.comun.contratos import Contratos, ErrorDeContrato, contratos_por_omision
 from trotamundos.comun.errores import Problema, no_encontrado
@@ -36,6 +36,7 @@ from trotamundos.comun.persistencia import (
     RespuestaGuardada,
     bloquear_usuario,
     borrar_usuario,
+    conectar,
     crear_esquema,
     guardar_respuesta,
     huella_de_solicitud,
@@ -87,7 +88,7 @@ class SupportLiaison:
         self._lector = lector_de_viajes or instantanea.LectorDeViajesHttp(
             os.environ.get("TROTAMUNDOS_URL_ITINERARY_LECTURA", "http://localhost:18102"))
         self.adaptador = adaptador or AgenciaSimulada()
-        self._secreto_jwt = (secreto_jwt or os.environ.get("TROTAMUNDOS_JWT_SECRETO")
+        self._secreto_jwt = (secreto_jwt or _variable("TROTAMUNDOS_JWT_SECRETO")
                              or secrets.token_hex(32))
         self._reloj = reloj
         self._nuevo_id = nuevo_id
@@ -172,10 +173,20 @@ class SupportLiaison:
         return casos.a_dict(fila) if fila else previa.cuerpo
 
     def _derivar(self, usuario_id: UUID | str, caso_id: UUID | str) -> dict[str, Any]:
-        """Un intento de derivación, en su transacción. Con el acuse de la agencia, `Derivado` y
-        `CasoDerivado` en la *outbox*; si no responde, queda `Abierto` con su próximo intento."""
-        with self._transaccion(usuario_id) as conexion:
-            fila = casos.obtener(conexion, usuario_id, caso_id)
+        """Un intento de derivación. Con el acuse de la agencia, `Derivado` y `CasoDerivado` en la
+        *outbox*; si no responde, queda `Abierto` con su próximo intento.
+
+        La llamada a la agencia no se hace dentro de una transacción ni con el usuario bloqueado:
+        una agencia lenta no frena las demás escrituras del viajero. Un cerrojo por caso, en una
+        conexión aparte, evita que dos intentos simultáneos le manden el mismo caso dos veces."""
+        with conectar(self._configuracion.dsn_postgres, self._esquema) as turno:
+            turno.autocommit = True  # el cerrojo dura lo que la conexión, sin transacción abierta
+            if not turno.execute("SELECT pg_try_advisory_lock(hashtextextended(%s, 0)) AS ok",
+                                 (f"derivar:{caso_id}",)).fetchone()["ok"]:
+                with self._lectura() as conexion:  # otro intento lo está derivando
+                    return casos.obtener(conexion, usuario_id, caso_id)
+            with self._lectura() as conexion:
+                fila = casos.obtener(conexion, usuario_id, caso_id)
             if fila is None or fila["estado"] != "Abierto":
                 return fila
             ahora = self._reloj()
@@ -184,6 +195,16 @@ class SupportLiaison:
             except AgenciaNoDisponible:
                 _registro_de_errores.warning("La agencia %s no acusó recibo del caso %s",
                                              fila["agencia_id"], caso_id)
+                referencia = None
+            return self._registrar_derivacion(usuario_id, caso_id, referencia, ahora)
+
+    def _registrar_derivacion(self, usuario_id: UUID | str, caso_id: UUID | str,
+                              referencia: str | None, ahora: datetime) -> dict[str, Any]:
+        with self._transaccion(usuario_id) as conexion:
+            fila = casos.obtener(conexion, usuario_id, caso_id)
+            if fila is None or fila["estado"] != "Abierto":
+                return fila  # el viajero lo resolvió mientras se llamaba a la agencia
+            if referencia is None:
                 return casos.postergar(conexion, fila, ahora)
             fila = casos.marcar_derivado(conexion, fila, referencia, ahora)
             publicacion.registrar(conexion, [Evento.nuevo(

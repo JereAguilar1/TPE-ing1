@@ -106,11 +106,15 @@ class Cortacircuitos:
     abierto_desde: datetime | None = None
     seguidos: int = 0
     sondas_ok: int = 0
+    sondas_en_vuelo: int = 0  # llamadas de prueba en curso mientras está semiabierto
     llamadas: deque = field(default_factory=deque)  # (instante, falló)
 
     def permite(self, ahora: datetime) -> bool:
         if self.estado == ABIERTO and ahora - self.abierto_desde >= ABIERTO_DURANTE:
             self.estado, self.sondas_ok = SEMIABIERTO, 0
+        if self.estado == SEMIABIERTO:
+            # Semiabierto deja pasar solo las sondas que faltan, no todo el tráfico (ADR-0024).
+            return self.sondas_ok + self.sondas_en_vuelo < SONDAS
         return self.estado != ABIERTO
 
     def exito(self, ahora: datetime) -> None:
@@ -198,26 +202,38 @@ class ProtectorDeProveedores:
         with self._candado:
             if not cortacircuitos.permite(ahora):
                 raise CortacircuitosAbierto(adaptador_id)
-            if not cuota.tomar(prioridad, ahora, drenando):
-                raise SinCuota(adaptador_id)
+            sonda = cortacircuitos.estado == SEMIABIERTO
+            if sonda:
+                cortacircuitos.sondas_en_vuelo += 1
         mamparo = self._mamparos[adaptador_id]
         if not mamparo.acquire(blocking=False):
+            if sonda:
+                with self._candado:
+                    cortacircuitos.sondas_en_vuelo -= 1
             raise MamparoLleno(adaptador_id)
         try:
-            resultado = llamada()
-        except ProveedorNoDisponible as error:
+            # La cuota se toma recién con lugar en el mamparo: una llamada que no sale no la gasta.
             with self._candado:
-                cortacircuitos.fallo(ahora)
-            raise FallaTransitoria(str(error)) from error
-        except CuotaExcedida as error:  # freno de cuota: no es una falla de salud
+                if not cuota.tomar(prioridad, ahora, drenando):
+                    raise SinCuota(adaptador_id)
+            try:
+                resultado = llamada()
+            except ProveedorNoDisponible as error:
+                with self._candado:
+                    cortacircuitos.fallo(ahora)
+                raise FallaTransitoria(str(error)) from error
+            except CuotaExcedida as error:  # freno de cuota: no es una falla de salud
+                with self._candado:
+                    cuota.frenar(ahora, error.retry_after)
+                raise SinCuota(str(error)) from error
             with self._candado:
-                cuota.frenar(ahora, error.retry_after)
-            raise SinCuota(str(error)) from error
+                cortacircuitos.exito(ahora)
+            return resultado
         finally:
             mamparo.release()
-        with self._candado:
-            cortacircuitos.exito(ahora)
-        return resultado
+            if sonda:
+                with self._candado:
+                    cortacircuitos.sondas_en_vuelo -= 1
 
 
 # --- cola_pendientes ----------------------------------------------------------------------------

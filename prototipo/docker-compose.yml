@@ -380,6 +380,8 @@ services:
     command: ["uvicorn", "--factory", "trotamundos.servicios.api_gateway.servicio:crear_app",
               "--host", "0.0.0.0", "--port", "8000"]
     environment:
+      # Solo a app-web (nginx) se le cree la dirección del cliente en X-Real-IP (límite de tasa).
+      TROTAMUNDOS_PROXIES_CONFIABLES: app-web
       TROTAMUNDOS_URL_BFF_WEB: http://bff-web:8000
       TROTAMUNDOS_URL_BFF_MOBILE: http://bff-mobile:8000
       TROTAMUNDOS_URL_IDENTITY_ACCESS: http://identity-access:8000

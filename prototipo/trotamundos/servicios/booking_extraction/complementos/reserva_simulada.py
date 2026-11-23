@@ -27,6 +27,8 @@ _COORDENADAS = {
     'EZE': (-34.8222, -58.5358), 'AEP': (-34.5592, -58.4156),
     'MDZ': (-32.8317, -68.7929), 'MAD': (40.4983, -3.5676),
 }
+# La ciudad de cada aeropuerto, para el título del viaje (comun.yaml 1.1.0).
+_CIUDADES = {'EZE': 'Buenos Aires', 'AEP': 'Buenos Aires', 'MDZ': 'Mendoza', 'MAD': 'Madrid'}
 _CAMPOS = ('Localizador', 'Aerolinea', 'Numero', 'Origen', 'Destino', 'Salida', 'Llegada', 'Emitido')
 
 
@@ -40,8 +42,8 @@ def _instante(valor):
 def _extremo(codigo, instante):
     nombre, pais, zona = _AEROPUERTOS[codigo]
     return {'instante': _instante(instante), 'precision': 'instante', 'zonaHoraria': zona,
-            'lugar': {'nombre': nombre, 'pais': pais, 'zonaHoraria': zona,
-                      'codigo': codigo, 'esquemaDeCodigo': 'IATA',
+            'lugar': {'nombre': nombre, 'ciudad': _CIUDADES[codigo], 'pais': pais,
+                      'zonaHoraria': zona, 'codigo': codigo, 'esquemaDeCodigo': 'IATA',
                       'coordenadas': dict(zip(('lat', 'lon'), _COORDENADAS[codigo]))}}
 
 

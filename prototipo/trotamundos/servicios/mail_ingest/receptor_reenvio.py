@@ -9,7 +9,10 @@ El servidor de correo entrante propio entrega por HTTP cada mensaje que llega a 
    escribir cualquiera. Hace falta `dkim=pass` y además `spf=pass` o `arc=pass` (el ARC es lo que
    sobrevive a un reenvío automático);
 3. que quien reenvió sea el titular del buzón: el remitente del sobre (`Return-Path`) o, si no
-   está, el `From`, tiene que coincidir con su correo verificado.
+   está, el `From`, tiene que coincidir con su correo verificado;
+4. si se acepta solo por el ARC (el SPF no pasó), que alguna firma DKIM válida sea del dominio
+   del titular (`header.d` o `header.i`, alineación relajada). Sin esto, cualquiera con su propio
+   dominio firmado y su propia cadena ARC podía hacerse pasar por el titular.
 
 Lo que no pasa se descarta y queda auditado, sin guardar el contenido del mensaje.
 """
@@ -26,6 +29,7 @@ import psycopg
 
 AUTENTICADOR = "ingesta.trotamundos.app"
 _RESULTADO = re.compile(r"\b(dkim|spf|arc)\s*=\s*([a-z]+)", re.IGNORECASE)
+_FIRMANTE = re.compile(r"\bheader\.(?:d=([\w.-]+)|i=[^\s;@]*@([\w.-]+))", re.IGNORECASE)
 
 DDL = (
     """
@@ -51,6 +55,23 @@ def resultados(mensaje: EmailMessage) -> dict[str, str]:
     return encontrados
 
 
+def firmantes_dkim(mensaje: EmailMessage) -> set[str]:
+    """Los dominios de las firmas DKIM que el servidor propio dio por válidas."""
+    dominios: set[str] = set()
+    for cabecera in mensaje.get_all("Authentication-Results") or []:
+        autenticador, _, detalle = str(cabecera).partition(";")
+        if autenticador.strip().lower() != AUTENTICADOR:
+            continue
+        for resultado in detalle.split(";"):
+            if re.match(r"\s*dkim\s*=\s*pass\b", resultado, re.IGNORECASE):
+                dominios |= {(d or i).lower() for d, i in _FIRMANTE.findall(resultado)}
+    return dominios
+
+
+def _alineados(firmante: str, dominio: str) -> bool:
+    return firmante == dominio or dominio.endswith("." + firmante) or firmante.endswith("." + dominio)
+
+
 def quien_reenvia(mensaje: EmailMessage) -> str:
     sobre = parseaddr(str(mensaje["Return-Path"] or ""))[1]
     return (sobre or parseaddr(str(mensaje["From"] or ""))[1]).strip().lower()
@@ -64,6 +85,10 @@ def motivo_de_rechazo(mensaje: EmailMessage, correo_titular: str | None) -> str 
         return "autenticacionFallida"
     if not correo_titular or quien_reenvia(mensaje) != correo_titular.strip().lower():
         return "remitenteNoAutorizado"
+    if autenticacion.get("spf") != "pass":
+        dominio = correo_titular.strip().lower().rpartition("@")[2]
+        if not any(_alineados(f, dominio) for f in firmantes_dkim(mensaje)):
+            return "autenticacionFallida"
     return None
 
 

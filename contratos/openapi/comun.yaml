@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Trotamundos — componentes comunes
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Esquemas, parámetros, respuestas y esquemas de seguridad compartidos por todos los contratos
     OpenAPI y por el contrato AsyncAPI de eventos de dominio. No expone rutas.
@@ -15,6 +15,10 @@ info:
     - `429` con `Retry-After`, `X-Deadline-Ms`: ADR-0020.
     - `traceparent`: ADR-0025.
     - Versionado por tipo de medio `application/vnd.trotamundos.v{N}+json`: ADR-0027.
+
+    - `1.1.0`: `Lugar.ciudad`, opcional: la ciudad de un aeropuerto, una estación o un hotel. El
+      título del viaje dice adónde se va («Viaje a Mendoza») y no el nombre del lugar («El
+      Plumerillo»). Agregar una propiedad opcional es un cambio compatible (ADR-0027).
 paths: {}
 components:
   securitySchemes:
@@ -173,6 +177,9 @@ components:
       required: [nombre, pais, zonaHoraria]
       properties:
         nombre: { type: string }
+        ciudad:
+          type: string
+          description: Opcional; la ciudad del lugar, para el título del viaje (desde `1.1.0`).
         codigo:
           type: string
           description: Opcional; las estaciones de tren y autobús no tienen un código universal (iteración 2, paso 7).

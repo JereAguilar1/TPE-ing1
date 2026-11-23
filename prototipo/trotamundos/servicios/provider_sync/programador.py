@@ -60,12 +60,14 @@ def sondear_adaptador(conexion: psycopg.Connection, registro: RegistroDeAdaptado
 
 
 def sondear_todos(conexion: psycopg.Connection, registro: RegistroDeAdaptadores,
-                  ahora: datetime, protector: proteccion.ProtectorDeProveedores | None = None
-                  ) -> list[tuple[str, list[dict[str, Any]]]]:
-    """Sondea todos los adaptadores con `sondeo: true`. Si un proveedor falla transitoriamente,
-    no detiene a los demás (ADR-0006, QA-06)."""
+                  ahora: datetime, protector: proteccion.ProtectorDeProveedores | None = None,
+                  solo: str | None = None) -> list[tuple[str, list[dict[str, Any]]]]:
+    """Sondea los adaptadores con `sondeo: true` (o solo `solo`). Si un proveedor falla
+    transitoriamente, no detiene a los demás (ADR-0006, QA-06)."""
     resultados: list[tuple[str, list[dict[str, Any]]]] = []
     for adaptador in registro.adaptadores_con_sondeo():
+        if solo is not None and adaptador.id != solo:
+            continue
         if protector is None:
             try:
                 resultados.append((adaptador.id,

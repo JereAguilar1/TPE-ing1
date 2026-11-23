@@ -30,6 +30,9 @@ _ESTACIONES: dict[str, tuple[str, str, str, float, float]] = {
     "ATO": ("Madrid Atocha", "ES", "Europe/Madrid", 40.4066, -3.6892),
     "BCN": ("Barcelona Sants", "ES", "Europe/Madrid", 41.3793, 2.1404),
 }
+# La ciudad de cada estación, para el título del viaje (comun.yaml 1.1.0).
+_CIUDADES = {"RET": "Buenos Aires", "CON": "Buenos Aires", "MDQ": "Mar del Plata",
+             "ROS": "Rosario", "ATO": "Madrid", "BCN": "Barcelona"}
 _ESTADOS = {"CONFIRMED": "confirmado", "CANCELLED": "cancelado"}
 _DETALLE = (("coach", "coche"), ("seat", "asiento"), ("platform", "anden"), ("class", "clase"))
 
@@ -53,7 +56,8 @@ def _extremo(parada: Any) -> dict[str, Any]:
     nombre, pais, zona, lat, lon = _ESTACIONES[codigo]
     return {"instante": _instante_utc(parada.get("time")), "precision": "instante",
             "zonaHoraria": zona,
-            "lugar": {"nombre": nombre, "codigo": codigo, "esquemaDeCodigo": "interno",
+            "lugar": {"nombre": nombre, "ciudad": _CIUDADES[codigo], "codigo": codigo,
+                      "esquemaDeCodigo": "interno",
                       "pais": pais, "zonaHoraria": zona,
                       "coordenadas": {"lat": lat, "lon": lon}}}
 

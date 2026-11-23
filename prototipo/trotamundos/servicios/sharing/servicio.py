@@ -22,7 +22,7 @@ from uuid import UUID, uuid4
 
 from fastapi import FastAPI
 
-from trotamundos.comun.config import Configuracion
+from trotamundos.comun.config import Configuracion, _variable
 from trotamundos.comun.contratos import Contratos, contratos_por_omision
 from trotamundos.comun.errores import Problema, no_encontrado
 from trotamundos.comun.persistencia import (
@@ -65,9 +65,9 @@ class Sharing:
         self._autorizador = autorizador or puertos.AutorizadorHttp(
             os.environ.get("TROTAMUNDOS_URL_IDENTITY_ACCESS", "http://localhost:18103"))
         self.redes = redes or RedSocialSimulada()
-        self._secreto_jwt = (secreto_jwt or os.environ.get("TROTAMUNDOS_JWT_SECRETO")
+        self._secreto_jwt = (secreto_jwt or _variable("TROTAMUNDOS_JWT_SECRETO")
                              or secrets.token_hex(32))
-        self._secreto_vale = (secreto_vale or os.environ.get("TROTAMUNDOS_VALE_SECRETO")
+        self._secreto_vale = (secreto_vale or _variable("TROTAMUNDOS_VALE_SECRETO")
                               or secrets.token_hex(32))
         self._reloj = reloj
 

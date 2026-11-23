@@ -239,3 +239,23 @@ def test_en_disrupcion_el_plazo_es_1500_y_se_apagan_las_publicaciones(contratos)
         assert atras.pedidos[-1].url.host == "bff-web"  # el asistente se publica por bff-web
         apagada = cliente.post(f"/viajes/{USUARIO}/publicaciones", headers=sesion())
         assert apagada.status_code == 503 and apagada.headers["retry-after"] == "60"
+
+
+def _publicas_hasta_el_429(cliente, cabeceras: dict[str, str]) -> int:
+    for pedidas in range(1, 40):
+        if cliente.get("/tipos-de-segmento", headers=cabeceras).status_code == 429:
+            return pedidas
+    return 0
+
+
+@pytest.mark.parametrize("proxies, cuotas_separadas", [({"testclient"}, True), (set(), False)])
+def test_detras_de_nginx_cada_cliente_tiene_su_cubeta(contratos, proxies, cuotas_separadas):
+    """ADR-0020: las operaciones públicas se limitan por dirección. Detrás de un proxy de
+    confianza (el nginx de `app-web`) es la de `X-Real-IP`; a cualquier otro no se le cree."""
+    gateway = ApiGateway(contratos=contratos, secreto_jwt=SECRETO, urls=dict(URLS),
+                         transporte=httpx.MockTransport(Atras()), reloj=Reloj(),
+                         proxies_confiables=proxies)
+    with TestClient(gateway.app()) as cliente:
+        assert _publicas_hasta_el_429(cliente, {"X-Real-IP": "203.0.113.1"}) == 21
+        otro = _publicas_hasta_el_429(cliente, {"X-Real-IP": "203.0.113.2"})
+    assert otro == (21 if cuotas_separadas else 1)

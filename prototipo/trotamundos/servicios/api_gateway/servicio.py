@@ -27,17 +27,20 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import ipaddress
 import os
 import re
 import secrets
+import socket
 import time
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Callable
+from typing import AsyncIterator, Callable, Iterable
 
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 
+from trotamundos.comun.config import _variable
 from trotamundos.comun.contratos import Contratos, contratos_por_omision
 from trotamundos.comun.errores import Problema, instalar_manejadores, no_encontrado
 from trotamundos.comun.sesion import region_de_sesion, sujeto_de_sesion, usuario_de_sesion
@@ -91,10 +94,11 @@ class ApiGateway:
                  urls: dict[str, str] | None = None, umbrales: modos.Umbrales | None = None,
                  transporte: httpx.AsyncBaseTransport | None = None,
                  reloj: Callable[[], float] = time.monotonic,
-                 region: str | None = None, regionales: dict[str, str] | None = None):
+                 region: str | None = None, regionales: dict[str, str] | None = None,
+                 proxies_confiables: Iterable[str] | None = None):
         self._contratos = contratos or contratos_por_omision()
         self._rutas = rutas.Rutas(self._contratos)
-        self._secreto_jwt = (secreto_jwt or os.environ.get("TROTAMUNDOS_JWT_SECRETO")
+        self._secreto_jwt = (secreto_jwt or _variable("TROTAMUNDOS_JWT_SECRETO")
                              or secrets.token_hex(32))
         self._urls = urls if urls is not None else {
             nombre: os.environ.get(variable, omision).rstrip("/")
@@ -112,6 +116,13 @@ class ApiGateway:
         self._regionales = ({self._region: self._urls.get(REGIONAL, ""), **regionales}
                             if regionales else {})
         self.salud = regiones.SaludDeRegiones(self._regionales)
+        # Quién puede decir la dirección real del cliente (`X-Real-IP`): el nginx de `app-web`. Sin
+        # esto, todo lo que llega por la página compartiría la cubeta de la dirección de nginx.
+        self._proxies = frozenset(
+            proxies_confiables if proxies_confiables is not None else
+            (p.strip() for p in os.environ.get("TROTAMUNDOS_PROXIES_CONFIABLES", "").split(",")
+             if p.strip()))
+        self._direcciones_de_proxies: tuple[float, frozenset[str]] = (float("-inf"), frozenset())
 
     def app(self) -> FastAPI:
         @asynccontextmanager
@@ -155,7 +166,7 @@ class ApiGateway:
                            "La única representación es application/vnd.trotamundos.v1+json")
         usuario = None
         if destino.publica:
-            clave = f"ip:{request.client.host if request.client else '-'}"
+            clave = f"ip:{self._direccion_del_cliente(request)}"
         elif (destino.servicio == "sharing" and metodo == "GET"
               and re.fullmatch(r"/comparticiones/[^/]+", ruta)):
             # El contrato admite invitados sin UUID. Sharing pide la decisión ABAC y verifica
@@ -202,6 +213,34 @@ class ApiGateway:
         devueltas["traceparent"] = traza
         devueltas["X-Modo-Operativo"] = modo
         return Response(respuesta.content, status_code=respuesta.status_code, headers=devueltas)
+
+    def _direccion_del_cliente(self, request: Request) -> str:
+        """La del cliente; si llega por un proxy de confianza, la que el proxy dice en
+        `X-Real-IP` (nginx la pisa: el cliente no la puede elegir)."""
+        directa = request.client.host if request.client else "-"
+        real = request.headers.get("X-Real-IP", "").strip()
+        if real and directa in self._confiables():
+            try:
+                return str(ipaddress.ip_address(real))
+            except ValueError:
+                pass
+        return directa
+
+    def _confiables(self) -> frozenset[str]:
+        """Los proxies por nombre o dirección, con los nombres resueltos (cada 30 s: el DNS de
+        Docker cambia la dirección si el contenedor se recrea)."""
+        resueltas_en, direcciones = self._direcciones_de_proxies
+        ahora = time.monotonic()
+        if ahora - resueltas_en >= 30:
+            direcciones = set(self._proxies)
+            for proxy in self._proxies:
+                try:
+                    direcciones |= {i[4][0] for i in socket.getaddrinfo(proxy, None)}
+                except OSError:
+                    pass
+            direcciones = frozenset(direcciones)
+            self._direcciones_de_proxies = (ahora, direcciones)
+        return direcciones
 
     async def comprobar_regiones(self, http: httpx.AsyncClient) -> None:
         """Una ronda de la comprobación de salud de cada región (su `bff-web`)."""

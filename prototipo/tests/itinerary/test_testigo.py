@@ -21,7 +21,7 @@ from trotamundos.comun.errores import Problema
 from trotamundos.comun.persistencia import conectar
 from trotamundos.servicios.itinerary import gestion_manual
 from trotamundos.servicios.itinerary.servicio import Itinerary
-from trotamundos.servicios.itinerary.testigo import Cinta, RegistroTestigo
+from trotamundos.servicios.itinerary.testigo import Cinta, RegistroTestigo, RespaldoNoDisponible
 
 
 @pytest.fixture
@@ -133,6 +133,57 @@ def test_sin_testigo_el_comando_no_se_confirma(dsn, contratos, esquemas, reloj, 
     with pytest.raises(Problema) as error:
         am.crear_reserva(USUARIO, uuid4(), alta)
     assert error.value.status == 503
+
+
+class _TestigoQueSeCae(RegistroTestigo):
+    """El testigo de la región de respaldo, que no responde mientras `caido` sea verdadero."""
+
+    caido = False
+
+    def registrar(self, *argumentos, **opciones):
+        if self.caido:
+            raise RespaldoNoDisponible("sin respuesta")
+        return super().registrar(*argumentos, **opciones)
+
+
+@pytest.fixture
+def remoto(dsn, esquemas):
+    return _TestigoQueSeCae(dsn, esquemas["testigo"])
+
+
+def test_un_reintento_tras_el_503_no_cambia_los_ids_en_la_region_de_respaldo(
+        dsn, contratos, esquemas, reloj, alta, remoto, eu):
+    """El alta se aplicó en AM y respondió 503; el viajero reintenta con la misma clave. La entrada
+    original (con sus ids) llega antes que la del reintento, que en EU no repite el efecto."""
+    am = _region(dsn, contratos, esquemas["am"], "AM", reloj, testigo_remoto=remoto)
+    clave = uuid4()
+    remoto.caido = True
+    with pytest.raises(Problema) as error:
+        am.crear_reserva(USUARIO, clave, alta)
+    assert error.value.status == 503
+
+    remoto.caido = False
+    _, creada = am.crear_reserva(USUARIO, clave, alta)
+    reserva_id = creada["reserva"]["id"]
+    assert eu.leer_reserva(USUARIO, reserva_id) == am.leer_reserva(USUARIO, reserva_id)
+    assert [(e["operacion"], e["error"]) for e in _testigo(dsn, esquemas)] == [
+        ("crearReserva", None), ("crearReserva", None)]
+
+
+def test_mientras_el_testigo_no_responde_no_se_aplica_otro_comando_y_el_trabajo_periodico_lo_envia(
+        dsn, contratos, esquemas, reloj, alta, remoto, eu):
+    am = _region(dsn, contratos, esquemas["am"], "AM", reloj, testigo_remoto=remoto)
+    remoto.caido = True
+    with pytest.raises(Problema):
+        am.crear_reserva(USUARIO, uuid4(), alta)
+    reserva_id = am.leer_panel(USUARIO)["viajesActivos"][0]["reservas"][0]["id"]
+    with pytest.raises(Problema):  # lo pendiente va primero: este no se aplica
+        am.eliminar_reserva(USUARIO, UUID(reserva_id))
+    assert am.leer_reserva(USUARIO, reserva_id) is not None
+
+    remoto.caido = False
+    am.tareas_periodicas()
+    assert eu.leer_reserva(USUARIO, reserva_id) == am.leer_reserva(USUARIO, reserva_id)
 
 
 def test_la_supresion_borra_tambien_el_testigo(am, alta, dsn, esquemas):

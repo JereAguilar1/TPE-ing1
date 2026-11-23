@@ -11,7 +11,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import os
 import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -21,7 +20,7 @@ from uuid import UUID
 from fastapi import FastAPI
 
 from trotamundos.comun.carriles import asegurar_topicos, carriles_posibles, topico
-from trotamundos.comun.config import Configuracion
+from trotamundos.comun.config import Configuracion, _variable
 from trotamundos.comun.contratos import Contratos, contratos_por_omision
 from trotamundos.comun.eventos import Evento
 from trotamundos.comun.persistencia import (
@@ -51,7 +50,7 @@ class Preferences:
         self._configuracion = configuracion or Configuracion.desde_entorno()
         self._esquema = esquema
         self._contratos = contratos or contratos_por_omision()
-        self._secreto_jwt = (secreto_jwt or os.environ.get("TROTAMUNDOS_JWT_SECRETO")
+        self._secreto_jwt = (secreto_jwt or _variable("TROTAMUNDOS_JWT_SECRETO")
                              or secrets.token_hex(32))
         self._reloj = reloj
 

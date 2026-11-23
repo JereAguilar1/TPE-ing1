@@ -51,6 +51,7 @@ from trotamundos.comun.persistencia import (
     RespuestaGuardada,
     bloquear_usuario,
     borrar_usuario,
+    conectar,
     crear_esquema,
     guardar_respuesta,
     huella_de_solicitud,
@@ -81,6 +82,7 @@ DDL = (
     *repositorio_de_viajes.DDL,
     *proyeccion_panel.DDL,
     *DDL_RECHAZADOS,
+    *testigo.DDL_PENDIENTE,
     """
     CREATE TABLE IF NOT EXISTS usuario_version (
         usuario_id uuid   PRIMARY KEY,
@@ -306,6 +308,7 @@ class Itinerary:
         transiciones por tiempo de los viajes (RF-08) y la purga de la bandeja de entrada y las
         claves de idempotencia (ADR-0014)."""
         ahora = self._reloj()
+        self._reenviar_al_testigo()
         self._finalizar_reservas(ahora)
         with self._lectura() as conexion:
             pendientes = [f["usuario_id"] for f in conexion.execute(
@@ -455,18 +458,44 @@ class Itinerary:
         # Los comandos del mismo usuario llegan al testigo en el orden en que se aplicaron aquí:
         # la región de respaldo los reproduce en ese orden y obtiene los mismos ids y versiones.
         with testigo.en_orden(self._configuracion.dsn_postgres, usuario_id):
+            try:
+                # Primero lo que el testigo no recibió antes: si no, un reintento de ese mismo
+                # comando (que ya se aplicó y no vuelve a tomar ids) llegaría antes que el original.
+                self._enviar_al_testigo(usuario_id)
+            except testigo.RespaldoNoDisponible as error:
+                raise _sin_testigo(error) from error
             with testigo.con_cinta(testigo.Cinta()) as cinta:
                 resultado = metodo(self, usuario_id, *argumentos, traceparent=traceparent)
             try:
                 self._testigo_remoto.registrar(usuario_id, self._configuracion.region, operacion,
                                                argumentos, cinta)
             except testigo.RespaldoNoDisponible as error:
-                _registro_de_errores.error("El testigo de la región de respaldo no respondió: %s",
-                                           error)
-                raise Problema(503, "Servicio no disponible",
-                               "No se pudo registrar el comando en la región de respaldo",
-                               cabeceras={"Retry-After": "2"}) from error
+                # El comando ya se aplicó aquí: su entrada, con sus ids e instantes, queda para
+                # mandarla en cuanto el testigo responda.
+                with transaccion(self._configuracion.dsn_postgres, self._esquema) as conexion:
+                    testigo.guardar_pendiente(conexion, usuario_id, self._configuracion.region,
+                                              operacion, argumentos, cinta)
+                raise _sin_testigo(error) from error
         return resultado
+
+    def _enviar_al_testigo(self, usuario_id: UUID | str) -> int:
+        with conectar(self._configuracion.dsn_postgres, self._esquema) as conexion:
+            conexion.autocommit = True  # cada entrada que llega se borra enseguida
+            return testigo.enviar_pendientes(conexion, usuario_id, self._testigo_remoto)
+
+    def _reenviar_al_testigo(self) -> None:
+        """Trabajo periódico: lo pendiente de cada usuario, bajo su orden de comandos."""
+        if self._testigo_remoto is None:
+            return
+        with self._lectura() as conexion:
+            usuarios = testigo.usuarios_con_pendientes(conexion)
+        for usuario in usuarios:
+            with testigo.en_orden(self._configuracion.dsn_postgres, usuario):
+                try:
+                    self._enviar_al_testigo(usuario)
+                except testigo.RespaldoNoDisponible as error:
+                    _registro_de_errores.error("El testigo sigue sin responder: %s", error)
+                    return
 
     def _ponerse_al_dia(self, usuario_id: UUID | str) -> None:
         """Reproduce lo que la región primaria del usuario dejó en el testigo local. Solo hay
@@ -575,6 +604,13 @@ class Itinerary:
             version = fila["version"] if fila else 0
         proyeccion_panel.aplicar(conexion, eventos, version)
         return version
+
+
+def _sin_testigo(error: Exception) -> Problema:
+    _registro_de_errores.error("El testigo de la región de respaldo no respondió: %s", error)
+    return Problema(503, "Servicio no disponible",
+                    "No se pudo registrar el comando en la región de respaldo",
+                    cabeceras={"Retry-After": "2"})
 
 
 def _con_viaje(cuerpo: dict[str, Any], viaje_id: UUID | None) -> dict[str, Any]:

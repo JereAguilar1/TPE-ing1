@@ -54,6 +54,23 @@ DDL = (
         WHERE aplicado_en IS NULL;
     """,
 )
+# En el esquema de `itinerary` de la región primaria: las entradas que el testigo de la región de
+# respaldo no recibió (no respondió). Se le envían, en orden, antes del próximo comando manual del
+# usuario y en el trabajo periódico: un reintento del comando no puede grabar otra entrada antes.
+DDL_PENDIENTE = (
+    """
+    CREATE TABLE IF NOT EXISTS testigo_pendiente (
+        secuencia     bigserial   PRIMARY KEY,
+        usuario_id    uuid        NOT NULL,
+        region_origen text        NOT NULL,
+        operacion     text        NOT NULL,
+        argumentos    jsonb       NOT NULL,
+        ids           jsonb       NOT NULL,
+        instantes     jsonb       NOT NULL,
+        creado_en     timestamptz NOT NULL DEFAULT now()
+    );
+    """,
+)
 # El testigo está en otra región: si no contesta en este tiempo, el comando no se confirma.
 ESPERA_DE_CONEXION_S = 2
 
@@ -143,6 +160,40 @@ def a_json(argumentos: Sequence[Any]) -> list[Any]:
 
 def de_json(argumentos: Sequence[Any]) -> list[Any]:
     return [UUID(a) if isinstance(a, str) else a for a in argumentos]
+
+
+# --- lo que el testigo no recibió (en la región primaria) -------------------------------------
+
+def guardar_pendiente(conexion: psycopg.Connection, usuario_id: UUID, region_origen: str,
+                      operacion: str, argumentos: Sequence[Any], cinta: Cinta) -> None:
+    """Guarda, en la transacción de `conexion` (esquema de `itinerary`), la entrada que no llegó."""
+    conexion.execute(
+        """INSERT INTO testigo_pendiente
+               (usuario_id, region_origen, operacion, argumentos, ids, instantes)
+           VALUES (%s, %s, %s, %s, %s, %s)""",
+        (str(usuario_id), region_origen, operacion, Jsonb(a_json(argumentos)),
+         Jsonb(cinta.ids), Jsonb(cinta.instantes)))
+
+
+def usuarios_con_pendientes(conexion: psycopg.Connection) -> list[UUID]:
+    return [f["usuario_id"] for f in conexion.execute(
+        "SELECT DISTINCT usuario_id FROM testigo_pendiente").fetchall()]
+
+
+def enviar_pendientes(conexion: psycopg.Connection, usuario_id: UUID | str,
+                      remoto: "RegistroTestigo") -> int:
+    """Manda al testigo remoto, en orden, las entradas pendientes del usuario y las borra a medida
+    que llegan. Lanza `RespaldoNoDisponible` en la primera que no llega (quedan las demás).
+    `conexion` tiene que estar en modo *autocommit*: cada borrado se confirma enseguida."""
+    filas = conexion.execute(
+        """SELECT secuencia, region_origen, operacion, argumentos, ids, instantes
+           FROM testigo_pendiente WHERE usuario_id = %s ORDER BY secuencia""",
+        (str(usuario_id),)).fetchall()
+    for fila in filas:
+        remoto.registrar(UUID(str(usuario_id)), fila["region_origen"], fila["operacion"],
+                         fila["argumentos"], Cinta(list(fila["ids"]), list(fila["instantes"])))
+        conexion.execute("DELETE FROM testigo_pendiente WHERE secuencia = %s", (fila["secuencia"],))
+    return len(filas)
 
 
 # --- el registro ------------------------------------------------------------------------------

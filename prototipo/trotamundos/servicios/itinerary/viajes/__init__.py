@@ -201,7 +201,10 @@ class Viaje:
         return tramos[0].lugar_inicio
 
     def titulo(self, registro: RegistroDeTipos) -> str:
-        return f"Viaje a {self.destino_principal(registro)['nombre']}"
+        """«Viaje a Mendoza»: la ciudad del destino si la fuente la informa (comun.yaml 1.1.0);
+        si no, el nombre del lugar."""
+        destino = self.destino_principal(registro)
+        return f"Viaje a {destino.get('ciudad') or destino['nombre']}"
 
     def llegadas(self, registro: RegistroDeTipos) -> list[Mapping[str, Any]]:
         """Los lugares donde el viajero está o va a estar: el fin de cada traslado y los lugares
