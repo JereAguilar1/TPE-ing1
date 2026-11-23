@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Recorrido de demostración del prototipo, por la API pública (bff-web) como la usa app-web.
+# Recorrido de demostración del prototipo, por bff-web, con las mismas operaciones que usa app-web.
 #
 # Uso, desde cualquier carpeta:
 #   bash prototipo/demo/demo.sh            levanta lo que falte y deja los servicios arriba
@@ -93,49 +93,8 @@ confirmar
 pausa
 
 titulo "7. Disrupción del proveedor y derivación a la agencia (ADR-0039)"
-echo "  Se publican en el broker lo que mandarían preferences (no construido) y provider-sync:"
-VUELO=$(curl -s "$BFF/panel" "${SESION[@]}" | "$PY" -c '
-import json,sys
-p=json.load(sys.stdin)
-vuelos = [r for v in p["viajesActivos"] for r in v["reservas"] if r["segmentos"][0]["tipo"] == "vuelo"]
-print(min(vuelos, key=lambda r: r["segmentos"][0]["inicio"]["instante"])["id"])  # el próximo vuelo')
-USUARIO=$("$PY" -c "import base64,json,sys; p=sys.argv[1].split('.')[1]; p+='='*(-len(p)%4); print(json.loads(base64.urlsafe_b64decode(p))['sub'])" "$TOKEN")
-"$PY" - "$USUARIO" "$VUELO" <<'EOF'
-import asyncio, sys
-from aiokafka import AIOKafkaProducer
-from trotamundos.comun.carriles import topico
-from trotamundos.comun.config import Configuracion
-from trotamundos.comun.contratos import contratos_por_omision
-from trotamundos.comun.eventos import Evento
-
-usuario, vuelo = sys.argv[1], sys.argv[2]
-eventos = [
-    (Evento.nuevo("PreferenciasActualizadas", {"preferencias": {
-        "agenciaPreferida": {"id": "agencia-sur", "nombre": "Agencia del Sur"},
-        "idioma": "es-AR", "zonaHoraria": "America/Argentina/Buenos_Aires", "region": "AM"}},
-        productor="preferences", usuario_id=usuario, region="AM"), "P2"),
-    (Evento.nuevo("DisrupcionDetectada", {
-        "disrupcionId": f"disr-{usuario[:8]}", "proveedor": "Aerolíneas Argentinas",
-        "severidad": "alta", "descripcion": "Vuelo cancelado por tormenta",
-        "afectados": [{"usuarioId": usuario, "reservaIds": [vuelo]}]},
-        productor="provider-sync", usuario_id=usuario, region="AM"), "P1"),
-]
-
-async def enviar():
-    c = Configuracion.desde_entorno()
-    productor = AIOKafkaProducer(bootstrap_servers=c.broker)
-    await productor.start()
-    try:
-        for evento, carril in eventos:
-            clave, valor, cabeceras = evento.a_kafka()
-            await productor.send_and_wait(topico(contratos_por_omision(), evento.tipo, carril,
-                                                 c.prefijo_topicos), valor, key=clave, headers=cabeceras)
-            print("   -", evento.tipo, f"({carril})")
-    finally:
-        await productor.stop()
-
-asyncio.run(enviar())
-EOF
+echo "  La agencia preferida, por preferences; la cancelación, como la publicaría provider-sync:"
+"$PY" demo/apoyo.py disrupcion "$CORREO" | sed 's/^/   - /'
 sleep 2
 decir '{"texto":"¿Se canceló mi vuelo?"}' "¿Se canceló mi vuelo?"
 confirmar
