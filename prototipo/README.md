@@ -513,14 +513,14 @@ implementa. La columna «Prioridad» ordena lo que falta según el recorte acord
 | # | Paso | Trazabilidad | Prioridad | Estado | Responsable |
 |---|---|---|---|---|---|
 | 1 | Base: tecnología, infraestructura, validación contra `contratos/` | ADR-0009, ADR-0036 | — | ✅ | Francisco Lozano |
-| 1 | Registro de tipos de segmento y modelos canónicos | ADR-0010, ADR-0011 | — | ✅ | Francisco Lozano |
-| 2 | `itinerary`: agregado `Reserva` y fusión determinista | ADR-0010, ADR-0013 | — | ✅ | Francisco Lozano |
-| 3 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | — | ✅ | Francisco Lozano |
-| 4 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | — | ✅ | Francisco Lozano |
-| 5 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | — | ✅ | Francisco Lozano |
-| 6 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | — | ✅ | Jeremias Aguilar |
-| 7 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | — | ✅ | Francisco Lozano |
-| 8 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | Sí o sí | ✅ completo: el recorte, más los extractores de boletos de tren y de reservas de hotel | Juan Pardo (recorte), Francisco Lozano (completo) |
+| 2 | Registro de tipos de segmento y modelos canónicos | ADR-0010, ADR-0011 | — | ✅ | Francisco Lozano |
+| 3 | `itinerary`: agregado `Reserva` y fusión determinista | ADR-0010, ADR-0013 | — | ✅ | Francisco Lozano |
+| 4 | `itinerary`: persistencia, *outbox*, *inbox* y API interna | ADR-0012, ADR-0014 | — | ✅ | Francisco Lozano |
+| 5 | `itinerary`: viajes, agrupación, ciclo de vida y proyección del panel | RF-07, RF-08 | — | ✅ | Francisco Lozano |
+| 6 | *Broker*: publicador de la *outbox*, consumidores y carriles | ADR-0014, ADR-0020 | — | ✅ | Francisco Lozano |
+| 7 | `identity-access`: sesiones, buzones, bóveda con cifrado por sobres, auditoría | QA-13, ADR-0029 | — | ✅ | Jeremias Aguilar |
+| 8 | `mail-ingest`: webhooks, filtros, normalización, deduplicación | RF-02, RF-04 | — | ✅ | Francisco Lozano |
+| 9 | `booking-extraction`: extractores, bandas de confianza, formato desconocido | QA-11, ADR-0015 | Sí o sí | ✅ completo: el recorte, más los extractores de boletos de tren y de reservas de hotel | Juan Pardo (recorte), Francisco Lozano (completo) |
 | 10 | `provider-sync`: adaptador simulado, cortacircuitos, disrupciones | QA-10, ADR-0024 | Si sobra (reducido) | ✅ completo: el reducido, más la protección de ADR-0024 y el adaptador ferroviario | Ivo Iriarte (reducido), Francisco Lozano (completo) |
 | 11 | BFF y `api-gateway`: panel, límite de tasa, plazos | QA-02, ADR-0020 | Debería (reducido) | ✅ completo: `bff-web` (reducido), más `bff-mobile`, `api-gateway`, plazo propagado, modos operativos y la degradación del asistente | Ivo Iriarte (reducido), Francisco Lozano (completo) |
 | 12 | `notification`, `support-liaison` y `preferences` mínimo | UC-5, UC-7, ADR-0034 | Sí o sí (reducido) | ✅ completo: `support-liaison` (reducido), más `preferences` y `notification` | Francisco Lozano |
