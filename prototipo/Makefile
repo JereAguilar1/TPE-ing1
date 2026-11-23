@@ -18,7 +18,8 @@ pruebas:
 # clave de las sesiones dejaría ilegibles los buzones guardados e inválidas las sesiones abiertas.
 SECRETOS_LOCALES = POSTGRES_PASSWORD TROTAMUNDOS_KMS_SECRETO TROTAMUNDOS_JWT_SECRETO \
                    TROTAMUNDOS_VALE_SECRETO TROTAMUNDOS_SECRETO_WEBHOOK_CORREO \
-                   TROTAMUNDOS_SECRETO_WEBHOOK_PROVEEDOR TROTAMUNDOS_SECRETO_ACTAS
+                   TROTAMUNDOS_SECRETO_WEBHOOK_PROVEEDOR TROTAMUNDOS_SECRETO_ACTAS \
+                   TROTAMUNDOS_SECRETO_SEUDONIMO
 
 .env: FORZAR
 	@python3 -c "import pathlib, secrets, sys; \

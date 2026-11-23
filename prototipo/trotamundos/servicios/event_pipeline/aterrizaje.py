@@ -3,14 +3,14 @@
 Retiene los eventos de dominio inmutables para poder reconstruir el esquema en estrella si cambia
 el modelo dimensional, sin tocar jamás el plano operacional (regla R6). Ninguna fila guarda
 `usuario_id` ni datos personales directos: el identificador operacional se reemplaza en la entrada
-por su `seudonimo_analitico` determinista.
+por su `seudonimo_analitico` (`comun.seudonimo`: HMAC con un secreto de `.env`, el mismo que usa
+`identity-access`).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-import hashlib
 from typing import Any, Mapping
 
 import psycopg
@@ -18,6 +18,7 @@ from psycopg.types.json import Jsonb
 
 from trotamundos.comun.eventos import Evento
 from trotamundos.comun.modelo import instante_desde_texto
+from trotamundos.comun.seudonimo import PREFIJO, seudonimo_analitico
 
 DDL = (
     """
@@ -52,11 +53,11 @@ class EventoCrudo:
 
 
 def seudonimo_de_usuario(usuario_id: str) -> str:
-    """Seudónimo analítico determinista derivado de `usuario_id` sin guardar el UUID operacional."""
-    if usuario_id.startswith("seu_"):
+    """El seudónimo analítico de `usuario_id`, sin guardar el UUID operacional. Es el mismo que
+    `identity-access` publica en `CuentaSuprimida` (`comun.seudonimo`, ADR-0030)."""
+    if usuario_id.startswith(PREFIJO):
         return usuario_id
-    digest = hashlib.sha256(f"analitica:{usuario_id}".encode("utf-8")).hexdigest()[:24]
-    return f"seu_{digest}"
+    return seudonimo_analitico(usuario_id)
 
 
 def _sanitizar_carga(carga: Mapping[str, Any]) -> dict[str, Any]:

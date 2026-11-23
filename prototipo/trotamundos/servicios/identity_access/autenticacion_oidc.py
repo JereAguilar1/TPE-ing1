@@ -16,6 +16,7 @@ from uuid import UUID, uuid4
 import jwt
 import psycopg
 
+from trotamundos.comun.seudonimo import seudonimo_analitico
 from trotamundos.servicios.identity_access import auditoria_y_revocacion as auditoria
 
 TTL_SESION = timedelta(hours=1)
@@ -163,7 +164,9 @@ def crear_sesion(
             """,
             (usuario_id, perfil.sujeto_externo, perfil.correo, region, instante),
         )
-        seudonimo = f"seu_{hashlib.sha256(f'{usuario_id}:{secrets.token_hex(16)}'.encode()).hexdigest()[:24]}"
+        # El mismo que calcula event-pipeline (comun.seudonimo): si no, CuentaSuprimida no
+        # encontraría las filas analíticas del usuario (ADR-0030, fase 2).
+        seudonimo = seudonimo_analitico(usuario_id)
         conexion.execute(
             """
             INSERT INTO mapa_seudonimo_usuario (usuario_id, seudonimo_analitico)
@@ -408,9 +411,14 @@ def eliminar_identidad_usuario(
     *,
     ahora: datetime | None = None,
 ) -> str | None:
-    """Elimina la identidad R1 y el vínculo de seudónimo devolviendo `seudonimo_analitico` (ADR-0030)."""
+    """Elimina la identidad R1 y el vínculo de seudónimo devolviendo `seudonimo_analitico` (ADR-0030).
+
+    El seudónimo se recalcula con `comun.seudonimo`, el mismo que usa `event-pipeline`, en lugar
+    de leerlo del mapa: una cuenta creada antes de esa función tiene guardado otro, que no está
+    en ninguna fila analítica. `None` si el usuario no tenía identidad."""
     instante = (ahora or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    seudonimo = obtener_seudonimo(conexion, usuario_id)
+    seudonimo = (seudonimo_analitico(usuario_id)
+                 if obtener_seudonimo(conexion, usuario_id) is not None else None)
     conexion.execute("DELETE FROM mapa_seudonimo_usuario WHERE usuario_id = %s", (usuario_id,))
     conexion.execute("DELETE FROM usuario_identidad WHERE usuario_id = %s", (usuario_id,))
     auditoria.registrar_evento(

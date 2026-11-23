@@ -123,6 +123,8 @@ services:
       TROTAMUNDOS_KMS_SECRETO: ${TROTAMUNDOS_KMS_SECRETO}
       TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
       TROTAMUNDOS_VALE_SECRETO: ${TROTAMUNDOS_VALE_SECRETO}
+      # El mismo que event-pipeline: el seudónimo analítico de CuentaSuprimida (ADR-0030).
+      TROTAMUNDOS_SECRETO_SEUDONIMO: ${TROTAMUNDOS_SECRETO_SEUDONIMO}
       # A quién ordena el borrado de la fase 1 al suprimir una cuenta (ADR-0030, ADR-0042).
       TROTAMUNDOS_URL_ITINERARY_ESCRITURA: http://itinerary-escritura:8000
       TROTAMUNDOS_URL_SUPPORT_LIAISON: http://support-liaison:8000
@@ -468,6 +470,8 @@ services:
       TROTAMUNDOS_REGION: AM
       # De .env (make infra-arriba): firma las actas de la compactación de fase 2 (ADR-0030).
       TROTAMUNDOS_SECRETO_ACTAS: ${TROTAMUNDOS_SECRETO_ACTAS}
+      # El mismo que identity-access: el seudónimo analítico que reemplaza a usuarioId.
+      TROTAMUNDOS_SECRETO_SEUDONIMO: ${TROTAMUNDOS_SECRETO_SEUDONIMO}
     ports:
       - "127.0.0.1:18110:8000"
     depends_on:

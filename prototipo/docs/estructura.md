@@ -18,6 +18,7 @@ prototipo/
 │   │   ├── bff.py              # lo que comparten bff-web y bff-mobile: clientes, rutas y plazo (ADR-0005, ADR-0020)
 │   │   ├── catalogo_extractores.py # catálogo de remitentes y extractores (.yaml), sin importar complementos (ADR-0006, RF-04)
 │   │   ├── sesion.py           # sesión OIDC de las operaciones públicas      (ADR-0007)
+│   │   ├── seudonimo.py        # seudónimo analítico compartido, con secreto (ADR-0016, ADR-0030)
 │   │   └── tipos_de_segmento.py # registro de descriptores de tipo           (ADR-0011, ADR-0027)
 │   └── servicios/              # un subpaquete por servicio; ninguno importa a otro (ADR-0036)
 │       ├── itinerary/          # un módulo por cada módulo de la vista N2, más servicio.py

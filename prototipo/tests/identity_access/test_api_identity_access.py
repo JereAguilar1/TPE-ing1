@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from trotamundos.comun.config import Configuracion
 from trotamundos.comun.persistencia import conectar
+from trotamundos.servicios.event_pipeline.aterrizaje import seudonimo_de_usuario
 from trotamundos.servicios.identity_access import api
 from trotamundos.servicios.identity_access.auditoria_y_revocacion import (
     DetectorDeAnomalias,
@@ -448,6 +449,31 @@ def test_la_supresion_de_cuenta_publica_la_revocacion_de_cada_buzon(dsn, esquema
         if f["tipo"] == "EstadoDeBuzonCambiado" and f["carga"]["estadoNuevo"] == "Revocado"
     )
     assert [f["carril"] for f in filas if f["tipo"] == "CuentaSuprimida"] == ["P3"]
+
+
+def test_cuenta_suprimida_lleva_el_seudonimo_con_que_event_pipeline_guardo_los_eventos(
+    dsn, esquema, contratos
+):
+    """ADR-0030, fase 2: `event-pipeline` busca las filas del usuario por el seudónimo de
+    `CuentaSuprimida`. Tiene que ser el mismo con que guardó sus eventos, también para una cuenta
+    creada cuando `identity-access` guardaba un seudónimo al azar."""
+    cliente, _, _ = _armar(dsn, esquema, contratos)
+    nuevo_token, nuevo = _iniciar_sesion(cliente, "oidc:nuevo@test.app:AM")
+    viejo_token, viejo = _iniciar_sesion(cliente, "oidc:viejo@test.app:AM")
+    with conectar(dsn, esquema) as conexion:
+        conexion.execute("UPDATE mapa_seudonimo_usuario SET seudonimo_analitico = %s "
+                         "WHERE usuario_id = %s", ("seu_guardado_al_azar_000", viejo))
+    assert _filas(dsn, esquema, "SELECT seudonimo_analitico FROM mapa_seudonimo_usuario "
+                                f"WHERE usuario_id = '{nuevo}'")[0]["seudonimo_analitico"] \
+        == seudonimo_de_usuario(str(nuevo))
+
+    for token in (nuevo_token, viejo_token):
+        assert cliente.delete("/privacidad/cuenta", headers={
+            "Authorization": f"Bearer {token}", "Idempotency-Key": str(uuid4())}).status_code == 202
+
+    publicados = [f["carga"]["seudonimoAnalitico"] for f in _filas(
+        dsn, esquema, "SELECT carga FROM bandeja_salida WHERE tipo = 'CuentaSuprimida' ORDER BY seq")]
+    assert publicados == [seudonimo_de_usuario(str(nuevo)), seudonimo_de_usuario(str(viejo))]
 
 
 def test_el_buzon_activo_publica_lo_que_mail_ingest_necesita(dsn, esquema, contratos):
