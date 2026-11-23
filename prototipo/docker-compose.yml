@@ -483,8 +483,9 @@ services:
 
   app-web:
     # Interfaz web mínima (paso 20, RF-09): el panel y el chat del asistente. nginx sirve la página
-    # como el borde (CDN) y enruta /api/bff a bff-web y el inicio de sesión a identity-access, desde
-    # el mismo origen (app_web/nginx.conf). Abrir http://localhost:18111.
+    # como el borde (CDN) y enruta /api/bff a api-gateway (que elige el bff-web de la región del
+    # viajero) y el inicio de sesión a identity-access, desde el mismo origen (app_web/nginx.conf).
+    # Abrir http://localhost:18111.
     image: nginx:1.27.3-alpine
     volumes:
       - ./app_web/publico:/usr/share/nginx/html:ro
@@ -492,7 +493,7 @@ services:
     ports:
       - "18111:80"
     depends_on:
-      bff-web:
+      api-gateway:  # /api/bff pasa por el gateway (paso 16: conmuta de región)
         condition: service_healthy
       identity-access:
         condition: service_healthy

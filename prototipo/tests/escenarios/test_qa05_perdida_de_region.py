@@ -32,6 +32,7 @@ PROTOTIPO = Path(__file__).resolve().parents[2]
 REGION_AM = ["itinerary-escritura", "itinerary-lectura", "bff-web"]
 REDIRECCION_S = 60
 PRESUPUESTO_S = 90
+APP_WEB = "http://localhost:18111"
 
 
 def _compose(*argumentos: str) -> None:
@@ -96,6 +97,9 @@ def test_qa05_se_cae_la_region_am_y_no_se_pierde_nada_confirmado(cliente):
 
     panel = esperar(panel_desde_eu, REDIRECCION_S, "el gateway redirige al viajero a EU")
     redireccion_s = time.monotonic() - caida
+    # La página también: nginx la manda por el gateway.
+    pagina = cliente.get(f"{APP_WEB}/api/bff/panel", headers=viajero.sesion)
+    assert pagina.status_code == 200 and pagina.json() == panel
     print(f"\nQA-05: tráfico redirigido a EU en {redireccion_s:.1f} s")
     assert redireccion_s <= REDIRECCION_S
     assert redireccion_s <= PRESUPUESTO_S

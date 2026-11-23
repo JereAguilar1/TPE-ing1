@@ -30,9 +30,9 @@ SECRETOS_LOCALES = POSTGRES_PASSWORD TROTAMUNDOS_KMS_SECRETO TROTAMUNDOS_JWT_SEC
 
 FORZAR:
 
-# PostgreSQL y el broker: lo que necesitan las pruebas.
+# PostgreSQL (las dos regiones, paso 16) y el broker: lo que necesitan las pruebas.
 infra-arriba: .env
-	docker compose up -d --wait postgres broker
+	docker compose up -d --wait postgres postgres-eu broker
 
 # Todo, incluidos los servicios de Trotamundos (construye la imagen).
 servicios-arriba: .env
