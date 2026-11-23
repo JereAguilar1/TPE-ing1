@@ -74,7 +74,7 @@ services:
       # con su entrada en la región de respaldo (EU).
       TROTAMUNDOS_DSN_TESTIGO: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres-eu:5432/trotamundos
     ports:
-      - "18101:8000"
+      - "127.0.0.1:18101:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,7 +98,7 @@ services:
       <<: *entorno_itinerary
       TROTAMUNDOS_MODO: lectura
     ports:
-      - "18102:8000"
+      - "127.0.0.1:18102:8000"
     depends_on:
       itinerary-escritura:  # que el esquema lo cree uno solo
         condition: service_healthy
@@ -130,7 +130,7 @@ services:
       TROTAMUNDOS_URL_PREFERENCES: http://preferences:8000
       TROTAMUNDOS_URL_SHARING: http://sharing:8000
     ports:
-      - "18103:8000"
+      - "127.0.0.1:18103:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -157,7 +157,7 @@ services:
       TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
       TROTAMUNDOS_SECRETO_WEBHOOK_CORREO: ${TROTAMUNDOS_SECRETO_WEBHOOK_CORREO}
     ports:
-      - "18104:8000"
+      - "127.0.0.1:18104:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -183,7 +183,7 @@ services:
       # De .env (make infra-arriba): la sesión la emite identity-access con el mismo secreto.
       TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
     ports:
-      - "18105:8000"
+      - "127.0.0.1:18105:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -212,7 +212,7 @@ services:
       # De .env (make infra-arriba): la sesión la emite identity-access con el mismo secreto.
       TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
     ports:
-      - "18106:8000"
+      - "127.0.0.1:18106:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -234,7 +234,7 @@ services:
       TROTAMUNDOS_BROKER: broker:9092
       TROTAMUNDOS_REGION: AM
     ports:
-      - "18107:8000"
+      - "127.0.0.1:18107:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -259,7 +259,7 @@ services:
       # De .env (make infra-arriba): la sesión la emite identity-access con el mismo secreto.
       TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
     ports:
-      - "18108:8000"
+      - "127.0.0.1:18108:8000"
     depends_on:
       itinerary-lectura:
         condition: service_healthy
@@ -290,7 +290,7 @@ services:
       TROTAMUNDOS_MODO: escritura
       TROTAMUNDOS_DSN_TESTIGO: postgresql://trotamundos:${POSTGRES_PASSWORD}@postgres:5432/trotamundos
     ports:
-      - "18121:8000"
+      - "127.0.0.1:18121:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -312,7 +312,7 @@ services:
       <<: *entorno_itinerary_eu
       TROTAMUNDOS_MODO: lectura
     ports:
-      - "18122:8000"
+      - "127.0.0.1:18122:8000"
     depends_on:
       itinerary-escritura-eu:
         condition: service_healthy
@@ -333,7 +333,7 @@ services:
       TROTAMUNDOS_URL_VIRTUAL_ASSISTANT: http://virtual-assistant:8000
       TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
     ports:
-      - "18128:8000"
+      - "127.0.0.1:18128:8000"
     depends_on:
       itinerary-lectura-eu:
         condition: service_healthy
@@ -357,7 +357,7 @@ services:
       TROTAMUNDOS_URL_ITINERARY_ESCRITURA: http://itinerary-escritura:8000
       TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
     ports:
-      - "18115:8000"
+      - "127.0.0.1:18115:8000"
     depends_on:
       itinerary-lectura:
         condition: service_healthy
@@ -390,7 +390,7 @@ services:
       TROTAMUNDOS_REGION: AM
       TROTAMUNDOS_URL_BFF_WEB_EU: http://bff-web-eu:8000
     ports:
-      - "18114:8000"
+      - "127.0.0.1:18114:8000"
     depends_on:
       bff-web:
         condition: service_healthy
@@ -421,7 +421,7 @@ services:
       TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
       TROTAMUNDOS_VALE_SECRETO: ${TROTAMUNDOS_VALE_SECRETO}
     ports:
-      - "18116:8000"
+      - "127.0.0.1:18116:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -444,7 +444,7 @@ services:
       TROTAMUNDOS_REGION: AM
       TROTAMUNDOS_SECRETO_WEBHOOK_PROVEEDOR: ${TROTAMUNDOS_SECRETO_WEBHOOK_PROVEEDOR}
     ports:
-      - "18109:8000"
+      - "127.0.0.1:18109:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -469,7 +469,7 @@ services:
       # De .env (make infra-arriba): firma las actas de la compactación de fase 2 (ADR-0030).
       TROTAMUNDOS_SECRETO_ACTAS: ${TROTAMUNDOS_SECRETO_ACTAS}
     ports:
-      - "18110:8000"
+      - "127.0.0.1:18110:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -491,6 +491,9 @@ services:
       - ./app_web/publico:/usr/share/nginx/html:ro
       - ./app_web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
+      # El único puerto abierto a la red, para ver la página desde el celular (guion de la
+      # demostración). Los servicios internos confían en `X-Usuario-Id` y en el mTLS simulado con
+      # `X-Servicio-Cliente`: sus puertos solo escuchan en 127.0.0.1, como el de PostgreSQL.
       - "18111:80"
     depends_on:
       api-gateway:  # /api/bff pasa por el gateway (paso 16: conmuta de región)
@@ -516,7 +519,7 @@ services:
       # De .env (make infra-arriba): la sesión la emite identity-access con el mismo secreto.
       TROTAMUNDOS_JWT_SECRETO: ${TROTAMUNDOS_JWT_SECRETO}
     ports:
-      - "18112:8000"
+      - "127.0.0.1:18112:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -540,7 +543,7 @@ services:
       TROTAMUNDOS_BROKER: broker:9092
       TROTAMUNDOS_REGION: AM
     ports:
-      - "18113:8000"
+      - "127.0.0.1:18113:8000"
     depends_on:
       postgres:
         condition: service_healthy
