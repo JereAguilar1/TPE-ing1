@@ -69,6 +69,10 @@ def firmantes_dkim(mensaje: EmailMessage) -> set[str]:
 
 
 def _alineados(firmante: str, dominio: str) -> bool:
+    """Alineación relajada: el mismo dominio o uno dentro del otro. Un firmante sin punto (`com`)
+    no alinea con nada: sería un dominio de primer nivel."""
+    if "." not in firmante:
+        return False
     return firmante == dominio or dominio.endswith("." + firmante) or firmante.endswith("." + dominio)
 
 

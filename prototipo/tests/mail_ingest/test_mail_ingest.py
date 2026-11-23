@@ -445,11 +445,15 @@ def test_un_reenvio_que_no_se_autentica_se_descarta_y_se_audita(mail):
                                                        "arc=pass")).status_code == 403
     assert _reenviar(cliente, _reenviado(autenticacion="ingesta.trotamundos.app; dkim=pass; "
                                                        "spf=fail; arc=pass")).status_code == 403
+    assert _reenviar(cliente, _reenviado(autenticacion="ingesta.trotamundos.app; dkim=pass "
+                                                       "header.d=app; spf=fail; arc=pass")
+                     ).status_code == 403  # un dominio de primer nivel no alinea
 
     assert _publicados(mail) == []
     assert _rechazos(mail) == ["aliasDesconocido", "autenticacionFallida",
                                "autenticacionFallida", "remitenteNoAutorizado",
-                               "autenticacionFallida", "autenticacionFallida"]
+                               "autenticacionFallida", "autenticacionFallida",
+                               "autenticacionFallida"]
 
 
 def test_un_reenvio_de_un_remitente_bloqueado_no_se_publica(mail):
