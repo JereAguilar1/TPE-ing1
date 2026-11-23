@@ -68,8 +68,10 @@ def disrupcion(cliente: httpx.Client, viajero: Viajero) -> None:
 
 
 def _usuario_del_token(token: str) -> str:
-    import jwt
-    return str(jwt.decode(token, options={"verify_signature": False})["sub"])
+    """El usuario de la sesión, con la firma verificada como en los servicios (`comun.sesion`)."""
+    from trotamundos.comun.config import _variable
+    from trotamundos.comun.sesion import usuario_de_sesion
+    return str(usuario_de_sesion(f"Bearer {token}", _variable("TROTAMUNDOS_JWT_SECRETO")))
 
 
 async def _publicar_disrupcion(usuario: str, reserva: str) -> None:
