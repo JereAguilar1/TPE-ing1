@@ -19,3 +19,14 @@
     tiposDeSegmento: [tren]
     umbrales: {alto: 0.90, bajo: 0.60}
     corpus: tests/booking_extraction/corpus/boleto_tren_simulado.json
+# Reservas de hotel por correo (paso 9, «Para completar el 100 %»): otro remitente y otro tipo de
+# segmento con un complemento más, sin cambios en booking-extraction.
+- modulo: trotamundos.servicios.booking_extraction.complementos.reserva_hotel_simulada
+  manifiesto:
+    id: extractor-reserva-hotel-simulada
+    version: 1.0.0
+    apiContrato: '1.0'
+    remitentesQueReconoce: [reservas@hotel.example]
+    tiposDeSegmento: [hotel]
+    umbrales: {alto: 0.90, bajo: 0.60}
+    corpus: tests/booking_extraction/corpus/reserva_hotel_simulada.json

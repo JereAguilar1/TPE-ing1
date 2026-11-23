@@ -1,0 +1,415 @@
+[
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H00AX0",
+      "recibidoEn": "2026-11-22T12:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H00AX0\nCadena: HX\nHotel: Hotel Plaza\nCiudad: BUE\nIngreso: 2026-12-01T17:00:00Z\nSalida: 2026-12-03T14:00:00Z\nHabitaciones: 1\nHuespedes: 1\nHabitacion: Doble estandar\nRegimen: Desayuno\nCancelacion: Gratis hasta 48 h antes\nEmitido: 2026-11-22T12:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H00AX0",
+      "emisor": "hotel:HX",
+      "operador": "Hotel Plaza",
+      "ciudad": "BUE",
+      "ingreso": "2026-12-01T17:00:00Z",
+      "salida": "2026-12-03T14:00:00Z",
+      "emitido": "2026-11-22T12:00:00Z",
+      "habitaciones": 1,
+      "huespedes": 1,
+      "tipoDeHabitacion": "Doble estandar",
+      "regimen": "desayuno",
+      "politicaDeCancelacion": "Gratis hasta 48 h antes"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H01BX1",
+      "recibidoEn": "2026-11-22T11:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H01BX1\nCadena: HX\nHotel: Posada del Sol\nCiudad: MDZ\nIngreso: 2026-12-02T17:00:00Z\nSalida: 2026-12-05T14:00:00Z\nHabitaciones: 2\nHuespedes: 2\nRegimen: Solo alojamiento\nEmitido: 2026-11-22T11:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H01BX1",
+      "emisor": "hotel:HX",
+      "operador": "Posada del Sol",
+      "ciudad": "MDZ",
+      "ingreso": "2026-12-02T17:00:00Z",
+      "salida": "2026-12-05T14:00:00Z",
+      "emitido": "2026-11-22T11:00:00Z",
+      "habitaciones": 2,
+      "huespedes": 2,
+      "regimen": "soloAlojamiento"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H02CX2",
+      "recibidoEn": "2026-11-22T10:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H02CX2\nCadena: HX\nHotel: Gran Hotel Atlántico\nCiudad: MDQ\nIngreso: 2026-12-03T17:00:00Z\nSalida: 2026-12-07T14:00:00Z\nHabitaciones: 1\nHuespedes: 3\nHabitacion: Doble estandar\nRegimen: Media pension\nEmitido: 2026-11-22T10:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H02CX2",
+      "emisor": "hotel:HX",
+      "operador": "Gran Hotel Atlántico",
+      "ciudad": "MDQ",
+      "ingreso": "2026-12-03T17:00:00Z",
+      "salida": "2026-12-07T14:00:00Z",
+      "emitido": "2026-11-22T10:00:00Z",
+      "habitaciones": 1,
+      "huespedes": 3,
+      "tipoDeHabitacion": "Doble estandar",
+      "regimen": "mediaPension"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H03DX3",
+      "recibidoEn": "2026-11-22T09:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H03DX3\nCadena: HX\nHotel: Hostal Mayor\nCiudad: MAD\nIngreso: 2026-12-04T17:00:00Z\nSalida: 2026-12-06T14:00:00Z\nHabitaciones: 2\nHuespedes: 4\nCancelacion: Gratis hasta 48 h antes\nEmitido: 2026-11-22T09:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H03DX3",
+      "emisor": "hotel:HX",
+      "operador": "Hostal Mayor",
+      "ciudad": "MAD",
+      "ingreso": "2026-12-04T17:00:00Z",
+      "salida": "2026-12-06T14:00:00Z",
+      "emitido": "2026-11-22T09:00:00Z",
+      "habitaciones": 2,
+      "huespedes": 4,
+      "politicaDeCancelacion": "Gratis hasta 48 h antes"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H04EX4",
+      "recibidoEn": "2026-11-22T08:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H04EX4\nCadena: HX\nHotel: Hotel Rambla\nCiudad: BCN\nIngreso: 2026-12-05T17:00:00Z\nSalida: 2026-12-08T14:00:00Z\nHabitaciones: 1\nHuespedes: 1\nHabitacion: Doble estandar\nRegimen: Todo incluido\nEmitido: 2026-11-22T08:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H04EX4",
+      "emisor": "hotel:HX",
+      "operador": "Hotel Rambla",
+      "ciudad": "BCN",
+      "ingreso": "2026-12-05T17:00:00Z",
+      "salida": "2026-12-08T14:00:00Z",
+      "emitido": "2026-11-22T08:00:00Z",
+      "habitaciones": 1,
+      "huespedes": 1,
+      "tipoDeHabitacion": "Doble estandar",
+      "regimen": "todoIncluido"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H05AX5",
+      "recibidoEn": "2026-11-22T07:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H05AX5\nCadena: HX\nHotel: Hotel Plaza\nCiudad: BUE\nIngreso: 2026-12-06T17:00:00Z\nSalida: 2026-12-10T14:00:00Z\nHabitaciones: 2\nHuespedes: 2\nRegimen: Desayuno\nEmitido: 2026-11-22T07:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H05AX5",
+      "emisor": "hotel:HX",
+      "operador": "Hotel Plaza",
+      "ciudad": "BUE",
+      "ingreso": "2026-12-06T17:00:00Z",
+      "salida": "2026-12-10T14:00:00Z",
+      "emitido": "2026-11-22T07:00:00Z",
+      "habitaciones": 2,
+      "huespedes": 2,
+      "regimen": "desayuno"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H06BX6",
+      "recibidoEn": "2026-11-22T06:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H06BX6\nCadena: HX\nHotel: Posada del Sol\nCiudad: MDZ\nIngreso: 2026-12-07T17:00:00Z\nSalida: 2026-12-09T14:00:00Z\nHabitaciones: 1\nHuespedes: 3\nHabitacion: Doble estandar\nRegimen: Solo alojamiento\nCancelacion: Gratis hasta 48 h antes\nEmitido: 2026-11-22T06:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H06BX6",
+      "emisor": "hotel:HX",
+      "operador": "Posada del Sol",
+      "ciudad": "MDZ",
+      "ingreso": "2026-12-07T17:00:00Z",
+      "salida": "2026-12-09T14:00:00Z",
+      "emitido": "2026-11-22T06:00:00Z",
+      "habitaciones": 1,
+      "huespedes": 3,
+      "tipoDeHabitacion": "Doble estandar",
+      "regimen": "soloAlojamiento",
+      "politicaDeCancelacion": "Gratis hasta 48 h antes"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H07CX7",
+      "recibidoEn": "2026-11-22T05:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H07CX7\nCadena: HX\nHotel: Gran Hotel Atlántico\nCiudad: MDQ\nIngreso: 2026-12-08T17:00:00Z\nSalida: 2026-12-11T14:00:00Z\nHabitaciones: 2\nHuespedes: 4\nRegimen: Media pension\nEmitido: 2026-11-22T05:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H07CX7",
+      "emisor": "hotel:HX",
+      "operador": "Gran Hotel Atlántico",
+      "ciudad": "MDQ",
+      "ingreso": "2026-12-08T17:00:00Z",
+      "salida": "2026-12-11T14:00:00Z",
+      "emitido": "2026-11-22T05:00:00Z",
+      "habitaciones": 2,
+      "huespedes": 4,
+      "regimen": "mediaPension"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H08DX8",
+      "recibidoEn": "2026-11-22T04:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H08DX8\nCadena: HX\nHotel: Hostal Mayor\nCiudad: MAD\nIngreso: 2026-12-09T17:00:00Z\nSalida: 2026-12-13T14:00:00Z\nHabitaciones: 1\nHuespedes: 1\nHabitacion: Doble estandar\nEmitido: 2026-11-22T04:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H08DX8",
+      "emisor": "hotel:HX",
+      "operador": "Hostal Mayor",
+      "ciudad": "MAD",
+      "ingreso": "2026-12-09T17:00:00Z",
+      "salida": "2026-12-13T14:00:00Z",
+      "emitido": "2026-11-22T04:00:00Z",
+      "habitaciones": 1,
+      "huespedes": 1,
+      "tipoDeHabitacion": "Doble estandar"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H09EX9",
+      "recibidoEn": "2026-11-22T03:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H09EX9\nCadena: HX\nHotel: Hotel Rambla\nCiudad: BCN\nIngreso: 2026-12-10T17:00:00Z\nSalida: 2026-12-12T14:00:00Z\nHabitaciones: 2\nHuespedes: 2\nRegimen: Todo incluido\nCancelacion: Gratis hasta 48 h antes\nEmitido: 2026-11-22T03:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H09EX9",
+      "emisor": "hotel:HX",
+      "operador": "Hotel Rambla",
+      "ciudad": "BCN",
+      "ingreso": "2026-12-10T17:00:00Z",
+      "salida": "2026-12-12T14:00:00Z",
+      "emitido": "2026-11-22T03:00:00Z",
+      "habitaciones": 2,
+      "huespedes": 2,
+      "regimen": "todoIncluido",
+      "politicaDeCancelacion": "Gratis hasta 48 h antes"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H10AX0",
+      "recibidoEn": "2026-11-22T02:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H10AX0\nCadena: HX\nHotel: Hotel Plaza\nCiudad: BUE\nIngreso: 2026-12-11T17:00:00Z\nSalida: 2026-12-14T14:00:00Z\nHabitaciones: 1\nHuespedes: 3\nHabitacion: Doble estandar\nRegimen: Desayuno\nEmitido: 2026-11-22T02:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H10AX0",
+      "emisor": "hotel:HX",
+      "operador": "Hotel Plaza",
+      "ciudad": "BUE",
+      "ingreso": "2026-12-11T17:00:00Z",
+      "salida": "2026-12-14T14:00:00Z",
+      "emitido": "2026-11-22T02:00:00Z",
+      "habitaciones": 1,
+      "huespedes": 3,
+      "tipoDeHabitacion": "Doble estandar",
+      "regimen": "desayuno"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H11BX1",
+      "recibidoEn": "2026-11-22T01:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H11BX1\nCadena: HX\nHotel: Posada del Sol\nCiudad: MDZ\nIngreso: 2026-12-12T17:00:00Z\nSalida: 2026-12-16T14:00:00Z\nHabitaciones: 2\nHuespedes: 4\nRegimen: Solo alojamiento\nEmitido: 2026-11-22T01:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H11BX1",
+      "emisor": "hotel:HX",
+      "operador": "Posada del Sol",
+      "ciudad": "MDZ",
+      "ingreso": "2026-12-12T17:00:00Z",
+      "salida": "2026-12-16T14:00:00Z",
+      "emitido": "2026-11-22T01:00:00Z",
+      "habitaciones": 2,
+      "huespedes": 4,
+      "regimen": "soloAlojamiento"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H12CX2",
+      "recibidoEn": "2026-11-22T00:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H12CX2\nCadena: HX\nHotel: Gran Hotel Atlántico\nCiudad: MDQ\nIngreso: 2026-12-13T17:00:00Z\nSalida: 2026-12-15T14:00:00Z\nHabitaciones: 1\nHuespedes: 1\nHabitacion: Doble estandar\nRegimen: Media pension\nCancelacion: Gratis hasta 48 h antes\nEmitido: 2026-11-22T00:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H12CX2",
+      "emisor": "hotel:HX",
+      "operador": "Gran Hotel Atlántico",
+      "ciudad": "MDQ",
+      "ingreso": "2026-12-13T17:00:00Z",
+      "salida": "2026-12-15T14:00:00Z",
+      "emitido": "2026-11-22T00:00:00Z",
+      "habitaciones": 1,
+      "huespedes": 1,
+      "tipoDeHabitacion": "Doble estandar",
+      "regimen": "mediaPension",
+      "politicaDeCancelacion": "Gratis hasta 48 h antes"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H13DX3",
+      "recibidoEn": "2026-11-21T23:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H13DX3\nCadena: HX\nHotel: Hostal Mayor\nCiudad: MAD\nIngreso: 2026-12-14T17:00:00Z\nSalida: 2026-12-17T14:00:00Z\nHabitaciones: 2\nHuespedes: 2\nEmitido: 2026-11-21T23:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H13DX3",
+      "emisor": "hotel:HX",
+      "operador": "Hostal Mayor",
+      "ciudad": "MAD",
+      "ingreso": "2026-12-14T17:00:00Z",
+      "salida": "2026-12-17T14:00:00Z",
+      "emitido": "2026-11-21T23:00:00Z",
+      "habitaciones": 2,
+      "huespedes": 2
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H14EX4",
+      "recibidoEn": "2026-11-21T22:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H14EX4\nCadena: HX\nHotel: Hotel Rambla\nCiudad: BCN\nIngreso: 2026-12-15T17:00:00Z\nSalida: 2026-12-19T14:00:00Z\nHabitaciones: 1\nHuespedes: 3\nHabitacion: Doble estandar\nRegimen: Todo incluido\nEmitido: 2026-11-21T22:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H14EX4",
+      "emisor": "hotel:HX",
+      "operador": "Hotel Rambla",
+      "ciudad": "BCN",
+      "ingreso": "2026-12-15T17:00:00Z",
+      "salida": "2026-12-19T14:00:00Z",
+      "emitido": "2026-11-21T22:00:00Z",
+      "habitaciones": 1,
+      "huespedes": 3,
+      "tipoDeHabitacion": "Doble estandar",
+      "regimen": "todoIncluido"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H15AX5",
+      "recibidoEn": "2026-11-21T21:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H15AX5\nCadena: HX\nHotel: Hotel Plaza\nCiudad: BUE\nIngreso: 2026-12-16T17:00:00Z\nSalida: 2026-12-18T14:00:00Z\nHabitaciones: 2\nHuespedes: 4\nRegimen: Desayuno\nCancelacion: Gratis hasta 48 h antes\nEmitido: 2026-11-21T21:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H15AX5",
+      "emisor": "hotel:HX",
+      "operador": "Hotel Plaza",
+      "ciudad": "BUE",
+      "ingreso": "2026-12-16T17:00:00Z",
+      "salida": "2026-12-18T14:00:00Z",
+      "emitido": "2026-11-21T21:00:00Z",
+      "habitaciones": 2,
+      "huespedes": 4,
+      "regimen": "desayuno",
+      "politicaDeCancelacion": "Gratis hasta 48 h antes"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H16BX6",
+      "recibidoEn": "2026-11-21T20:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H16BX6\nCadena: HX\nHotel: Posada del Sol\nCiudad: MDZ\nIngreso: 2026-12-17T17:00:00Z\nSalida: 2026-12-20T14:00:00Z\nHabitaciones: 1\nHuespedes: 1\nHabitacion: Doble estandar\nRegimen: Solo alojamiento\nEmitido: 2026-11-21T20:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H16BX6",
+      "emisor": "hotel:HX",
+      "operador": "Posada del Sol",
+      "ciudad": "MDZ",
+      "ingreso": "2026-12-17T17:00:00Z",
+      "salida": "2026-12-20T14:00:00Z",
+      "emitido": "2026-11-21T20:00:00Z",
+      "habitaciones": 1,
+      "huespedes": 1,
+      "tipoDeHabitacion": "Doble estandar",
+      "regimen": "soloAlojamiento"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H17CX7",
+      "recibidoEn": "2026-11-21T19:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H17CX7\nCadena: HX\nHotel: Gran Hotel Atlántico\nCiudad: MDQ\nIngreso: 2026-12-18T17:00:00Z\nSalida: 2026-12-22T14:00:00Z\nHabitaciones: 2\nHuespedes: 2\nRegimen: Media pension\nEmitido: 2026-11-21T19:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H17CX7",
+      "emisor": "hotel:HX",
+      "operador": "Gran Hotel Atlántico",
+      "ciudad": "MDQ",
+      "ingreso": "2026-12-18T17:00:00Z",
+      "salida": "2026-12-22T14:00:00Z",
+      "emitido": "2026-11-21T19:00:00Z",
+      "habitaciones": 2,
+      "huespedes": 2,
+      "regimen": "mediaPension"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H18DX8",
+      "recibidoEn": "2026-11-21T18:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H18DX8\nCadena: HX\nHotel: Hostal Mayor\nCiudad: MAD\nIngreso: 2026-12-19T17:00:00Z\nSalida: 2026-12-21T14:00:00Z\nHabitaciones: 1\nHuespedes: 3\nHabitacion: Doble estandar\nCancelacion: Gratis hasta 48 h antes\nEmitido: 2026-11-21T18:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H18DX8",
+      "emisor": "hotel:HX",
+      "operador": "Hostal Mayor",
+      "ciudad": "MAD",
+      "ingreso": "2026-12-19T17:00:00Z",
+      "salida": "2026-12-21T14:00:00Z",
+      "emitido": "2026-11-21T18:00:00Z",
+      "habitaciones": 1,
+      "huespedes": 3,
+      "tipoDeHabitacion": "Doble estandar",
+      "politicaDeCancelacion": "Gratis hasta 48 h antes"
+    }
+  },
+  {
+    "mensaje": {
+      "remitente": "reservas@hotel.example",
+      "asunto": "Tu reserva H19EX9",
+      "recibidoEn": "2026-11-21T17:00:00Z",
+      "cuerpoTexto": "Reserva de hotel simulada v1\nLocalizador: H19EX9\nCadena: HX\nHotel: Hotel Rambla\nCiudad: BCN\nIngreso: 2026-12-20T17:00:00Z\nSalida: 2026-12-23T14:00:00Z\nHabitaciones: 2\nHuespedes: 4\nRegimen: Todo incluido\nEmitido: 2026-11-21T17:00:00Z"
+    },
+    "esperado": {
+      "localizador": "H19EX9",
+      "emisor": "hotel:HX",
+      "operador": "Hotel Rambla",
+      "ciudad": "BCN",
+      "ingreso": "2026-12-20T17:00:00Z",
+      "salida": "2026-12-23T14:00:00Z",
+      "emitido": "2026-11-21T17:00:00Z",
+      "habitaciones": 2,
+      "huespedes": 4,
+      "regimen": "todoIncluido"
+    }
+  }
+]

@@ -79,4 +79,4 @@ def test_el_remitente_entra_solo_al_catalogo_de_remitentes():
     """RF-04: la lista de remitentes reconocidos que ve `mail-ingest` sale del catálogo."""
     assert {"patron": "boletos@ferrocarril.example",
             "extractorId": "extractor-boleto-tren-simulado"} in remitentes()
-    assert [e["manifiesto"]["tiposDeSegmento"] for e in entradas()] == [["vuelo"], ["tren"]]
+    assert [e["manifiesto"]["tiposDeSegmento"] for e in entradas()] == [["vuelo"], ["tren"], ["hotel"]]

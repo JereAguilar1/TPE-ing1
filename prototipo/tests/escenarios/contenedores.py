@@ -154,6 +154,17 @@ class Viajero:
         return self.reenviar("boletos@ferrocarril.example", f"Tu boleto {localizador}", cuerpo,
                              emitido)
 
+    def reenviar_reserva_de_hotel(self, localizador: str, ingreso: datetime, noches: int = 2,
+                                  ciudad: str = "MDZ") -> httpx.Response:
+        """El viajero reenvía la reserva de la cadena hotelera de ejemplo (extractor del paso 9)."""
+        emitido = ahora().replace(microsecond=0)
+        cuerpo = "\n".join([
+            "Reserva de hotel simulada v1", f"Localizador: {localizador}", "Cadena: HX",
+            "Hotel: Posada del Sol", f"Ciudad: {ciudad}", f"Ingreso: {texto_utc(ingreso)}",
+            f"Salida: {texto_utc(ingreso + timedelta(days=noches))}", "Habitaciones: 1",
+            "Huespedes: 2", "Regimen: Desayuno", f"Emitido: {texto_utc(emitido)}"])
+        return self.reenviar("reservas@hotel.example", f"Tu reserva {localizador}", cuerpo, emitido)
+
     def reenviar(self, remitente: str, asunto: str, cuerpo: str, emitido: datetime) -> httpx.Response:
         """Reenvía a su alias un correo de `remitente`, verificado por el servidor propio."""
         correo = EmailMessage()
